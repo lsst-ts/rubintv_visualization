@@ -13,6 +13,68 @@ class UpdateMultiSelect extends ToolbarAction {
   UpdateMultiSelect(this.tool);
 }
 
+class DatePickerWidget extends StatefulWidget {
+  const DatePickerWidget({super.key});
+
+  @override
+  DatePickerWidgetState createState() => DatePickerWidgetState();
+}
+
+class DatePickerWidgetState extends State<DatePickerWidget> {
+  DateTime? selectedDate;
+
+  @override
+  Widget build(BuildContext context) {
+    DateTime? date = selectedDate?.toLocal();
+    String dateString = date != null
+        ? "${date.year}-${date.month}-${date.day}"
+        : 'No date selected';
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        GestureDetector(
+          onTap: () async {
+            final DateTime? pickedDate = await showDatePicker(
+              context: context,
+              initialDate: selectedDate ?? DateTime.now(),
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2101),
+            );
+            if (pickedDate != null && pickedDate != selectedDate) {
+              setState(() {
+                selectedDate = pickedDate;
+              });
+            }
+          },
+          child: Container(
+            margin: const EdgeInsets.all(4),
+            padding: const EdgeInsets.all(4),
+            height: 40,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.blueAccent),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(child: Text(dateString)),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              selectedDate = null;
+            });
+          },
+          child: const Icon(
+            Icons.clear,
+            color: Colors.red,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class Toolbar extends StatefulWidget {
   final MultiSelectionTool tool;
 
@@ -40,13 +102,17 @@ class ToolbarState extends State<Toolbar> {
 
     return Container(
       width: workspace.size.width,
-      height: kToolbarHeight,
+      height: workspace.theme.toolbarHeight,
       decoration: BoxDecoration(
         color: workspace.theme.themeData.colorScheme.primaryContainer,
       ),
       child: Row(
         children: [
           const Spacer(),
+          SizedBox(
+            height: workspace.theme.toolbarHeight,
+            child: DatePickerWidget(),
+          ),
           SegmentedButton<MultiSelectionTool>(
             selected: {tool},
             segments: [

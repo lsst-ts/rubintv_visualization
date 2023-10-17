@@ -10,6 +10,7 @@ import 'package:rubintv_visualization/state/workspace.dart';
 class AppState {
   /// The manipulated expressions
   final TimeMachine<Workspace> timeMachine;
+  // The address of the analysis service.
 
   const AppState({
     required this.timeMachine,
@@ -18,6 +19,8 @@ class AppState {
   /// Make a copy of the state with the specified terms updated
   AppState copyWith({
     TimeMachine<Workspace>? timeMachine,
+    String? serviceAddress,
+    String? servicePort,
   }) =>
       AppState(
         timeMachine: timeMachine ?? this.timeMachine,

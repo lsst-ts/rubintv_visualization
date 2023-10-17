@@ -42,6 +42,10 @@ dependencies:
   redux: ^5.0.0
   # The flutter_redux package, built on dart redux
   flutter_redux: ^0.10.0
+  # Websocket connections in Flutter
+  web_socket_channel: ^2.4.0
+  # Display feedback to the user
+  fluttertoast: ^8.2.2
 
 dev_dependencies:
   flutter_test:

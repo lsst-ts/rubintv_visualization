@@ -1,9 +1,15 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:redux/redux.dart';
+import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/state/time_machine.dart';
+import 'package:rubintv_visualization/workspace/data.dart';
+import 'package:rubintv_visualization/workspace/menu.dart';
+import 'package:rubintv_visualization/workspace/toolbar.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 
 /// Auto counter to keep track of the next window ID.
@@ -29,18 +35,22 @@ class Workspace {
   final ChartTheme theme;
 
   /// Keys for selected data points.
-  /// The key is name of the [DataSet] containing the point, and the [Set] is the
-  /// set of keys in that [DataSet] that are selected.
+  /// The key is name of the [Database] containing the point, and the [Set] is the
+  /// set of keys in that [Database] that are selected.
   final Map<String, Set<dynamic>> _selected;
 
   /// Which tool to use for multi-selection/zoom
   final MultiSelectionTool multiSelectionTool;
+
+  // The websocket connection to the analysis service.
+  final WebSocket? webSocket;
 
   const Workspace({
     required this.theme,
     Map<int, Window> windows = const {},
     Map<String, Set<dynamic>> selected = const {},
     this.multiSelectionTool = MultiSelectionTool.select,
+    this.webSocket,
   })  : _windows = windows,
         _selected = selected;
 
@@ -49,12 +59,14 @@ class Workspace {
     Map<int, Window>? windows,
     Map<String, Set<dynamic>>? selected,
     MultiSelectionTool? multiSelectionTool,
+    WebSocket? webSocket,
   }) =>
       Workspace(
         theme: theme ?? this.theme,
         windows: windows ?? this.windows,
         selected: selected ?? this.selected,
         multiSelectionTool: multiSelectionTool ?? this.multiSelectionTool,
+        webSocket: webSocket ?? this.webSocket,
       );
 
   /// Protect [_windows] so that it can only be updated through the app.
@@ -84,6 +96,31 @@ class Workspace {
       windows: newWindows,
     );
   }
+}
+
+/// Process a message received from the analysis service.
+class WebSocketReceiveMessageAction extends UiAction {
+  final DataCenter dataCenter;
+  final String message;
+
+  const WebSocketReceiveMessageAction({
+    required this.dataCenter,
+    required this.message,
+  });
+}
+
+/// Store the websocket connection to the analysis service.
+TimeMachine<Workspace> webSocketReceiveMessageReducer(
+  TimeMachine<Workspace> state,
+  WebSocketReceiveMessageAction action,
+) {
+  Workspace workspace = state.currentState;
+  Map<String, dynamic> message = jsonDecode(action.message);
+  //print(message);
+  if (message["type"]! == "database schema") {
+    action.dataCenter.addDatabase(message["content"]);
+  }
+  return state.addForgettable(workspace);
 }
 
 /// Add a new cartesian plot to the workspace
@@ -124,6 +161,8 @@ Reducer<TimeMachine<Workspace>> workspaceReducer =
     combineReducers<TimeMachine<Workspace>>([
   TypedReducer<TimeMachine<Workspace>, TimeMachineAction>(timeMachineReducer),
   TypedReducer<TimeMachine<Workspace>, ApplyWindowUpdate>(updateWindowReducer),
+  TypedReducer<TimeMachine<Workspace>, WebSocketReceiveMessageAction>(
+      webSocketReceiveMessageReducer),
   /*TypedReducer<TimeMachine<Workspace>, NewCartesianPlotAction>(
       newCartesianPlotReducer),
   TypedReducer<TimeMachine<Workspace>, SeriesUpdateAction>(updateSeriesReducer),
@@ -137,3 +176,222 @@ Reducer<TimeMachine<Workspace>> workspaceReducer =
   TypedReducer<TimeMachine<Workspace>, UpdateMultiSelect>(
       updateMultiSelectReducer),*/
 ]);
+
+/// A [Widget] used to display a set of re-sizable and translatable [Window] widgets in a container.
+class WorkspaceViewer extends StatefulWidget {
+  final Size size;
+  final Workspace workspace;
+  final DataCenter dataCenter;
+  final DispatchAction dispatch;
+
+  const WorkspaceViewer({
+    super.key,
+    required this.size,
+    required this.workspace,
+    required this.dataCenter,
+    required this.dispatch,
+  });
+
+  @override
+  WorkspaceViewerState createState() => WorkspaceViewerState();
+
+  /// Implement the [WorkspaceViewer.of] method to allow children
+  /// to find this container based on their [BuildContext].
+  static WorkspaceViewerState of(BuildContext context) {
+    final WorkspaceViewerState? result =
+        context.findAncestorStateOfType<WorkspaceViewerState>();
+    assert(() {
+      if (result == null) {
+        throw FlutterError.fromParts(<DiagnosticsNode>[
+          ErrorSummary(
+              'WorkspaceViewer.of() called with a context that does not '
+              'contain a WorkspaceViewer.'),
+          ErrorDescription(
+              'No WorkspaceViewer ancestor could be found starting from the context '
+              'that was passed to WorkspaceViewer.of().'),
+          ErrorHint(
+              'This probably happened when an interactive child was created '
+              'outside of an WorkspaceViewer'),
+          context.describeElement('The context used was')
+        ]);
+      }
+      return true;
+    }());
+    return result!;
+  }
+}
+
+class WorkspaceViewerState extends State<WorkspaceViewer> {
+  ChartTheme get theme => widget.workspace.theme;
+  Size get size => widget.size;
+  Workspace get info => widget.workspace;
+  DataCenter get dataCenter => widget.dataCenter;
+  DispatchAction get dispatch => widget.dispatch;
+  Map<String, Set<dynamic>> get selected => widget.workspace.selected;
+
+  WindowInteractionInfo? interactionInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppMenu(
+      theme: theme,
+      dispatch: dispatch,
+      dataCenter: dataCenter,
+      child: Column(children: [
+        Toolbar(tool: widget.workspace.multiSelectionTool),
+        SizedBox(
+          width: size.width,
+          height: size.height - 2 * kToolbarHeight,
+          child: Builder(
+            builder: (BuildContext context) {
+              List<Widget> children = [];
+              for (Window window in info.windows.values) {
+                Offset offset = window.offset;
+                Size size = window.size;
+                if (interactionInfo != null &&
+                    window.id == interactionInfo!.id) {
+                  offset = interactionInfo!.offset;
+                  size = interactionInfo!.size;
+                }
+
+                children.add(Positioned(
+                  left: offset.dx,
+                  top: offset.dy,
+                  child: ResizableWindow(
+                    info: window,
+                    theme: theme,
+                    title: window.title,
+                    dispatch: _updateWindow,
+                    size: size,
+                    toolbar: window.createToolbar(context),
+                    child: window.createWidget(context),
+                  ),
+                ));
+              }
+
+              return Stack(
+                children: children,
+              );
+            },
+          ),
+        ),
+      ]),
+    );
+  }
+
+  void _updateWindow(WindowUpdate update) {
+    // Translation updates
+    if (update is StartDragWindowUpdate) {
+      return startWindowDrag(update);
+    }
+    if (update is UpdateDragWindowUpdate) {
+      return updateWindowDrag(update);
+    }
+    if (update is WindowDragEnd) {
+      return dragEnd();
+    }
+    // Resize updates
+    if (update is StartWindowResize) {
+      return startWindowResize(update);
+    }
+    if (update is UpdateWindowResize) {
+      return updateWindowReSize(update);
+    }
+    if (update is EndWindowResize) {
+      return dragEnd();
+    }
+    throw ArgumentError("Unrecognized WindowUpdate $update");
+  }
+
+  /// Keep track of the starting drag position
+  void startWindowDrag(StartDragWindowUpdate update) {
+    if (interactionInfo != null) {
+      dragEnd();
+    }
+    Window window = info.windows[update.windowId]!;
+    interactionInfo = WindowDragInfo(
+      id: update.windowId,
+      pointerOffset: window.offset - update.details.localPosition,
+      offset: window.offset,
+      size: window.size,
+    );
+    setState(() {});
+  }
+
+  void updateWindowDrag(UpdateDragWindowUpdate update) {
+    if (interactionInfo is! WindowDragInfo) {
+      dragEnd();
+      throw Exception("Mismatched interactionInfo, got $interactionInfo");
+    }
+    setState(() {
+      WindowDragInfo interaction = interactionInfo as WindowDragInfo;
+      interaction.offset = update.details.localPosition +
+          (interactionInfo as WindowDragInfo).pointerOffset;
+    });
+  }
+
+  void dragEnd() {
+    if (interactionInfo != null) {
+      dispatch(ApplyWindowUpdate(
+        windowId: interactionInfo!.id,
+        offset: interactionInfo!.offset,
+        size: interactionInfo!.size,
+      ));
+      interactionInfo = null;
+      setState(() {});
+    }
+  }
+
+  void startWindowResize(StartWindowResize update) {
+    if (interactionInfo != null) {
+      dragEnd();
+    }
+    Window window = info.windows[update.windowId]!;
+
+    interactionInfo = WindowResizeInfo(
+      id: update.windowId,
+      initialPointerOffset: update.details.globalPosition,
+      initialSize: window.size,
+      initialOffset: window.offset,
+      offset: window.offset,
+      size: window.size,
+    );
+    setState(() {});
+  }
+
+  void updateWindowReSize(UpdateWindowResize update) {
+    if (interactionInfo is! WindowResizeInfo) {
+      dragEnd();
+      throw Exception("Mismatched interactionInfo, got $interactionInfo");
+    }
+    WindowResizeInfo interaction = interactionInfo as WindowResizeInfo;
+    Offset deltaPosition =
+        update.details.globalPosition - interaction.initialPointerOffset;
+
+    double left = interaction.initialOffset.dx;
+    double top = interaction.initialOffset.dy;
+    double width = interaction.initialSize.width;
+    double height = interaction.initialSize.height;
+
+    // Update the width and x-offset
+    if (update.direction == WindowResizeDirections.right ||
+        update.direction == WindowResizeDirections.downRight) {
+      width = interaction.initialSize.width + deltaPosition.dx;
+    } else if (update.direction == WindowResizeDirections.left ||
+        update.direction == WindowResizeDirections.downLeft) {
+      left = interaction.initialOffset.dx + deltaPosition.dx;
+      width = interaction.initialSize.width - deltaPosition.dx;
+    }
+
+    // Update the height and y-offset
+    if (update.direction == WindowResizeDirections.down ||
+        update.direction == WindowResizeDirections.downLeft ||
+        update.direction == WindowResizeDirections.downRight) {
+      height = interaction.initialSize.height + deltaPosition.dy;
+    }
+
+    interaction.offset = Offset(left, top);
+    interaction.size = Size(width, height);
+    setState(() {});
+  }
+}

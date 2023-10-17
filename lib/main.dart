@@ -1,15 +1,17 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_redux/flutter_redux.dart';
 import 'package:redux/redux.dart';
+import 'package:rubintv_visualization/io.dart';
 import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/app.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/state/time_machine.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
-import 'package:rubintv_visualization/workspace/window.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 void main() {
   DataCenter dataCenter = DataCenter();
@@ -27,6 +29,55 @@ class DemoApp extends StatefulWidget {
 class DemoAppState extends State<DemoApp> {
   final StreamController<DataCenterUpdate> streamController =
       StreamController.broadcast();
+
+  /// The websocket connection to the analysis service.
+  late final WebSocketChannel channel;
+
+  /// The last message received from the analysis service.
+  List<String> messageQueue = [];
+
+  // The address of the analysis service.
+  String serviceAddress = "localhost";
+  // The port of the analysis service.
+  int servicePort = 2000;
+
+  @override
+  void initState() {
+    super.initState();
+    _connect();
+  }
+
+  Future<void> _connect() async {
+    try {
+      channel = WebSocketChannel.connect(
+          Uri.parse('ws://$serviceAddress:$servicePort/ws/client'));
+      channel.stream.listen(
+        (event) {
+          setState(() {
+            messageQueue.add(event);
+          });
+        },
+        onDone: () {
+          developer.log('WebSocket connection closed.',
+              name: "rubinTV.visualization.main");
+        },
+        onError: (error) {
+          developer.log('WebSocket error: $error.',
+              name: "rubinTV.visualization.main");
+        },
+      );
+    } catch (e) {
+      developer.log('WebSocket connection failed: $e',
+          name: "rubinTV.visualization.main");
+    }
+    channel.sink.add(LoadSchemaCommand().toJson());
+  }
+
+  @override
+  void dispose() {
+    channel.sink.close();
+    super.dispose();
+  }
 
   // This widget is the root of your application.
   @override
@@ -54,6 +105,12 @@ class DemoAppState extends State<DemoApp> {
     );
 
     Size screenSize = MediaQuery.of(context).size;
+
+    if (messageQueue.isNotEmpty) {
+      // Process the incoming messages in order
+      store.dispatch(WebSocketReceiveMessageAction(
+          dataCenter: widget.dataCenter, message: messageQueue.removeAt(0)));
+    }
 
     return StoreProvider<AppState>(
       store: store,

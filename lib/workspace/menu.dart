@@ -47,7 +47,7 @@ class DataSetSelectorDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<DropdownMenuItem<String>> dataSetEntries = dataCenter
-        .dataSets.keys
+        .databases.keys
         .map((String name) => DropdownMenuItem(value: name, child: Text(name)))
         .toList();
 
@@ -142,10 +142,6 @@ class AppMenu extends StatelessWidget {
               MenuButton(
                 onTap: showNotImplemented(context),
                 text: const Text('Open Workspace'),
-              ),
-              MenuButton(
-                onTap: showNotImplemented(context),
-                text: const Text('Connect to data set'),
               ),
               const MenuDivider(),
               MenuButton(

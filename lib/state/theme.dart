@@ -10,6 +10,7 @@ class ChartTheme {
   final Offset newWindowOffset;
   final Size newPlotSize;
   final double resizeInteractionWidth;
+  final double toolbarHeight;
 
   const ChartTheme({
     required this.themeData,
@@ -39,6 +40,7 @@ class ChartTheme {
     this.newWindowOffset = const Offset(20, 20),
     this.newPlotSize = const Size(600, 400),
     this.resizeInteractionWidth = kMinInteractiveDimension / 4,
+    this.toolbarHeight = 40,
   })  : _queryStyle = queryStyle,
         _editorTitleStyle = editorTitleStyle,
         _titleStyle = titleStyle;

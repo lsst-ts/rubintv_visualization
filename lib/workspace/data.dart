@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+
 int _nextDataset = 0;
 
 class DataAccessException implements IOException {
@@ -15,9 +18,26 @@ enum DataType {
   string,
   integer,
   double,
-  date,
-  time,
-  dateTime,
+  dateTime;
+
+  static DataType fromString(String dataType) {
+    switch (dataType) {
+      case "char":
+        return DataType.string;
+      case "int":
+        return DataType.integer;
+      case "long":
+        return DataType.integer;
+      case "float":
+        return DataType.double;
+      case "double":
+        return DataType.double;
+      case "timestamp":
+        return DataType.dateTime;
+      default:
+        throw DataAccessException("Unknown data type: $dataType");
+    }
+  }
 }
 
 Map<Type, DataType> _dataTypeLookup = {
@@ -29,11 +49,13 @@ Map<Type, DataType> _dataTypeLookup = {
 
 class SchemaField {
   final String name;
+  final DataType? type;
   final String? unit;
   final String? description;
 
   const SchemaField({
     required this.name,
+    required this.type,
     this.unit,
     this.description,
   });
@@ -48,54 +70,101 @@ class SchemaField {
 typedef ExtremaCallback<T> = bool Function(T lhs, T rhs);
 
 class Schema {
+  final String indexColumn;
   final Map<String, SchemaField> fields;
-  const Schema(this.fields);
-
-  static Schema fromFields(List<SchemaField> fields) =>
-      Schema({for (SchemaField field in fields) field.name: field});
+  //Map<String, dynamic> bounds;
+  const Schema({required this.indexColumn, required this.fields});
 }
 
-class DataSet {
-  final int id;
-  final String name;
-  final Schema schema;
+class DatabaseTable {
+  String name;
+  Schema schema;
 
-  DataSet._({
-    required this.id,
+  DatabaseTable({
     required this.name,
     required this.schema,
   });
+}
 
-  static DataSet init({
-    required String name,
-    required Schema schema,
-  }) =>
-      DataSet._(
-        id: _nextDataset++,
-        name: name,
-        schema: schema,
-      );
+class Database {
+  final int id;
+  final String name;
+  final String description;
+  final List<DatabaseTable> tables;
+
+  Database({
+    int? id,
+    required this.name,
+    required this.tables,
+    required this.description,
+  }) : id = id ?? _nextDataset++;
 
   @override
-  String toString() => "DataSet<$name>";
+  String toString() => "Database<$name>";
 }
 
 class DataCenterUpdate {}
 
-class DataSetLoaded extends DataCenterUpdate {
-  DataSet dataSet;
-  DataSetLoaded({required this.dataSet});
-}
-
 class DataCenter {
-  final Map<String, DataSet> _dataSets = {};
+  final Map<String, Database> _databases = {};
 
   DataCenter();
 
-  Map<String, DataSet> get dataSets => {..._dataSets};
+  Map<String, Database> get databases => {..._databases};
 
-  void addDataSet(DataSet dataSet) {
-    _dataSets[dataSet.name] = dataSet;
+  void addDatabase(Map<String, dynamic> schema_dict) {
+    if (!schema_dict.containsKey("name")) {
+      String msg = "Schema does not contain a name";
+      Fluttertoast.showToast(
+          msg: msg,
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.CENTER,
+          timeInSecForIosWeb: 5,
+          backgroundColor: Colors.red,
+          webBgColor: "#e74c3c",
+          textColor: Colors.white,
+          fontSize: 16.0);
+      return;
+    }
+
+    try {
+      List<DatabaseTable> tables = [];
+      for (Map<String, dynamic> table_dict in schema_dict["tables"]) {
+        List<SchemaField> fields = [];
+        for (Map<String, dynamic> column in table_dict["columns"]) {
+          fields.add(
+            SchemaField(
+                name: column["name"]!,
+                type: DataType.fromString(column["datatype"]!),
+                unit: column["unit"],
+                description: column["description"]),
+          );
+        }
+        Schema schema = Schema(
+            indexColumn: table_dict["index_column"],
+            fields: Map.fromIterable(fields, key: (e) => e.name));
+        tables.add(DatabaseTable(name: table_dict["name"], schema: schema));
+      }
+
+      Database database = Database(
+          name: schema_dict["name"],
+          description: schema_dict["description"],
+          tables: tables);
+      databases[database.name] = database;
+    } catch (e, s) {
+      print("error: $e");
+      print(s);
+      String msg = "Could not initialize database";
+      Fluttertoast.showToast(
+          msg: msg,
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.CENTER,
+          timeInSecForIosWeb: 5,
+          backgroundColor: Colors.red,
+          webBgColor: "#e74c3c",
+          textColor: Colors.white,
+          fontSize: 16.0);
+    }
   }
 
   /// Check if two [SchemaField]s are compatible
@@ -103,5 +172,5 @@ class DataCenter {
       throw UnimplementedError();
 
   @override
-  String toString() => "DataCenter:[${dataSets.keys}]";
+  String toString() => "DataCenter:[${databases.keys}]";
 }
