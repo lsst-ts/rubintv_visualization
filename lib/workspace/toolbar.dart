@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:rubintv_visualization/query/query.dart';
+import 'package:rubintv_visualization/query/widget.dart';
 import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
-import 'package:rubintv_visualization/workspace/window.dart';
 
 class ToolbarAction extends UiAction {
   const ToolbarAction();
@@ -77,10 +78,12 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
 
 class Toolbar extends StatefulWidget {
   final MultiSelectionTool tool;
+  final bool isConnected;
 
   const Toolbar({
     super.key,
     required this.tool,
+    required this.isConnected,
   });
 
   @override
@@ -96,6 +99,10 @@ class ToolbarState extends State<Toolbar> {
     tool = widget.tool;
   }
 
+  void updateQuery(Query? query) {
+    //series = series.copyWith(query: query);
+  }
+
   @override
   Widget build(BuildContext context) {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
@@ -108,7 +115,37 @@ class ToolbarState extends State<Toolbar> {
       ),
       child: Row(
         children: [
+          Center(
+              child: Container(
+            margin: const EdgeInsets.only(left: 4),
+            height: 10,
+            width: 10,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle, // Makes the container a circle
+              color: widget.isConnected
+                  ? Colors.green
+                  : Colors.red, // Fills the circle with blue color
+            ),
+          )),
           const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.travel_explore, color: Colors.green),
+            onPressed: () {
+              showDialog(
+                  context: context,
+                  builder: (BuildContext context) => Dialog(
+                        child: QueryEditor(
+                          theme: workspace.theme,
+                          expression: QueryExpression(
+                            queries: [],
+                            dataCenter: workspace.dataCenter,
+                          ),
+                          onCompleted: updateQuery,
+                        ),
+                      ));
+            },
+          ),
           SizedBox(
             height: workspace.theme.toolbarHeight,
             child: DatePickerWidget(),

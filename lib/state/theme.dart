@@ -11,6 +11,8 @@ class ChartTheme {
   final Size newPlotSize;
   final double resizeInteractionWidth;
   final double toolbarHeight;
+  final Color wireColor;
+  final double wireThickness;
 
   const ChartTheme({
     required this.themeData,
@@ -41,6 +43,8 @@ class ChartTheme {
     this.newPlotSize = const Size(600, 400),
     this.resizeInteractionWidth = kMinInteractiveDimension / 4,
     this.toolbarHeight = 40,
+    this.wireColor = Colors.red,
+    this.wireThickness = 4,
   })  : _queryStyle = queryStyle,
         _editorTitleStyle = editorTitleStyle,
         _titleStyle = titleStyle;

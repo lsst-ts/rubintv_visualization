@@ -32,7 +32,7 @@ VoidCallback showNotImplemented(BuildContext context) {
 }
 
 /// Add a new [CartesianPlot] to the [WorkspaceViewer].
-class NewCartesianPlotAction extends UiAction {}
+class NewScatterChartAction extends UiAction {}
 
 class DataSetSelectorDialog extends StatelessWidget {
   final ChartTheme theme;
@@ -247,7 +247,7 @@ class AppMenu extends StatelessWidget {
                 submenu: SubMenu(menuItems: [
                   MenuButton(
                     onTap: () {
-                      dispatch(NewCartesianPlotAction());
+                      dispatch(NewScatterChartAction());
                     },
                     text: const Text("Cartesian Plot"),
                   ),

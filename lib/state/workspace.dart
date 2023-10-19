@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:redux/redux.dart';
+import 'package:rubintv_visualization/chart.dart';
 import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/state/time_machine.dart';
@@ -114,13 +115,11 @@ TimeMachine<Workspace> webSocketReceiveMessageReducer(
   TimeMachine<Workspace> state,
   WebSocketReceiveMessageAction action,
 ) {
-  Workspace workspace = state.currentState;
   Map<String, dynamic> message = jsonDecode(action.message);
-  //print(message);
   if (message["type"]! == "database schema") {
     action.dataCenter.addDatabase(message["content"]);
   }
-  return state.addForgettable(workspace);
+  return state;
 }
 
 /// Add a new cartesian plot to the workspace
@@ -137,6 +136,39 @@ TimeMachine<Workspace> updateWindowReducer(
 
   return state.updated(TimeMachineUpdate(
     comment: "update a window size and position",
+    state: workspace,
+  ));
+}
+
+/// Add a new cartesian plot to the workspace
+TimeMachine<Workspace> newScatterChartReducer(
+  TimeMachine<Workspace> state,
+  NewScatterChartAction action,
+) {
+  Workspace workspace = state.currentState;
+  Offset offset = workspace.theme.newWindowOffset;
+
+  if (workspace.windows.isNotEmpty) {
+    // Shift from last window
+    offset += workspace.windows.values.last.offset;
+  }
+
+  int id = -1;
+  for (int key in workspace.windows.keys) {
+    if (key > id) {
+      id = key;
+    }
+  }
+
+  workspace = workspace.addWindow(ScatterChart(
+    id: ++id, offset: offset, size: workspace.theme.newPlotSize, data: {},
+    //series: {},
+    //axes: [null, null],
+    //legend: ChartLegend(location: ChartLegendLocation.right),
+  ));
+
+  return state.updated(TimeMachineUpdate(
+    comment: "add new Cartesian plot",
     state: workspace,
   ));
 }
@@ -163,9 +195,9 @@ Reducer<TimeMachine<Workspace>> workspaceReducer =
   TypedReducer<TimeMachine<Workspace>, ApplyWindowUpdate>(updateWindowReducer),
   TypedReducer<TimeMachine<Workspace>, WebSocketReceiveMessageAction>(
       webSocketReceiveMessageReducer),
-  /*TypedReducer<TimeMachine<Workspace>, NewCartesianPlotAction>(
-      newCartesianPlotReducer),
-  TypedReducer<TimeMachine<Workspace>, SeriesUpdateAction>(updateSeriesReducer),
+  TypedReducer<TimeMachine<Workspace>, NewScatterChartAction>(
+      newScatterChartReducer),
+  /*TypedReducer<TimeMachine<Workspace>, SeriesUpdateAction>(updateSeriesReducer),
   TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
   TypedReducer<TimeMachine<Workspace>, RectSelectionAction>(
       rectSelectionReducer),
@@ -183,6 +215,7 @@ class WorkspaceViewer extends StatefulWidget {
   final Workspace workspace;
   final DataCenter dataCenter;
   final DispatchAction dispatch;
+  final bool isConnected;
 
   const WorkspaceViewer({
     super.key,
@@ -190,6 +223,7 @@ class WorkspaceViewer extends StatefulWidget {
     required this.workspace,
     required this.dataCenter,
     required this.dispatch,
+    required this.isConnected,
   });
 
   @override
@@ -238,7 +272,10 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
       dispatch: dispatch,
       dataCenter: dataCenter,
       child: Column(children: [
-        Toolbar(tool: widget.workspace.multiSelectionTool),
+        Toolbar(
+          tool: widget.workspace.multiSelectionTool,
+          isConnected: widget.isConnected,
+        ),
         SizedBox(
           width: size.width,
           height: size.height - 2 * kToolbarHeight,

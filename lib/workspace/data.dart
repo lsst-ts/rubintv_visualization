@@ -52,12 +52,15 @@ class SchemaField {
   final DataType? type;
   final String? unit;
   final String? description;
+  late final Schema schema;
+  final List<String>? bounds;
 
-  const SchemaField({
+  SchemaField({
     required this.name,
     required this.type,
     this.unit,
     this.description,
+    this.bounds,
   });
 
   /// Return the [SchemaField] label to be shown (for example as a [PlotAxis] label.
@@ -65,39 +68,49 @@ class SchemaField {
 
   @override
   String toString() => "SchemaField<$unit>($name, $unit)";
+
+  /// Whether or not the field is a string.
+  bool get isString => type == DataType.string;
+
+  /// Whether or not the field is a number.
+  bool get isNumerical => type == DataType.integer || type == DataType.double;
+
+  /// Whether or not the field is a date/time.
+  bool get isDateTime => type == DataType.dateTime;
 }
 
 typedef ExtremaCallback<T> = bool Function(T lhs, T rhs);
 
 class Schema {
+  final String name;
   final String indexColumn;
   final Map<String, SchemaField> fields;
-  //Map<String, dynamic> bounds;
-  const Schema({required this.indexColumn, required this.fields});
-}
+  late final Database database;
 
-class DatabaseTable {
-  String name;
-  Schema schema;
-
-  DatabaseTable({
-    required this.name,
-    required this.schema,
-  });
+  Schema(
+      {required this.name, required this.indexColumn, required this.fields}) {
+    for (SchemaField field in fields.values) {
+      field.schema = this;
+    }
+  }
 }
 
 class Database {
   final int id;
   final String name;
   final String description;
-  final List<DatabaseTable> tables;
+  final Map<String, Schema> tables;
 
   Database({
     int? id,
     required this.name,
     required this.tables,
     required this.description,
-  }) : id = id ?? _nextDataset++;
+  }) : id = id ?? _nextDataset++ {
+    for (Schema schema in tables.values) {
+      schema.database = this;
+    }
+  }
 
   @override
   String toString() => "Database<$name>";
@@ -128,10 +141,10 @@ class DataCenter {
     }
 
     try {
-      List<DatabaseTable> tables = [];
-      for (Map<String, dynamic> table_dict in schema_dict["tables"]) {
+      Map<String, Schema> tables = {};
+      for (Map<String, dynamic> tableDict in schema_dict["tables"]) {
         List<SchemaField> fields = [];
-        for (Map<String, dynamic> column in table_dict["columns"]) {
+        for (Map<String, dynamic> column in tableDict["columns"]) {
           fields.add(
             SchemaField(
                 name: column["name"]!,
@@ -141,16 +154,17 @@ class DataCenter {
           );
         }
         Schema schema = Schema(
-            indexColumn: table_dict["index_column"],
+            name: tableDict["name"],
+            indexColumn: tableDict["index_column"],
             fields: Map.fromIterable(fields, key: (e) => e.name));
-        tables.add(DatabaseTable(name: table_dict["name"], schema: schema));
+        tables[tableDict["name"]!] = schema;
       }
 
       Database database = Database(
           name: schema_dict["name"],
           description: schema_dict["description"],
           tables: tables);
-      databases[database.name] = database;
+      _databases[database.name] = database;
     } catch (e, s) {
       print("error: $e");
       print(s);

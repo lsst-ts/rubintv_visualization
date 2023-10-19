@@ -213,6 +213,12 @@ class WindowTitle extends StatelessWidget {
   }
 }
 
+/// Remove a [Chart] from the [Workspace].
+class RemoveWindowAction extends UiAction {
+  final Window window;
+  const RemoveWindowAction(this.window);
+}
+
 /// A single, persistable, item displayed in a [Workspace].
 abstract class Window {
   /// The [id] of this [Window] in [Workspace.windows].

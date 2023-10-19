@@ -33,6 +33,9 @@ class DemoAppState extends State<DemoApp> {
   /// The websocket connection to the analysis service.
   late final WebSocketChannel channel;
 
+  /// Whether or not the websocket is connected.
+  bool _isConnected = false;
+
   /// The last message received from the analysis service.
   List<String> messageQueue = [];
 
@@ -60,17 +63,22 @@ class DemoAppState extends State<DemoApp> {
         onDone: () {
           developer.log('WebSocket connection closed.',
               name: "rubinTV.visualization.main");
+          setState(() {
+            _isConnected = false;
+          });
         },
         onError: (error) {
           developer.log('WebSocket error: $error.',
               name: "rubinTV.visualization.main");
         },
       );
+
+      channel.sink.add(LoadSchemaCommand().toJson());
+      _isConnected = true;
     } catch (e) {
       developer.log('WebSocket connection failed: $e',
           name: "rubinTV.visualization.main");
     }
-    channel.sink.add(LoadSchemaCommand().toJson());
   }
 
   @override
@@ -121,13 +129,16 @@ class DemoAppState extends State<DemoApp> {
           body: StoreConnector<AppState, _WorkspaceViewModel>(
             distinct: true,
             converter: (store) => _WorkspaceViewModel(
-                appState: store.state, dispatch: store.dispatch),
+                isConnected: _isConnected,
+                appState: store.state,
+                dispatch: store.dispatch),
             builder: (BuildContext context, _WorkspaceViewModel model) =>
                 WorkspaceViewer(
               size: screenSize,
               workspace: model.info,
               dataCenter: widget.dataCenter,
               dispatch: model.dispatch,
+              isConnected: model.isConnected,
             ),
           ),
         ),
@@ -138,10 +149,12 @@ class DemoAppState extends State<DemoApp> {
 
 class _WorkspaceViewModel {
   final AppState appState;
+  final bool isConnected;
   final DispatchAction dispatch;
 
   const _WorkspaceViewModel({
     required this.appState,
+    required this.isConnected,
     required this.dispatch,
   });
 
