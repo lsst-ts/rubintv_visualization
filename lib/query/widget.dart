@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/query/update.dart';
@@ -658,6 +659,45 @@ class QueryEditorState extends State<QueryEditor> {
     setState(() {});
   }
 
+  bool validate(Query? query) {
+    if (query is QueryOperation) {
+      if (query.children.length <= 1) {
+        Fluttertoast.showToast(
+            msg: "Query error",
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.CENTER,
+            timeInSecForIosWeb: 5,
+            backgroundColor: Colors.red,
+            webBgColor: "#e74c3c",
+            textColor: Colors.white,
+            fontSize: 16.0);
+        return false;
+      }
+      for (Query child in query.children) {
+        if (!validate(child)) {
+          return false;
+        }
+      }
+      return true;
+    } else if (query is EqualityQuery) {
+      if (query.leftValue == null && query.rightValue == null) {
+        Fluttertoast.showToast(
+            msg: "Query $query has no comparison",
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.CENTER,
+            timeInSecForIosWeb: 5,
+            backgroundColor: Colors.red,
+            webBgColor: "#e74c3c",
+            textColor: Colors.white,
+            fontSize: 16.0);
+        return false;
+      }
+      return true;
+    } else {
+      throw UnimplementedError("Unrecognized query type ${query.runtimeType}");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     List<Widget> children = expression.queries
@@ -681,7 +721,20 @@ class QueryEditorState extends State<QueryEditor> {
         ),
         IconButton(
           onPressed: () {
-            if (_formKey.currentState!.validate()) {
+            if (expression.queries.isEmpty) {
+              widget.onCompleted(null);
+              Navigator.pop(context);
+            } else if (expression.queries.length > 1) {
+              Fluttertoast.showToast(
+                  msg: "Unconnected queries",
+                  toastLength: Toast.LENGTH_LONG,
+                  gravity: ToastGravity.CENTER,
+                  timeInSecForIosWeb: 5,
+                  backgroundColor: Colors.red,
+                  webBgColor: "#e74c3c",
+                  textColor: Colors.white,
+                  fontSize: 16.0);
+            } else if (validate(expression.queries.first)) {
               widget.onCompleted(expression.queries.length == 1
                   ? expression.queries.first
                   : null);
