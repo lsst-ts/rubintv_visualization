@@ -359,7 +359,7 @@ class QueryOperationWidgetState extends State<QueryOperationWidget> {
   /// Update the operator for this query
   void updateOperator(QueryOperator? operator) {
     if (operator == QueryOperator.blank) {
-      dispatch(RemoveQuery(query: query));
+      dispatch(RemoveQuery(query: query, keepChildren: true));
     }
     if (operator != query.operator) {
       setState(() {
