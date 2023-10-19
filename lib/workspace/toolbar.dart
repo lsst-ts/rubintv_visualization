@@ -15,7 +15,9 @@ class UpdateMultiSelect extends ToolbarAction {
 }
 
 class DatePickerWidget extends StatefulWidget {
-  const DatePickerWidget({super.key});
+  const DatePickerWidget({super.key, required this.dispatch});
+
+  final DispatchAction dispatch;
 
   @override
   DatePickerWidgetState createState() => DatePickerWidgetState();
@@ -43,11 +45,8 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
               firstDate: DateTime(2000),
               lastDate: DateTime(2101),
             );
-            if (pickedDate != null && pickedDate != selectedDate) {
-              setState(() {
-                selectedDate = pickedDate;
-              });
-            }
+
+            widget.dispatch(UpdateGlobalObsDateAction(obsDate: pickedDate));
           },
           child: Container(
             margin: const EdgeInsets.all(4),
@@ -64,6 +63,7 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
           onPressed: () {
             setState(() {
               selectedDate = null;
+              widget.dispatch(const UpdateGlobalObsDateAction(obsDate: null));
             });
           },
           child: const Icon(
@@ -99,10 +99,6 @@ class ToolbarState extends State<Toolbar> {
     tool = widget.tool;
   }
 
-  void updateQuery(Query? query) {
-    //series = series.copyWith(query: query);
-  }
-
   @override
   Widget build(BuildContext context) {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
@@ -130,7 +126,10 @@ class ToolbarState extends State<Toolbar> {
           )),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.travel_explore, color: Colors.green),
+            icon: Icon(Icons.travel_explore,
+                color: workspace.widget.workspace.globalQuery == null
+                    ? Colors.grey
+                    : Colors.green),
             onPressed: () {
               showDialog(
                   context: context,
@@ -138,17 +137,23 @@ class ToolbarState extends State<Toolbar> {
                         child: QueryEditor(
                           theme: workspace.theme,
                           expression: QueryExpression(
-                            queries: [],
+                            queries:
+                                workspace.widget.workspace.globalQuery == null
+                                    ? []
+                                    : [workspace.widget.workspace.globalQuery!],
                             dataCenter: workspace.dataCenter,
                           ),
-                          onCompleted: updateQuery,
+                          onCompleted: (Query? query) {
+                            workspace.dispatch(
+                                UpdateGlobalQueryAction(query: query));
+                          },
                         ),
                       ));
             },
           ),
           SizedBox(
             height: workspace.theme.toolbarHeight,
-            child: DatePickerWidget(),
+            child: DatePickerWidget(dispatch: workspace.widget.dispatch),
           ),
           SegmentedButton<MultiSelectionTool>(
             selected: {tool},

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:redux/redux.dart';
 import 'package:rubintv_visualization/chart.dart';
+import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/state/time_machine.dart';
@@ -40,6 +41,12 @@ class Workspace {
   /// set of keys in that [Database] that are selected.
   final Map<String, Set<dynamic>> _selected;
 
+  /// A query that applies to all plots (that opt in to gloabl queries)
+  final Query? globalQuery;
+
+  /// The observation date for any tables that have an observation date column.
+  final DateTime? obsDate;
+
   /// Which tool to use for multi-selection/zoom
   final MultiSelectionTool multiSelectionTool;
 
@@ -52,6 +59,8 @@ class Workspace {
     Map<String, Set<dynamic>> selected = const {},
     this.multiSelectionTool = MultiSelectionTool.select,
     this.webSocket,
+    this.globalQuery,
+    this.obsDate,
   })  : _windows = windows,
         _selected = selected;
 
@@ -68,6 +77,28 @@ class Workspace {
         selected: selected ?? this.selected,
         multiSelectionTool: multiSelectionTool ?? this.multiSelectionTool,
         webSocket: webSocket ?? this.webSocket,
+      );
+
+  /// Because the global query can be null, we need a special copy method.
+  Workspace updateGlobalQuery(Query? query) => Workspace(
+        theme: theme,
+        windows: windows,
+        selected: selected,
+        multiSelectionTool: multiSelectionTool,
+        webSocket: webSocket,
+        globalQuery: query,
+        obsDate: obsDate,
+      );
+
+  /// Becayse the obsDate can be null, we need a special copy method.
+  Workspace updateObsDate(DateTime? obsDate) => Workspace(
+        theme: theme,
+        windows: windows,
+        selected: selected,
+        multiSelectionTool: multiSelectionTool,
+        webSocket: webSocket,
+        globalQuery: globalQuery,
+        obsDate: obsDate,
       );
 
   /// Protect [_windows] so that it can only be updated through the app.
@@ -140,6 +171,42 @@ TimeMachine<Workspace> updateWindowReducer(
   ));
 }
 
+class UpdateGlobalQueryAction extends UiAction {
+  final Query? query;
+
+  const UpdateGlobalQueryAction({required this.query});
+}
+
+TimeMachine<Workspace> updateGlobalQueryReducer(
+  TimeMachine<Workspace> state,
+  UpdateGlobalQueryAction action,
+) {
+  Workspace workspace = state.currentState;
+  workspace = workspace.updateGlobalQuery(action.query);
+  return state.updated(TimeMachineUpdate(
+    comment: "update global query",
+    state: workspace,
+  ));
+}
+
+class UpdateGlobalObsDateAction extends UiAction {
+  final DateTime? obsDate;
+
+  const UpdateGlobalObsDateAction({required this.obsDate});
+}
+
+TimeMachine<Workspace> updateGlobalObsDateReducer(
+  TimeMachine<Workspace> state,
+  UpdateGlobalObsDateAction action,
+) {
+  Workspace workspace = state.currentState;
+  workspace = workspace.updateObsDate(action.obsDate);
+  return state.updated(TimeMachineUpdate(
+    comment: "update global observation date",
+    state: workspace,
+  ));
+}
+
 /// Add a new cartesian plot to the workspace
 TimeMachine<Workspace> newScatterChartReducer(
   TimeMachine<Workspace> state,
@@ -197,6 +264,10 @@ Reducer<TimeMachine<Workspace>> workspaceReducer =
       webSocketReceiveMessageReducer),
   TypedReducer<TimeMachine<Workspace>, NewScatterChartAction>(
       newScatterChartReducer),
+  TypedReducer<TimeMachine<Workspace>, UpdateGlobalQueryAction>(
+      updateGlobalQueryReducer),
+  TypedReducer<TimeMachine<Workspace>, UpdateGlobalObsDateAction>(
+      updateGlobalObsDateReducer),
   /*TypedReducer<TimeMachine<Workspace>, SeriesUpdateAction>(updateSeriesReducer),
   TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
   TypedReducer<TimeMachine<Workspace>, RectSelectionAction>(
