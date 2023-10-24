@@ -21,7 +21,7 @@ typedef UpdateQueryOperatorCallback = void Function(QueryOperator? operator);
 /// Widget to display an [EqualityOperator] in an [EqualityQueryWidget].
 class EqualityOperatorWidget extends StatefulWidget {
   /// Theme for the app.
-  final ChartTheme theme;
+  final AppTheme theme;
 
   /// Operator to display
   final EqualityOperator operator;
@@ -86,7 +86,7 @@ class EqualityOperatorWidgetState extends State<EqualityOperatorWidget> {
 /// [Widget] to display an [EqualityQuery]
 class EqualityQueryWidget extends StatefulWidget {
   /// Theme for the app.
-  final ChartTheme theme;
+  final AppTheme theme;
 
   /// The [EqualityQuery] to display.
   final EqualityQuery query;
@@ -117,7 +117,7 @@ class EqualityQueryWidgetState extends State<EqualityQueryWidget> {
   EqualityQuery get query => widget.query;
 
   /// Shortcut to [EqualityQueryWidget.theme].
-  ChartTheme get theme => widget.theme;
+  AppTheme get theme => widget.theme;
 
   /// Update the left condition in the [EqualityQuery].
   void addLeftCondition(EqualityOperator? operator) {
@@ -127,7 +127,7 @@ class EqualityQueryWidgetState extends State<EqualityQueryWidget> {
     } else {
       query.leftOperator = operator;
       query.leftValue =
-          query.field.bounds == null ? 0 : query.field.bounds!.first;
+          query.field.bounds == null ? 0 : query.field.bounds!.max;
     }
     widget.dispatch(const QueryUpdate());
     setState(() {});
@@ -141,7 +141,7 @@ class EqualityQueryWidgetState extends State<EqualityQueryWidget> {
     } else {
       query.rightOperator = operator;
       query.rightValue =
-          query.field.bounds == null ? 0 : query.field.bounds!.last;
+          query.field.bounds == null ? 0 : query.field.bounds!.min;
     }
     widget.dispatch(const QueryUpdate());
     setState(() {});
@@ -267,7 +267,7 @@ class EqualityQueryWidgetState extends State<EqualityQueryWidget> {
 /// Widget to display an [EqualityOperator] in an [EqualityQueryWidget].
 class QueryOperatorWidget extends StatefulWidget {
   /// Theme for the app.
-  final ChartTheme theme;
+  final AppTheme theme;
 
   /// Operator to display
   final QueryOperator operator;
@@ -327,7 +327,7 @@ class QueryOperatorWidgetState extends State<QueryOperatorWidget> {
 /// Widget to display a [QueryOperation] and all of its children.
 class QueryOperationWidget extends StatefulWidget {
   /// Theme for the app.
-  final ChartTheme theme;
+  final AppTheme theme;
 
   /// The [QueryOperation] instance that this [Widget] displays.
   final QueryOperation query;
@@ -352,7 +352,7 @@ class QueryOperationWidget extends StatefulWidget {
 }
 
 class QueryOperationWidgetState extends State<QueryOperationWidget> {
-  ChartTheme get theme => widget.theme;
+  AppTheme get theme => widget.theme;
   QueryOperation get query => widget.query;
   QueryUpdateCallback get dispatch => widget.dispatch;
 
@@ -413,7 +413,7 @@ class QueryOperationWidgetState extends State<QueryOperationWidget> {
 /// Allow the user to select available columns for a query
 class NewQueryWidget extends StatefulWidget {
   /// The theme for the app.
-  final ChartTheme theme;
+  final AppTheme theme;
 
   /// Available column names to choose from.
   final DataCenter dataCenter;
@@ -549,7 +549,7 @@ class NewQueryWidgetState extends State<NewQueryWidget> {
 
 /// [Widget] to edit a full [Query] expression
 class QueryEditor extends StatefulWidget {
-  final ChartTheme theme;
+  final AppTheme theme;
   final QueryExpression expression;
   final SeriesQueryCallback onCompleted;
 
@@ -568,8 +568,8 @@ class QueryEditor extends StatefulWidget {
 class QueryEditorState extends State<QueryEditor> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  /// Shortcut to the [ChartTheme]/
-  ChartTheme get theme => widget.theme;
+  /// Shortcut to the [AppTheme]/
+  AppTheme get theme => widget.theme;
 
   /// Shortcut to the [QueryExpression].
   QueryExpression get expression => widget.expression;
@@ -762,7 +762,7 @@ class QueryEditorState extends State<QueryEditor> {
 
 class QueryWidget extends StatefulWidget {
   final Query query;
-  final ChartTheme theme;
+  final AppTheme theme;
   final QueryUpdateCallback dispatch;
   final int depth;
 
@@ -779,7 +779,7 @@ class QueryWidget extends StatefulWidget {
 }
 
 class QueryWidgetState extends State<QueryWidget> {
-  ChartTheme get theme => widget.theme;
+  AppTheme get theme => widget.theme;
   OverlayEntry? wireWidget;
   late Offset initialPosition;
   late Offset currentPosition;
@@ -878,7 +878,7 @@ class QueryWidgetState extends State<QueryWidget> {
 }
 
 class WirePainter extends CustomPainter {
-  final ChartTheme theme;
+  final AppTheme theme;
   final Offset initialPosition;
   final Offset currentPosition;
 
@@ -906,7 +906,7 @@ class WirePainter extends CustomPainter {
 }
 
 class WireWidget extends StatelessWidget {
-  final ChartTheme theme;
+  final AppTheme theme;
   final Offset initialPosition;
   final Offset currentPosition;
 

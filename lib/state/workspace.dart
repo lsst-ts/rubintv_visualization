@@ -4,7 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:redux/redux.dart';
-import 'package:rubintv_visualization/chart.dart';
+import 'package:rubintv_visualization/chart/scatter.dart';
+import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/theme.dart';
@@ -13,9 +14,6 @@ import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/menu.dart';
 import 'package:rubintv_visualization/workspace/toolbar.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
-
-/// Auto counter to keep track of the next window ID.
-int _nextWindowId = 0;
 
 /// Tools for selecting unique sources.
 enum MultiSelectionTool {
@@ -31,10 +29,10 @@ enum MultiSelectionTool {
 /// The full working area of the app.
 class Workspace {
   /// Windows to display in the [Workspace].
-  final Map<int, Window> _windows;
+  final Map<UniqueId, Window> _windows;
 
   /// The theme for the app
-  final ChartTheme theme;
+  final AppTheme theme;
 
   /// Keys for selected data points.
   /// The key is name of the [Database] containing the point, and the [Set] is the
@@ -55,7 +53,7 @@ class Workspace {
 
   const Workspace({
     required this.theme,
-    Map<int, Window> windows = const {},
+    Map<UniqueId, Window> windows = const {},
     Map<String, Set<dynamic>> selected = const {},
     this.multiSelectionTool = MultiSelectionTool.select,
     this.webSocket,
@@ -65,8 +63,8 @@ class Workspace {
         _selected = selected;
 
   Workspace copyWith({
-    ChartTheme? theme,
-    Map<int, Window>? windows,
+    AppTheme? theme,
+    Map<UniqueId, Window>? windows,
     Map<String, Set<dynamic>>? selected,
     MultiSelectionTool? multiSelectionTool,
     WebSocket? webSocket,
@@ -102,7 +100,7 @@ class Workspace {
       );
 
   /// Protect [_windows] so that it can only be updated through the app.
-  Map<int, Window> get windows => {..._windows};
+  Map<UniqueId, Window> get windows => {..._windows};
 
   /// Protect [_selected] so that it can only be updated through the app.
   Map<String, Set<dynamic>> get selected => {..._selected};
@@ -111,17 +109,7 @@ class Workspace {
   /// Normally the [index] is already created, unless
   /// the workspace is being loaded from disk.
   Workspace addWindow(Window window) {
-    Map<int, Window> newWindows = {..._windows};
-
-    if (window.id < 0) {
-      // Use the next entry counter to increment the index
-      int index = _nextWindowId++;
-      window = window.copyWith(id: index);
-    } else if (window.id > _nextWindowId) {
-      // The new entry is greater than the next entry counter, so make the new next entry
-      // greater than the current index
-      _nextWindowId = window.id + 1;
-    }
+    Map<UniqueId, Window> newWindows = {..._windows};
     newWindows[window.id] = window;
 
     return copyWith(
@@ -159,7 +147,7 @@ TimeMachine<Workspace> updateWindowReducer(
   ApplyWindowUpdate action,
 ) {
   Workspace workspace = state.currentState;
-  Map<int, Window> windows = {...workspace.windows};
+  Map<UniqueId, Window> windows = {...workspace.windows};
   Window window = windows[action.windowId]!
       .copyWith(offset: action.offset, size: action.size);
   windows[window.id] = window;
@@ -220,15 +208,9 @@ TimeMachine<Workspace> newScatterChartReducer(
     offset += workspace.windows.values.last.offset;
   }
 
-  int id = -1;
-  for (int key in workspace.windows.keys) {
-    if (key > id) {
-      id = key;
-    }
-  }
-
   workspace = workspace.addWindow(ScatterChart(
-    id: ++id, offset: offset, size: workspace.theme.newPlotSize, data: {},
+    id: UniqueId.next(), offset: offset, size: workspace.theme.newPlotSize,
+    data: {},
     //series: {},
     //axes: [null, null],
     //legend: ChartLegend(location: ChartLegendLocation.right),
@@ -327,7 +309,7 @@ class WorkspaceViewer extends StatefulWidget {
 }
 
 class WorkspaceViewerState extends State<WorkspaceViewer> {
-  ChartTheme get theme => widget.workspace.theme;
+  AppTheme get theme => widget.workspace.theme;
   Size get size => widget.size;
   Workspace get info => widget.workspace;
   DataCenter get dataCenter => widget.dataCenter;
@@ -416,6 +398,8 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
     if (interactionInfo != null) {
       dragEnd();
     }
+    print("Window id is ${update.windowId}");
+    print("window ids: ${info.windows.keys}");
     Window window = info.windows[update.windowId]!;
     interactionInfo = WindowDragInfo(
       id: update.windowId,

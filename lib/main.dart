@@ -97,7 +97,7 @@ class DemoAppState extends State<DemoApp> {
     themeData = themeData.copyWith(
         scaffoldBackgroundColor: themeData.colorScheme.secondaryContainer);
 
-    ChartTheme theme = ChartTheme(
+    AppTheme theme = AppTheme(
       themeData: themeData,
     );
 

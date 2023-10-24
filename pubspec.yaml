@@ -46,8 +46,8 @@ dependencies:
   web_socket_channel: ^2.4.0
   # Display feedback to the user
   fluttertoast: ^8.2.2
-  # Graphic library for creating charts
-  graphic: ^2.2.1
+  # The rubin_chart plotting package.
+  fl_chart: ^0.64.0
 
 dev_dependencies:
   flutter_test:

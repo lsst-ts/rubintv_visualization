@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 
@@ -16,7 +17,7 @@ typedef WindowUpdateCallback = void Function(WindowUpdate update);
 
 /// Information about window interactions
 class WindowInteractionInfo {
-  final int id;
+  final UniqueId id;
   Offset offset;
   Size size;
 
@@ -60,7 +61,7 @@ class WindowUpdate {
 
 /// Update when a window is first being dragged.
 class StartDragWindowUpdate extends WindowUpdate {
-  final int windowId;
+  final UniqueId windowId;
   final DragStartDetails details;
 
   const StartDragWindowUpdate({
@@ -71,7 +72,7 @@ class StartDragWindowUpdate extends WindowUpdate {
 
 /// Update when a window is being dragged.
 class UpdateDragWindowUpdate extends WindowUpdate {
-  final int windowId;
+  final UniqueId windowId;
   final DragUpdateDetails details;
 
   const UpdateDragWindowUpdate({
@@ -82,7 +83,7 @@ class UpdateDragWindowUpdate extends WindowUpdate {
 
 /// Update when the drag pointer has been removed and the window is no longer being dragged.
 class WindowDragEnd extends WindowUpdate {
-  final int windowId;
+  final UniqueId windowId;
   final DragEndDetails details;
 
   const WindowDragEnd({
@@ -93,7 +94,7 @@ class WindowDragEnd extends WindowUpdate {
 
 /// A window has started to be resized
 class StartWindowResize extends WindowUpdate {
-  final int windowId;
+  final UniqueId windowId;
   final DragStartDetails details;
 
   StartWindowResize({
@@ -104,7 +105,7 @@ class StartWindowResize extends WindowUpdate {
 
 /// [WindowUpdate] to update the size of a [Window] in the parent [WorkspaceViewer].
 class UpdateWindowResize extends WindowUpdate {
-  final int windowId;
+  final UniqueId windowId;
   final DragUpdateDetails details;
   final WindowResizeDirections direction;
 
@@ -117,7 +118,7 @@ class UpdateWindowResize extends WindowUpdate {
 
 /// The window has finished resizing.
 class EndWindowResize extends WindowUpdate {
-  final int windowId;
+  final UniqueId windowId;
   final DragEndDetails details;
 
   const EndWindowResize({
@@ -128,7 +129,7 @@ class EndWindowResize extends WindowUpdate {
 
 /// Apply an update to a [Window] to the main [AppState].
 class ApplyWindowUpdate extends UiAction {
-  final int windowId;
+  final UniqueId windowId;
   final Offset offset;
   final Size size;
 
@@ -144,8 +145,8 @@ class WindowTitle extends StatelessWidget {
   /// The text to display in the title
   final String? text;
 
-  /// The [ChartTheme] for the app.
-  final ChartTheme theme;
+  /// The [AppTheme] for the app.
+  final AppTheme theme;
   final Widget? toolbar;
 
   const WindowTitle({
@@ -222,7 +223,7 @@ class RemoveWindowAction extends UiAction {
 /// A single, persistable, item displayed in a [Workspace].
 abstract class Window {
   /// The [id] of this [Window] in [Workspace.windows].
-  final int id;
+  final UniqueId id;
 
   /// The location of the entry in the entire workspace
   final Offset offset;
@@ -241,7 +242,7 @@ abstract class Window {
   });
 
   Window copyWith({
-    int? id,
+    UniqueId? id,
     Offset? offset,
     Size? size,
     String? title,
@@ -264,8 +265,8 @@ class ResizableWindow extends StatelessWidget {
   /// If [size] is null then the window will layout the child first and expand to the child size.
   final Size size;
 
-  /// The [ChartTheme] for the app.
-  final ChartTheme theme;
+  /// The [AppTheme] for the app.
+  final AppTheme theme;
 
   /// Information about the widget
   final Window info;

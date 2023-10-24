@@ -35,7 +35,7 @@ VoidCallback showNotImplemented(BuildContext context) {
 class NewScatterChartAction extends UiAction {}
 
 class DataSetSelectorDialog extends StatelessWidget {
-  final ChartTheme theme;
+  final AppTheme theme;
   final DataCenter dataCenter;
 
   const DataSetSelectorDialog({
@@ -69,7 +69,7 @@ class DataSetSelectorDialog extends StatelessWidget {
 
 class AppMenu extends StatelessWidget {
   final Widget child;
-  final ChartTheme theme;
+  final AppTheme theme;
   final DispatchAction dispatch;
   final DataCenter dataCenter;
 

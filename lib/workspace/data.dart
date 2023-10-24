@@ -2,6 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:rubintv_visualization/editors/series.dart';
+import 'package:rubintv_visualization/id.dart';
+import 'package:rubintv_visualization/utils.dart';
 
 int _nextDataset = 0;
 
@@ -53,7 +56,7 @@ class SchemaField {
   final String? unit;
   final String? description;
   late final Schema schema;
-  final List<String>? bounds;
+  final Bounds? bounds;
 
   SchemaField({
     required this.name,
@@ -120,6 +123,7 @@ class DataCenterUpdate {}
 
 class DataCenter {
   final Map<String, Database> _databases = {};
+  final Map<UniqueId, SeriesData> _data = {};
 
   DataCenter();
 
@@ -179,6 +183,12 @@ class DataCenter {
           textColor: Colors.white,
           fontSize: 16.0);
     }
+  }
+
+  SeriesData? getSeriesData(UniqueId id) => _data[id];
+
+  void updateSeriesData({required UniqueId id, required SeriesData data}) {
+    _data[id] = data;
   }
 
   /// Check if two [SchemaField]s are compatible

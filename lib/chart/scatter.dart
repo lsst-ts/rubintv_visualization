@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 
@@ -18,7 +19,7 @@ class ScatterChart extends Window {
 
   @override
   ScatterChart copyWith(
-      {int? id,
+      {UniqueId? id,
       Offset? offset,
       Size? size,
       String? title,

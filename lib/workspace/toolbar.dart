@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rubintv_visualization/query/query.dart';
-import 'package:rubintv_visualization/query/widget.dart';
+import 'package:rubintv_visualization/editors/query.dart';
 import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
 
