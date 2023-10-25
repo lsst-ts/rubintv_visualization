@@ -55,3 +55,41 @@ class ErrorBarSettings {
         headSize: headSize ?? this.headSize,
       );
 }
+
+// TODO: replace this class with one that will draw the same marker element that is drawn in the chart
+class Marker extends StatelessWidget {
+  final double size;
+  final MarkerTypes markerType;
+  final Color color;
+  final Color? edgeColor;
+  final double edgeWidth;
+
+  const Marker({
+    super.key,
+    required this.size,
+    required this.color,
+    this.edgeColor,
+    this.edgeWidth = 1,
+    this.markerType = MarkerTypes.circle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget result;
+
+    if (markerType == MarkerTypes.circle) {
+      result = Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+        ),
+      );
+    } else {
+      throw UnimplementedError(
+          "Marker type $markerType has not yet been implemented");
+    }
+    return result;
+  }
+}

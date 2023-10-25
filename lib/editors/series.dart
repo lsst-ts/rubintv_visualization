@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rubintv_visualization/chart/chart.dart';
 import 'package:rubintv_visualization/chart/marker.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/query/query.dart';
@@ -10,13 +11,17 @@ import 'package:rubintv_visualization/workspace/data.dart';
 class Series {
   final UniqueId id;
   final String name;
+  final List<SchemaField> fields;
   final MarkerSettings? marker;
   final ErrorBarSettings? errorBarSettings;
   final Query? query;
+  final Chart chart;
 
   Series({
     required this.id,
     required this.name,
+    required this.fields,
+    required this.chart,
     this.marker,
     this.errorBarSettings,
     this.query,
@@ -25,6 +30,8 @@ class Series {
   Series copyWith({
     UniqueId? id,
     String? name,
+    List<SchemaField>? fields,
+    Chart? chart,
     MarkerSettings? marker,
     ErrorBarSettings? errorBarSettings,
     Query? query,
@@ -32,6 +39,8 @@ class Series {
       Series(
         id: id ?? this.id,
         name: name ?? this.name,
+        fields: fields ?? this.fields,
+        chart: chart ?? this.chart,
         marker: marker ?? this.marker,
         errorBarSettings: errorBarSettings ?? this.errorBarSettings,
         query: query ?? this.query,
@@ -54,7 +63,7 @@ class SeriesData {
 class SeriesUpdateAction extends UiAction {
   final Series series;
   final DataCenter dataCenter;
-  final String? groupByColumn;
+  final SchemaField? groupByColumn;
 
   const SeriesUpdateAction({
     required this.series,
@@ -95,7 +104,7 @@ class SeriesEditorState extends State<SeriesEditor> {
   TextEditingController nameController = TextEditingController();
 
   /// Create a collection of [Series] based on unique values of the [groupName] column.
-  String? groupByColumn;
+  SchemaField? groupByColumn;
 
   @override
   void initState() {

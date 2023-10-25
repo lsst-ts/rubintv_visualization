@@ -4,7 +4,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:redux/redux.dart';
+import 'package:rubintv_visualization/chart/chart.dart';
+import 'package:rubintv_visualization/chart/legend.dart';
 import 'package:rubintv_visualization/chart/scatter.dart';
+import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/state/action.dart';
@@ -209,16 +212,82 @@ TimeMachine<Workspace> newScatterChartReducer(
   }
 
   workspace = workspace.addWindow(ScatterChart(
-    id: UniqueId.next(), offset: offset, size: workspace.theme.newPlotSize,
-    data: {},
-    //series: {},
-    //axes: [null, null],
-    //legend: ChartLegend(location: ChartLegendLocation.right),
+    id: UniqueId.next(),
+    offset: offset,
+    size: workspace.theme.newPlotSize,
+    series: {},
+    axes: [null, null],
+    legend: ChartLegend(location: ChartLegendLocation.right),
   ));
 
   return state.updated(TimeMachineUpdate(
     comment: "add new Cartesian plot",
     state: workspace,
+  ));
+}
+
+/// Add a new cartesian plot to the workspace
+TimeMachine<Workspace> updateSeriesReducer(
+  TimeMachine<Workspace> state,
+  SeriesUpdateAction action,
+) {
+  Chart chart = action.series.chart;
+  late String comment = "update Series";
+
+  if (action.groupByColumn != null) {
+    throw UnimplementedError();
+    // Create a collection of series grouped by the specified column
+    /*SchemaField field = action.groupByColumn!;
+
+    Set unique = {};
+    for(dynamic index in indices){
+      Map<String, dynamic> record = dataSet.data[index]!;
+      unique.add(record[field.name]);
+    }
+
+    developer.log("Creating ${unique.length} new series", name: "rubin_chart.workspace");
+
+    for(dynamic value in unique){
+      Series series = action.series;
+
+      Query groupQuery = EqualityQuery(
+        columnField: field,
+        rightCondition: EqualityCondition(
+          operator: EqualityOperator.eq,
+          value: value,
+        ),
+      );
+
+      Query query = groupQuery;
+
+      if(series.query != null){
+        query = ParentQuery(
+          children: [series.query!, groupQuery],
+          operator: QueryOperator.and,
+        );
+      }
+      series = series.copyWith(name: value, query: query);
+      chart = chart.addSeries(series: series, dataCenter: action.dataCenter);
+    }*/
+  } else if (chart.series.keys.contains(action.series.id)) {
+    Map<UniqueId, Series> newSeries = {...chart.series};
+    newSeries[action.series.id] = action.series;
+    chart = chart.copyWith(series: newSeries);
+    chart = chart.onSeriesUpdate(
+        series: action.series, dataCenter: action.dataCenter);
+  } else {
+    chart =
+        chart.addSeries(series: action.series, dataCenter: action.dataCenter);
+    comment = "add new Series";
+  }
+
+  Workspace workspace = state.currentState;
+  Map<UniqueId, Window> windows = {...workspace.windows};
+  windows[chart.id] = chart;
+
+  return state.updated(TimeMachineUpdate(
+    comment: comment,
+    state: workspace.copyWith(windows: windows),
   ));
 }
 
@@ -250,8 +319,8 @@ Reducer<TimeMachine<Workspace>> workspaceReducer =
       updateGlobalQueryReducer),
   TypedReducer<TimeMachine<Workspace>, UpdateGlobalObsDateAction>(
       updateGlobalObsDateReducer),
-  /*TypedReducer<TimeMachine<Workspace>, SeriesUpdateAction>(updateSeriesReducer),
-  TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
+  TypedReducer<TimeMachine<Workspace>, SeriesUpdateAction>(updateSeriesReducer),
+  /*TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
   TypedReducer<TimeMachine<Workspace>, RectSelectionAction>(
       rectSelectionReducer),
   TypedReducer<TimeMachine<Workspace>, PointSelectionAction>(
