@@ -297,9 +297,11 @@ TimeMachine<Workspace> updateSeriesReducer(
 
   // Request the data from the server.
   if (workspace.webSocket != null) {
+    Query? query = action.series.query;
     workspace.webSocket!.sink.add(LoadColumnsCommand(
       seriesId: action.series.id,
       fields: action.series.fields,
+      query: query,
     ).toJson());
   }
 

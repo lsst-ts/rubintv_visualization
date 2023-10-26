@@ -434,41 +434,44 @@ class NewQueryWidget extends StatefulWidget {
 
 /// [State] for teh [NewQueryWidget].
 class NewQueryWidgetState extends State<NewQueryWidget> {
-  /// [TextEditingController] for the database.
-  TextEditingController databaseController = TextEditingController();
-
-  /// The [TextEditingController] for the table.
-  TextEditingController tableController = TextEditingController();
-
-  /// [TextEditingController] for the column.
-  TextEditingController columnController = TextEditingController();
-
   /// The currently selected [Database].
-  Database? selectedDatabase;
+  Database? _database;
 
   /// The currently selected [Schema].
-  Schema? selectedTable;
+  Schema? _table;
 
   /// The currently selected [SchemaField].
-  SchemaField? selectedColumn;
+  SchemaField? _field;
 
   @override
   Widget build(BuildContext context) {
-    selectedDatabase ??= widget.dataCenter.databases.entries.first.value;
-    // Populate drop-down menus with the available values
-    final List<DropdownMenuEntry<Database>> databaseEntries = widget
-        .dataCenter.databases.entries
-        .map((entry) => DropdownMenuEntry(value: entry.value, label: entry.key))
-        .toList();
-    final List<DropdownMenuEntry<Schema>> tableEntries = [];
-    for (Schema schema in selectedDatabase!.tables.values) {
-      tableEntries.add(DropdownMenuEntry(value: schema, label: schema.name));
+    if (_field != null) {
+      _table = _field!.schema;
+      _database = _table!.database;
+    } else {
+      _database = widget.dataCenter.databases.values.first;
+      _table = _database!.tables.values.first;
+      _field = _table!.fields.values.first;
     }
-    final List<DropdownMenuEntry<SchemaField>> columnEntries = [];
-    if (selectedTable != null) {
-      for (SchemaField field in selectedTable!.fields.values) {
-        columnEntries.add(DropdownMenuEntry(value: field, label: field.name));
-      }
+
+    List<DropdownMenuItem<Database>> databaseEntries = widget
+        .dataCenter.databases.entries
+        .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
+        .toList();
+
+    List<DropdownMenuItem<Schema>> tableEntries = [];
+    List<DropdownMenuItem<SchemaField>> columnEntries = [];
+
+    if (_database != null) {
+      tableEntries = _database!.tables.entries
+          .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
+          .toList();
+    }
+
+    if (_table != null) {
+      columnEntries = _table!.fields.values
+          .map((e) => DropdownMenuItem(value: e, child: Text(e.name)))
+          .toList();
     }
 
     return ClipRRect(
@@ -478,67 +481,57 @@ class NewQueryWidgetState extends State<NewQueryWidget> {
             color: widget.theme.themeData.colorScheme.background,
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            DropdownMenu<Database>(
-              controller: databaseController,
-              enableFilter: true,
-              leadingIcon: const Icon(Icons.search),
-              label: const Text("database"),
-              dropdownMenuEntries: databaseEntries,
-              inputDecorationTheme: widget.theme.queryTextDecorationTheme,
-              onSelected: (Database? database) {
-                if (selectedDatabase != database) {
-                  setState(() {
-                    selectedDatabase = database;
-                    selectedTable = null;
-                    selectedColumn = null;
-                  });
-                }
-              },
-            ),
-            DropdownMenu<Schema>(
-              controller: tableController,
-              enableFilter: true,
-              leadingIcon: const Icon(Icons.search),
-              label: const Text("table"),
-              dropdownMenuEntries: tableEntries,
-              inputDecorationTheme: widget.theme.queryTextDecorationTheme,
-              onSelected: (Schema? table) {
-                if (selectedTable != table) {
-                  setState(() {
-                    selectedTable = table;
-                    selectedColumn = null;
-                  });
-                }
-              },
-            ),
-            DropdownMenu<SchemaField>(
-              controller: columnController,
-              enableFilter: true,
-              leadingIcon: const Icon(Icons.search),
-              label: const Text("column"),
-              dropdownMenuEntries: columnEntries,
-              inputDecorationTheme: widget.theme.queryTextDecorationTheme,
-              onSelected: (SchemaField? column) {
+            DropdownButton<Database>(
+              /*decoration: const InputDecoration(
+                labelText: "Database",
+                border: OutlineInputBorder(),
+              ),*/
+              value: _database,
+              items: databaseEntries,
+              onChanged: (Database? newDatabase) {
                 setState(() {
-                  selectedColumn = column;
+                  _database = newDatabase;
+                  _table = _database!.tables.values.first;
+                  _field = _table!.fields.values.first;
+                });
+              },
+            ),
+            const SizedBox(height: 10),
+            DropdownButton<Schema>(
+              /*decoration: const InputDecoration(
+                labelText: "Table",
+                border: OutlineInputBorder(),
+              ),*/
+              value: _table,
+              items: tableEntries,
+              onChanged: (Schema? newTable) {
+                setState(() {
+                  _table = newTable;
+                  _field = _table!.fields.values.first;
+                });
+              },
+            ),
+            const SizedBox(height: 10),
+            DropdownButton<SchemaField>(
+              /*decoration: const InputDecoration(
+                labelText: "Column",
+                border: OutlineInputBorder(),
+              ),*/
+              value: _field,
+              items: columnEntries,
+              onChanged: (SchemaField? newField) {
+                setState(() {
+                  newField ??= _table!.fields.values.first;
+                  _field = newField;
                 });
               },
             ),
             IconButton(
-                icon: const Icon(Icons.clear, color: Colors.redAccent),
-                tooltip: "Clear column",
-                onPressed: () {
-                  setState(() {
-                    columnController.clear();
-                    columnController.clearComposing();
-                  });
-                }),
-            IconButton(
                 icon: const Icon(Icons.add_circle, color: Colors.green),
-                tooltip: "Create query entry for '${columnController.value}'",
+                tooltip: "Create query entry for '$_field'",
                 onPressed: () {
-                  if (selectedColumn != null) {
-                    widget.dispatch(AddNewQuery(column: selectedColumn!));
+                  if (_field != null) {
+                    widget.dispatch(AddNewQuery(column: _field!));
                     setState(() {});
                   }
                 }),

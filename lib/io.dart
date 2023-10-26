@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:rubintv_visualization/id.dart';
+import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 
 /// A command to be sent to the analysis service.
@@ -13,14 +14,20 @@ class ServiceCommand {
   /// The parameters of the command.
   Map<String, dynamic> parameters;
 
-  ServiceCommand(
-      {required this.name, required this.parameters, this.requestId});
+  ServiceCommand({
+    required this.name,
+    required this.parameters,
+    this.requestId,
+  });
 
   /// Convert the command to a JSON formatted string.
   String toJson() {
     if (requestId != null) {
-      return jsonEncode(
-          {"name": name, "parameters": parameters, "requestId": requestId});
+      return jsonEncode({
+        "name": name,
+        "parameters": parameters,
+        "requestId": requestId,
+      });
     }
     return jsonEncode({"name": name, "parameters": parameters});
   }
@@ -51,15 +58,18 @@ class FutureLoadColumnsCommand extends ServiceCommand {
 }
 
 class LoadColumnsCommand extends ServiceCommand {
-  LoadColumnsCommand(
-      {required List<SchemaField> fields, required UniqueId seriesId})
-      : super(
+  LoadColumnsCommand({
+    required List<SchemaField> fields,
+    required UniqueId seriesId,
+    Query? query,
+  }) : super(
           name: "load columns",
           requestId: "${seriesId.id}",
           parameters: {
             "database": fields.first.database.name,
             "table": fields.first.schema.name,
             "columns": fields.map((e) => e.name).toList(),
+            "query": query?.toDict(),
           },
         );
 }

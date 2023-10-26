@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 
@@ -5,19 +7,34 @@ import 'package:rubintv_visualization/workspace/data.dart';
 /// Note that there are no greater than operators, since the
 /// [EqualityQueryWidget] is designed such that it doesn't need them.
 enum EqualityOperator {
-  eq("="),
-  neq("\u2260"),
-  lt("<"),
-  lte("\u2264"),
-  blank(" "),
-  startsWith("starts with"),
-  endsWith("ends with"),
-  contains("contains");
+  eq("=", "eq", "eq"),
+  neq("\u2260", "neq", "neq"),
+  lt("<", "gt", "lt"),
+  lte("\u2264", "gte", "lte"),
+  blank(" ", " ", " "),
+  startsWith("starts with", null, "starts with"),
+  endsWith("ends with", null, "ends with"),
+  contains("contains", null, "contains");
 
-  const EqualityOperator(this.symbol);
+  const EqualityOperator(this.symbol, this.queryLeft, this.queryRight);
 
   /// The symbol representing the operator
   final String symbol;
+
+  /// The name of the operator in a query.
+  /// Note that if this operator is to the left of the
+  /// field name, for numbers the operator will flip,
+  /// 5 < x -> x > 5.
+  final String? queryLeft;
+
+  /// The name of the operator to the right of the field
+  /// name in a query.
+  final String queryRight;
+
+  String getName(EqualityOperator op) {
+    List<String> parts = op.toString().split('.');
+    return parts[1];
+  }
 }
 
 /// A boolean operator in a query to combine two or more query terms.
@@ -53,7 +70,7 @@ abstract class Query {
   QueryOperation? parent;
   Query({required this.id, this.parent});
 
-  String toJson() => throw UnimplementedError();
+  Map<String, dynamic> toDict();
 }
 
 /// A query that checks that values satisfy a left and/or right equality.
@@ -102,6 +119,47 @@ class EqualityQuery extends Query {
 
     return result.toString();
   }
+
+  @override
+  Map<String, dynamic> toDict() {
+    Map<String, dynamic>? leftQuery;
+    Map<String, dynamic>? rightQuery;
+    if (leftValue != null) {
+      leftQuery = {
+        "name": "EqualityQuery",
+        "content": {
+          "column": field.name,
+          "operator": leftOperator!.queryLeft,
+          "value": "$leftValue",
+        }
+      };
+    }
+    if (rightValue != null) {
+      rightQuery = {
+        "name": "EqualityQuery",
+        "content": {
+          "column": field.name,
+          "operator": rightOperator!.queryRight,
+          "value": "$rightValue",
+        }
+      };
+    }
+    if (leftQuery != null && rightQuery != null) {
+      return {
+        "name": "ParentQuery",
+        "content": {
+          "operator": "AND",
+          "children": [leftQuery, rightQuery],
+        }
+      };
+    } else if (leftQuery != null) {
+      return leftQuery;
+    } else if (rightQuery != null) {
+      return rightQuery;
+    } else {
+      throw QueryError("EqualityQuery has no left or right value!");
+    }
+  }
 }
 
 class QueryOperation extends Query {
@@ -140,6 +198,16 @@ class QueryOperation extends Query {
 
   @override
   String toString() => "(${children.join(' ${operator.symbol} ')})";
+
+  @override
+  Map<String, dynamic> toDict() {
+    Map<String, dynamic> result = {
+      "name": "ParentQuery",
+      "operator": operator.name,
+      "children": children.map((e) => e.toDict()).toList(),
+    };
+    return result;
+  }
 }
 
 class QueryExpression {

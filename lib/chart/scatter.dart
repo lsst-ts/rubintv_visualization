@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:graphic/graphic.dart' as graphic;
 import 'package:rubintv_visualization/chart/axis.dart';
