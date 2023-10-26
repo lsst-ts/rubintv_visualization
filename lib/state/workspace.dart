@@ -145,7 +145,8 @@ TimeMachine<Workspace> webSocketReceiveMessageReducer(
   if (message["type"]! == "database schema") {
     action.dataCenter.addDatabase(message["content"]);
   } else if (message["type"] == "table columns") {
-    print("received data for ${message["requestId"]}");
+    print(
+        "received ${message["content"]["data"].length} rows for ${message["requestId"]}");
     action.dataCenter.updateSeriesData(
       seriesId: UniqueId.from(id: BigInt.parse(message["requestId"])),
       columnNames:
@@ -186,7 +187,20 @@ class UpdateChartGlobalQueryAction extends UiAction {
   });
 }
 
+String? getFormattedDate(DateTime? obsDate) {
+  if (obsDate == null) {
+    return null;
+  }
+  String year = obsDate.year.toString();
+  String month = obsDate.month.toString().padLeft(2, '0');
+  String day = obsDate.day.toString().padLeft(2, '0');
+
+  return '$year-$month-$day';
+}
+
 void getSeriesData(Workspace workspace, {Chart? chart}) {
+  String? obsDate = getFormattedDate(workspace.obsDate);
+
   late final List<Chart> charts;
   if (chart != null) {
     charts = [chart];
@@ -194,7 +208,7 @@ void getSeriesData(Workspace workspace, {Chart? chart}) {
     charts = workspace.windows.values.whereType<Chart>().toList();
   }
   // Request the data from the server.
-  if (workspace.webSocket != null && workspace.globalQuery != null) {
+  if (workspace.webSocket != null) {
     for (Chart chart in charts) {
       for (Series series in chart.series.values) {
         workspace.webSocket!.sink.add(LoadColumnsCommand.build(
@@ -203,6 +217,7 @@ void getSeriesData(Workspace workspace, {Chart? chart}) {
           query: series.query,
           useGlobalQuery: chart.useGlobalQuery,
           globalQuery: workspace.globalQuery,
+          obsDate: obsDate,
         ).toJson());
       }
     }
@@ -257,8 +272,10 @@ TimeMachine<Workspace> updateGlobalObsDateReducer(
   TimeMachine<Workspace> state,
   UpdateGlobalObsDateAction action,
 ) {
+  print("updating date to ${action.obsDate}!");
   Workspace workspace = state.currentState;
   workspace = workspace.updateObsDate(action.obsDate);
+  getSeriesData(workspace);
   return state.updated(TimeMachineUpdate(
     comment: "update global observation date",
     state: workspace,
@@ -355,14 +372,16 @@ TimeMachine<Workspace> updateSeriesReducer(
 
   // Request the data from the server.
   if (workspace.webSocket != null) {
+    String? obsDate = getFormattedDate(workspace.obsDate);
     Query? query = action.series.query;
     workspace.webSocket!.sink.add(LoadColumnsCommand.build(
-      seriesId: action.series.id,
-      fields: action.series.fields,
-      query: query,
-      globalQuery: workspace.globalQuery,
-      useGlobalQuery: chart.useGlobalQuery,
-    ).toJson());
+            seriesId: action.series.id,
+            fields: action.series.fields,
+            query: query,
+            globalQuery: workspace.globalQuery,
+            useGlobalQuery: chart.useGlobalQuery,
+            obsDate: obsDate)
+        .toJson());
   }
 
   return state.updated(TimeMachineUpdate(

@@ -78,16 +78,29 @@ class LoadColumnsCommand extends ServiceCommand {
     required bool useGlobalQuery,
     required Query? query,
     required Query? globalQuery,
+    required String? obsDate,
   }) {
+    Query? fullQuery = query;
     if (useGlobalQuery && globalQuery != null) {
-      if (query == null) {
-        return LoadColumnsCommand(
-            fields: fields, seriesId: seriesId, query: globalQuery);
+      if (fullQuery == null) {
+        fullQuery = globalQuery;
       } else {
-        return LoadColumnsCommand(
-            fields: fields, seriesId: seriesId, query: query & globalQuery);
+        fullQuery = fullQuery & globalQuery;
       }
     }
-    return LoadColumnsCommand(fields: fields, seriesId: seriesId, query: query);
+    if (obsDate != null) {
+      Query obsQuery = EqualityQuery(
+          id: UniqueId.next(),
+          field: SchemaField(name: "obsNight", type: DataType.dateTime),
+          rightValue: obsDate,
+          rightOperator: EqualityOperator.eq);
+      if (fullQuery == null) {
+        fullQuery = obsQuery;
+      } else {
+        fullQuery = fullQuery & obsQuery;
+      }
+    }
+    return LoadColumnsCommand(
+        fields: fields, seriesId: seriesId, query: fullQuery);
   }
 }

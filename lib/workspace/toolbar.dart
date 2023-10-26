@@ -15,7 +15,12 @@ class UpdateMultiSelect extends ToolbarAction {
 }
 
 class DatePickerWidget extends StatefulWidget {
-  const DatePickerWidget({super.key, required this.dispatch});
+  final DateTime? obsDate;
+  const DatePickerWidget({
+    super.key,
+    required this.dispatch,
+    required this.obsDate,
+  });
 
   final DispatchAction dispatch;
 
@@ -25,6 +30,18 @@ class DatePickerWidget extends StatefulWidget {
 
 class DatePickerWidgetState extends State<DatePickerWidget> {
   DateTime? selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedDate = widget.obsDate;
+  }
+
+  @override
+  void didUpdateWidget(DatePickerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    selectedDate = widget.obsDate;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +170,10 @@ class ToolbarState extends State<Toolbar> {
           ),
           SizedBox(
             height: workspace.theme.toolbarHeight,
-            child: DatePickerWidget(dispatch: workspace.widget.dispatch),
+            child: DatePickerWidget(
+              dispatch: workspace.widget.dispatch,
+              obsDate: workspace.widget.workspace.obsDate,
+            ),
           ),
           SegmentedButton<MultiSelectionTool>(
             selected: {tool},
