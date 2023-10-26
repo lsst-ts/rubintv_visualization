@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/utils.dart';
 

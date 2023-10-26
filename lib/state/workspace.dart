@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:developer' as developer;
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:redux/redux.dart';
@@ -405,6 +403,22 @@ TimeMachine<Workspace> timeMachineReducer(
   return state;
 }
 
+/// Add a new cartesian plot to the workspace
+TimeMachine<Workspace> removeWindowReducer(
+  TimeMachine<Workspace> state,
+  RemoveWindowAction action,
+) {
+  Workspace workspace = state.currentState;
+  Map<UniqueId, Window> windows = {...workspace.windows};
+  windows.remove(action.window.id);
+  workspace = workspace.copyWith(windows: windows);
+
+  return state.updated(TimeMachineUpdate(
+    comment: "remove chart",
+    state: workspace,
+  ));
+}
+
 /// Handle a workspace action
 Reducer<TimeMachine<Workspace>> workspaceReducer =
     combineReducers<TimeMachine<Workspace>>([
@@ -421,13 +435,13 @@ Reducer<TimeMachine<Workspace>> workspaceReducer =
   TypedReducer<TimeMachine<Workspace>, SeriesUpdateAction>(updateSeriesReducer),
   TypedReducer<TimeMachine<Workspace>, UpdateChartGlobalQueryAction>(
       updateChartGlobalQueryReducer),
+  TypedReducer<TimeMachine<Workspace>, RemoveWindowAction>(removeWindowReducer),
   /*TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
   TypedReducer<TimeMachine<Workspace>, RectSelectionAction>(
       rectSelectionReducer),
   TypedReducer<TimeMachine<Workspace>, PointSelectionAction>(
       pointSelectionReducer),
   TypedReducer<TimeMachine<Workspace>, RectZoomAction>(rectZoomReducer),
-  TypedReducer<TimeMachine<Workspace>, RemoveChartAction>(removeChartReducer),
   TypedReducer<TimeMachine<Workspace>, UpdateMultiSelect>(
       updateMultiSelectReducer),*/
 ]);
