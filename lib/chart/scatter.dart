@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:graphic/graphic.dart' as graphic;
 import 'package:rubintv_visualization/chart/axis.dart';
 import 'package:rubintv_visualization/chart/chart.dart';
 import 'package:rubintv_visualization/chart/legend.dart';
@@ -94,6 +95,64 @@ class ScatterChart extends Chart {
       yLabel1 = axes[1]!.label;
     }
 
+    List<Map<String, dynamic>> seriesData = [];
+    for (Series s in series.values) {
+      List<Map<String, dynamic>>? _seriesData = dataCenter.getSeriesData(s.id);
+      if (_seriesData != null) {
+        print("found data!");
+        seriesData.addAll(_seriesData);
+      } else {
+        print("no data found for ${s.id}!, ${dataCenter.data.keys}");
+      }
+    }
+
+    late Widget plot;
+    if (seriesData.isEmpty) {
+      plot = Container();
+    } else {
+      plot = graphic.Chart(
+        data: seriesData,
+        variables: {
+          "x": graphic.Variable(
+            accessor: (Map<String, dynamic> d) =>
+                d[series.values.first.fields[0].name] as num,
+          ),
+          "y": graphic.Variable(
+            accessor: (Map<String, dynamic> d) =>
+                d[series.values.first.fields[1].name] as num,
+          ),
+          "series": graphic.Variable(
+              accessor: (Map<String, dynamic> d) => d["series"] as String),
+        },
+        marks: [
+          graphic.PointMark(
+            position: graphic.Varset("x") *
+                graphic.Varset("y") /
+                graphic.Varset("series"),
+            size: graphic.SizeEncode(value: 15),
+            color: graphic.ColorEncode(
+              variable: "series",
+              values: [...defaultColorCycle, ...defaultColorCycle],
+              updaters: {
+                "choose": {true: (_) => Colors.red}
+              },
+            ),
+          ),
+        ],
+        axes: [
+          graphic.Defaults.horizontalAxis,
+          graphic.Defaults.verticalAxis,
+        ],
+        coord: graphic.RectCoord(
+          horizontalRange: [0.05, 0.95],
+          verticalRange: [0.05, 0.95],
+          horizontalRangeUpdater: graphic.Defaults.horizontalRangeEvent,
+          verticalRangeUpdater: graphic.Defaults.verticalRangeEvent,
+        ),
+        selections: {'choose': graphic.PointSelection(toggle: true)},
+      );
+    }
+
     return SizedBox(
       width: size.width,
       height: size.height,
@@ -113,7 +172,9 @@ class ScatterChart extends Chart {
           LayoutId(
               id: _LayoutElement.plot,
               child: Container(
-                  decoration: const BoxDecoration(color: Colors.blue))),
+                //decoration: const BoxDecoration(color: Colors.blue),
+                child: plot,
+              )),
         ],
       ),
     );
@@ -125,6 +186,7 @@ class ScatterChart extends Chart {
     Database database = dataCenter.databases.values.first;
     Schema table = database.tables.values.first;
     UniqueId newId = UniqueId.next();
+    print("adding a new Series with $newId");
     return Series(
       id: newId,
       name: "Series $newId",

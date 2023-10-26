@@ -34,7 +34,8 @@ class AppState {
 AppState appReducer(AppState state, action) {
   TimeMachine<Workspace> workspaceState =
       workspaceReducer(state.timeMachine, action);
-  if (workspaceState != state.timeMachine) {
+  if (workspaceState != state.timeMachine ||
+      action is WebSocketReceiveMessageAction) {
     return state.copyWith(timeMachine: workspaceState);
   }
   return state;

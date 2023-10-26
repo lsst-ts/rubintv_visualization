@@ -27,11 +27,11 @@ class DemoApp extends StatefulWidget {
 }
 
 class DemoAppState extends State<DemoApp> {
-  final StreamController<DataCenterUpdate> streamController =
-      StreamController.broadcast();
+  final StreamController<String> streamController =
+      StreamController<String>.broadcast();
 
   /// The websocket connection to the analysis service.
-  late final WebSocketChannel channel;
+  late final WebSocketChannel webSocket;
 
   /// Whether or not the websocket is connected.
   bool _isConnected = false;
@@ -52,13 +52,11 @@ class DemoAppState extends State<DemoApp> {
 
   Future<void> _connect() async {
     try {
-      channel = WebSocketChannel.connect(
+      webSocket = WebSocketChannel.connect(
           Uri.parse('ws://$serviceAddress:$servicePort/ws/client'));
-      channel.stream.listen(
+      webSocket.stream.listen(
         (event) {
-          setState(() {
-            messageQueue.add(event);
-          });
+          streamController.add(event);
         },
         onDone: () {
           developer.log('WebSocket connection closed.',
@@ -73,7 +71,7 @@ class DemoAppState extends State<DemoApp> {
         },
       );
 
-      channel.sink.add(LoadSchemaCommand().toJson());
+      webSocket.sink.add(LoadSchemaCommand().toJson());
       _isConnected = true;
     } catch (e) {
       developer.log('WebSocket connection failed: $e',
@@ -83,13 +81,15 @@ class DemoAppState extends State<DemoApp> {
 
   @override
   void dispose() {
-    channel.sink.close();
+    webSocket.sink.close();
+    streamController.close();
     super.dispose();
   }
 
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    print("building main app");
     ThemeData themeData = ThemeData(
       colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF058b8c)),
       useMaterial3: true,
@@ -101,7 +101,7 @@ class DemoAppState extends State<DemoApp> {
       themeData: themeData,
     );
 
-    Workspace workspace = Workspace(theme: theme);
+    Workspace workspace = Workspace(theme: theme, webSocket: webSocket);
 
     // By default use scalar algebra over the complex field
     Store<AppState> store = Store<AppState>(
@@ -110,15 +110,16 @@ class DemoAppState extends State<DemoApp> {
         timeMachine: TimeMachine.init(workspace),
       ),
       distinct: true,
+      //middleware: [webSocketMiddleware],
     );
 
-    Size screenSize = MediaQuery.of(context).size;
-
-    if (messageQueue.isNotEmpty) {
-      // Process the incoming messages in order
+    // Listen to WebSocket messages and dispatch actions
+    streamController.stream.listen((message) {
       store.dispatch(WebSocketReceiveMessageAction(
-          dataCenter: widget.dataCenter, message: messageQueue.removeAt(0)));
-    }
+          dataCenter: widget.dataCenter, message: message));
+    });
+
+    Size screenSize = MediaQuery.of(context).size;
 
     return StoreProvider<AppState>(
       store: store,
@@ -129,9 +130,10 @@ class DemoAppState extends State<DemoApp> {
           body: StoreConnector<AppState, _WorkspaceViewModel>(
             distinct: true,
             converter: (store) => _WorkspaceViewModel(
-                isConnected: _isConnected,
-                appState: store.state,
-                dispatch: store.dispatch),
+              isConnected: _isConnected,
+              appState: store.state,
+              dispatch: store.dispatch,
+            ),
             builder: (BuildContext context, _WorkspaceViewModel model) =>
                 WorkspaceViewer(
               size: screenSize,

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:redux/redux.dart';
@@ -9,6 +9,7 @@ import 'package:rubintv_visualization/chart/legend.dart';
 import 'package:rubintv_visualization/chart/scatter.dart';
 import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
+import 'package:rubintv_visualization/io.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/theme.dart';
@@ -17,6 +18,7 @@ import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/menu.dart';
 import 'package:rubintv_visualization/workspace/toolbar.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Tools for selecting unique sources.
 enum MultiSelectionTool {
@@ -52,7 +54,7 @@ class Workspace {
   final MultiSelectionTool multiSelectionTool;
 
   // The websocket connection to the analysis service.
-  final WebSocket? webSocket;
+  final WebSocketChannel? webSocket;
 
   const Workspace({
     required this.theme,
@@ -70,7 +72,7 @@ class Workspace {
     Map<UniqueId, Window>? windows,
     Map<String, Set<dynamic>>? selected,
     MultiSelectionTool? multiSelectionTool,
-    WebSocket? webSocket,
+    WebSocketChannel? webSocket,
   }) =>
       Workspace(
         theme: theme ?? this.theme,
@@ -140,6 +142,14 @@ TimeMachine<Workspace> webSocketReceiveMessageReducer(
   Map<String, dynamic> message = jsonDecode(action.message);
   if (message["type"]! == "database schema") {
     action.dataCenter.addDatabase(message["content"]);
+  } else if (message["type"] == "table columns") {
+    action.dataCenter.updateSeriesData(
+      seriesId: UniqueId.from(id: BigInt.parse(message["requestId"])),
+      columnNames:
+          List<String>.from(message["content"]["columns"].map((e) => e)),
+      data: List<List<dynamic>>.from(message["content"]["data"].map((e) => e)),
+    );
+    print("dataCenter data: ${action.dataCenter.data.keys}");
   }
   return state;
 }
@@ -284,6 +294,14 @@ TimeMachine<Workspace> updateSeriesReducer(
   Workspace workspace = state.currentState;
   Map<UniqueId, Window> windows = {...workspace.windows};
   windows[chart.id] = chart;
+
+  // Request the data from the server.
+  if (workspace.webSocket != null) {
+    workspace.webSocket!.sink.add(LoadColumnsCommand(
+      seriesId: action.series.id,
+      fields: action.series.fields,
+    ).toJson());
+  }
 
   return state.updated(TimeMachineUpdate(
     comment: comment,
@@ -467,8 +485,6 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
     if (interactionInfo != null) {
       dragEnd();
     }
-    print("Window id is ${update.windowId}");
-    print("window ids: ${info.windows.keys}");
     Window window = info.windows[update.windowId]!;
     interactionInfo = WindowDragInfo(
       id: update.windowId,

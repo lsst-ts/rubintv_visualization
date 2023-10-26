@@ -47,16 +47,9 @@ class Series {
       );
 
   Series copy() => copyWith();
-}
 
-class SeriesData {
-  final UniqueId seriesId;
-  final Map<SchemaField, dynamic> data;
-
-  const SeriesData({
-    required this.seriesId,
-    required this.data,
-  });
+  @override
+  String toString() => "Series<$id:name>";
 }
 
 /// Notify the [WorkspaceViewer] that the series has been updated
@@ -125,6 +118,7 @@ class SeriesEditorState extends State<SeriesEditor> {
 
   @override
   Widget build(BuildContext context) {
+    print("Series is $series");
     DataCenter dataCenter = widget.dataCenter;
 
     return Form(
@@ -159,10 +153,8 @@ class SeriesEditorState extends State<SeriesEditor> {
                   dataCenter: dataCenter,
                   initialValue: series.fields,
                   onSaved: (List<SchemaField?>? fields) {
-                    print("saving!");
                     series = series.copyWith(
                         fields: fields!.map((e) => e!).toList());
-                    print("New series fields: ${series.fields}");
                   },
                   validator: (List<SchemaField?>? fields) {
                     if (fields == null || fields.any((e) => e == null)) {
@@ -257,16 +249,25 @@ class ColumnEditorFormField extends FormField<List<SchemaField?>> {
                   itemCount: initialValue.length,
                   shrinkWrap: true,
                   itemBuilder: (BuildContext context, int index) {
-                    return ColumnEditor(
-                      theme: theme,
-                      dataCenter: dataCenter,
-                      initialValue: initialValue[index],
-                      onChanged: (SchemaField? field) {
-                        List<SchemaField?> fields = [...formState.value!];
-                        fields[index] = field;
-                        formState.didChange(fields);
-                      },
-                    );
+                    return Container(
+                        margin: const EdgeInsets.all(10),
+                        child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: "axis $index",
+                              border: const OutlineInputBorder(),
+                            ),
+                            child: ColumnEditor(
+                              theme: theme,
+                              dataCenter: dataCenter,
+                              initialValue: initialValue[index],
+                              onChanged: (SchemaField? field) {
+                                List<SchemaField?> fields = [
+                                  ...formState.value!
+                                ];
+                                fields[index] = field;
+                                formState.didChange(fields);
+                              },
+                            )));
                   },
                 ),
               );
@@ -344,30 +345,44 @@ class ColumnEditorState extends State<ColumnEditor> {
       mainAxisAlignment: MainAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        DropdownButton<Database>(
+        DropdownButtonFormField<Database>(
+          decoration: const InputDecoration(
+            labelText: "Database",
+            border: OutlineInputBorder(),
+          ),
           value: _database,
           items: databaseEntries,
           onChanged: (Database? newDatabase) {
             setState(() {
               _database = newDatabase;
-              _table = null;
-              _field = null;
+              _table = _database!.tables.values.first;
+              _field = _table!.fields.values.first;
             });
             widget.onChanged(_field);
           },
         ),
-        DropdownButton<Schema>(
+        const SizedBox(height: 10),
+        DropdownButtonFormField<Schema>(
+          decoration: const InputDecoration(
+            labelText: "Table",
+            border: OutlineInputBorder(),
+          ),
           value: _table,
           items: tableEntries,
           onChanged: (Schema? newTable) {
             setState(() {
               _table = newTable;
-              _field = null;
+              _field = _table!.fields.values.first;
             });
             widget.onChanged(_field);
           },
         ),
-        DropdownButton<SchemaField>(
+        const SizedBox(height: 10),
+        DropdownButtonFormField<SchemaField>(
+          decoration: const InputDecoration(
+            labelText: "Column",
+            border: OutlineInputBorder(),
+          ),
           value: _field,
           items: columnEntries,
           onChanged: (SchemaField? newField) {

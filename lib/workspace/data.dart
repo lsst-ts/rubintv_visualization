@@ -66,6 +66,9 @@ class SchemaField {
     this.bounds,
   });
 
+  /// Get the database that contains the [SchemaField].
+  Database get database => schema.database;
+
   /// Return the [SchemaField] label to be shown (for example as a [PlotAxis] label.
   String get asLabel => unit == null ? name : "$name ($unit)";
 
@@ -123,7 +126,7 @@ class DataCenterUpdate {}
 
 class DataCenter {
   final Map<String, Database> _databases = {};
-  final Map<UniqueId, SeriesData> _data = {};
+  final Map<UniqueId, List<Map<String, dynamic>>> _data = {};
 
   DataCenter();
 
@@ -185,10 +188,23 @@ class DataCenter {
     }
   }
 
-  SeriesData? getSeriesData(UniqueId id) => _data[id];
+  List<Map<String, dynamic>>? getSeriesData(UniqueId id) => _data[id];
 
-  void updateSeriesData({required UniqueId id, required SeriesData data}) {
-    _data[id] = data;
+  void updateSeriesData({
+    required UniqueId seriesId,
+    required List<dynamic> columnNames,
+    required List<List<dynamic>> data,
+  }) {
+    List<Map<String, dynamic>> result = [];
+    for (List<dynamic> row in data) {
+      Map<String, dynamic> rowDict = {};
+      for (int i = 0; i < columnNames.length; i++) {
+        rowDict[columnNames[i]] = row[i];
+      }
+      rowDict["series"] = seriesId.id.toString();
+      result.add(rowDict);
+    }
+    _data[seriesId] = result;
   }
 
   /// Check if two [SchemaField]s are compatible
@@ -197,4 +213,6 @@ class DataCenter {
 
   @override
   String toString() => "DataCenter:[${databases.keys}]";
+
+  Map<UniqueId, List<Map<String, dynamic>>> get data => {..._data};
 }

@@ -132,15 +132,6 @@ abstract class Chart extends Window {
     required Series series,
     required DataCenter dataCenter,
   }) {
-    String name = series.name;
-    // Always create new series with an index greater than all of the current series in the plot
-    UniqueId seriesId = UniqueId.next();
-    BigInt index = seriesId.id;
-    // Create a default name
-    if (name.isEmpty) {
-      name = "Series-$index";
-    }
-    series = series.copyWith(name: name, id: seriesId);
     Map<UniqueId, Series> newSeries = {..._series};
     newSeries[series.id] = series;
     Chart result = copyWith(series: newSeries);
@@ -197,7 +188,6 @@ class RubinChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print("bulding chart!");
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
     DataCenter dataCenter = workspace.dataCenter;
 

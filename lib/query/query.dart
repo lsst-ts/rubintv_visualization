@@ -48,10 +48,12 @@ class QueryError implements Exception {
   String toString() => "$runtimeType:\n\t$message";
 }
 
-class Query {
+abstract class Query {
   UniqueId id;
   QueryOperation? parent;
   Query({required this.id, this.parent});
+
+  String toJson() => throw UnimplementedError();
 }
 
 /// A query that checks that values satisfy a left and/or right equality.
