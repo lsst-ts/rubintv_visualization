@@ -72,4 +72,22 @@ class LoadColumnsCommand extends ServiceCommand {
             "query": query?.toDict(),
           },
         );
+  static LoadColumnsCommand build({
+    required List<SchemaField> fields,
+    required UniqueId seriesId,
+    required bool useGlobalQuery,
+    required Query? query,
+    required Query? globalQuery,
+  }) {
+    if (useGlobalQuery && globalQuery != null) {
+      if (query == null) {
+        return LoadColumnsCommand(
+            fields: fields, seriesId: seriesId, query: globalQuery);
+      } else {
+        return LoadColumnsCommand(
+            fields: fields, seriesId: seriesId, query: query & globalQuery);
+      }
+    }
+    return LoadColumnsCommand(fields: fields, seriesId: seriesId, query: query);
+  }
 }

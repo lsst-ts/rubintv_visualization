@@ -71,6 +71,12 @@ abstract class Query {
   Query({required this.id, this.parent});
 
   Map<String, dynamic> toDict();
+
+  Query operator &(Query other) => QueryOperation(
+        id: UniqueId.next(),
+        children: [this, other],
+        operator: QueryOperator.and,
+      );
 }
 
 /// A query that checks that values satisfy a left and/or right equality.
@@ -203,8 +209,10 @@ class QueryOperation extends Query {
   Map<String, dynamic> toDict() {
     Map<String, dynamic> result = {
       "name": "ParentQuery",
-      "operator": operator.name,
-      "children": children.map((e) => e.toDict()).toList(),
+      "content": {
+        "operator": operator.name,
+        "children": children.map((e) => e.toDict()).toList(),
+      }
     };
     return result;
   }

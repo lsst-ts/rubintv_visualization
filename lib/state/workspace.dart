@@ -80,6 +80,8 @@ class Workspace {
         selected: selected ?? this.selected,
         multiSelectionTool: multiSelectionTool ?? this.multiSelectionTool,
         webSocket: webSocket ?? this.webSocket,
+        globalQuery: globalQuery,
+        obsDate: obsDate,
       );
 
   /// Because the global query can be null, we need a special copy method.
@@ -143,6 +145,7 @@ TimeMachine<Workspace> webSocketReceiveMessageReducer(
   if (message["type"]! == "database schema") {
     action.dataCenter.addDatabase(message["content"]);
   } else if (message["type"] == "table columns") {
+    print("received data for ${message["requestId"]}");
     action.dataCenter.updateSeriesData(
       seriesId: UniqueId.from(id: BigInt.parse(message["requestId"])),
       columnNames:
@@ -172,6 +175,59 @@ TimeMachine<Workspace> updateWindowReducer(
   ));
 }
 
+class UpdateChartGlobalQueryAction extends UiAction {
+  final UniqueId chartId;
+  final bool useGlobalQuery;
+  final DataCenter dataCenter;
+  UpdateChartGlobalQueryAction({
+    required this.useGlobalQuery,
+    required this.dataCenter,
+    required this.chartId,
+  });
+}
+
+void getSeriesData(Workspace workspace, {Chart? chart}) {
+  late final List<Chart> charts;
+  if (chart != null) {
+    charts = [chart];
+  } else {
+    charts = workspace.windows.values.whereType<Chart>().toList();
+  }
+  // Request the data from the server.
+  if (workspace.webSocket != null && workspace.globalQuery != null) {
+    for (Chart chart in charts) {
+      for (Series series in chart.series.values) {
+        workspace.webSocket!.sink.add(LoadColumnsCommand.build(
+          seriesId: series.id,
+          fields: series.fields,
+          query: series.query,
+          useGlobalQuery: chart.useGlobalQuery,
+          globalQuery: workspace.globalQuery,
+        ).toJson());
+      }
+    }
+  }
+}
+
+TimeMachine<Workspace> updateChartGlobalQueryReducer(
+  TimeMachine<Workspace> state,
+  UpdateChartGlobalQueryAction action,
+) {
+  Workspace workspace = state.currentState;
+  Map<UniqueId, Window> windows = {...workspace.windows};
+  Chart chart = windows[action.chartId] as Chart;
+  chart = chart.copyWith(useGlobalQuery: action.useGlobalQuery);
+  windows[chart.id] = chart;
+
+  workspace = workspace.copyWith(windows: windows);
+  getSeriesData(workspace, chart: chart);
+
+  return state.updated(TimeMachineUpdate(
+    comment: "update chart global query",
+    state: workspace,
+  ));
+}
+
 class UpdateGlobalQueryAction extends UiAction {
   final Query? query;
 
@@ -184,6 +240,7 @@ TimeMachine<Workspace> updateGlobalQueryReducer(
 ) {
   Workspace workspace = state.currentState;
   workspace = workspace.updateGlobalQuery(action.query);
+  getSeriesData(workspace);
   return state.updated(TimeMachineUpdate(
     comment: "update global query",
     state: workspace,
@@ -228,6 +285,7 @@ TimeMachine<Workspace> newScatterChartReducer(
     series: {},
     axes: [null, null],
     legend: ChartLegend(location: ChartLegendLocation.right),
+    useGlobalQuery: true,
   ));
 
   return state.updated(TimeMachineUpdate(
@@ -298,10 +356,12 @@ TimeMachine<Workspace> updateSeriesReducer(
   // Request the data from the server.
   if (workspace.webSocket != null) {
     Query? query = action.series.query;
-    workspace.webSocket!.sink.add(LoadColumnsCommand(
+    workspace.webSocket!.sink.add(LoadColumnsCommand.build(
       seriesId: action.series.id,
       fields: action.series.fields,
       query: query,
+      globalQuery: workspace.globalQuery,
+      useGlobalQuery: chart.useGlobalQuery,
     ).toJson());
   }
 
@@ -340,6 +400,8 @@ Reducer<TimeMachine<Workspace>> workspaceReducer =
   TypedReducer<TimeMachine<Workspace>, UpdateGlobalObsDateAction>(
       updateGlobalObsDateReducer),
   TypedReducer<TimeMachine<Workspace>, SeriesUpdateAction>(updateSeriesReducer),
+  TypedReducer<TimeMachine<Workspace>, UpdateChartGlobalQueryAction>(
+      updateChartGlobalQueryReducer),
   /*TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
   TypedReducer<TimeMachine<Workspace>, RectSelectionAction>(
       rectSelectionReducer),

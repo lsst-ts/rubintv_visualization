@@ -18,15 +18,19 @@ abstract class Chart extends Window {
   final ChartLegend legend;
   final List<PlotAxis?> _axes;
 
-  Chart({
-    required super.id,
-    required super.offset,
-    super.title,
-    required super.size,
-    required Map<UniqueId, Series> series,
-    required List<PlotAxis?> axes,
-    required this.legend,
-  })  : _series = Map.unmodifiable(series),
+  /// Whether or not to use the global query for all series in this [Chart].
+  final bool useGlobalQuery;
+
+  Chart(
+      {required super.id,
+      required super.offset,
+      super.title,
+      required super.size,
+      required Map<UniqueId, Series> series,
+      required List<PlotAxis?> axes,
+      required this.legend,
+      required this.useGlobalQuery})
+      : _series = Map.unmodifiable(series),
         _axes = List.unmodifiable(axes);
 
   /// Return a copy of the internal [Map] of [Series], to prevent updates.
@@ -44,6 +48,7 @@ abstract class Chart extends Window {
     Map<UniqueId, Series>? series,
     List<PlotAxis?>? axes,
     ChartLegend? legend,
+    bool? useGlobalQuery,
   });
 
   /// Create a new [Widget] to display in a [WorkspaceViewer].
@@ -162,18 +167,33 @@ abstract class Chart extends Window {
   @override
   Widget? createToolbar(BuildContext context) {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.redAccent,
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: const Icon(Icons.close, color: Colors.white),
+    return Row(children: [
+      IconButton(
+        icon: useGlobalQuery
+            ? const Icon(Icons.travel_explore, color: Colors.green)
+            : const Icon(Icons.public_off, color: Colors.grey),
         onPressed: () {
-          workspace.dispatch(RemoveWindowAction(this));
+          workspace.dispatch(UpdateChartGlobalQueryAction(
+            useGlobalQuery: !useGlobalQuery,
+            dataCenter: workspace.dataCenter,
+            chartId: id,
+          ));
         },
       ),
-    );
+      const SizedBox(width: 10),
+      Container(
+        decoration: const BoxDecoration(
+          color: Colors.redAccent,
+          shape: BoxShape.circle,
+        ),
+        child: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () {
+            workspace.dispatch(RemoveWindowAction(this));
+          },
+        ),
+      )
+    ]);
   }
 }
 

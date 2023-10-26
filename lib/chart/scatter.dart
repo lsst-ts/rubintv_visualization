@@ -57,6 +57,7 @@ class ScatterChart extends Chart {
     required super.series,
     required super.axes,
     required super.legend,
+    required super.useGlobalQuery,
   });
 
   @override
@@ -68,6 +69,7 @@ class ScatterChart extends Chart {
     Map<UniqueId, Series>? series,
     List<PlotAxis?>? axes,
     ChartLegend? legend,
+    bool? useGlobalQuery,
   }) =>
       ScatterChart(
         id: id ?? this.id,
@@ -77,6 +79,7 @@ class ScatterChart extends Chart {
         series: series ?? this.series,
         axes: axes ?? this.axes,
         legend: legend ?? this.legend,
+        useGlobalQuery: useGlobalQuery ?? this.useGlobalQuery,
       );
 
   /// Create the internal chart, not including the [ChartLegend].
