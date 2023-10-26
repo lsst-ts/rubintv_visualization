@@ -117,6 +117,12 @@ class SeriesEditorState extends State<SeriesEditor> {
     series = series.copyWith(query: query);
   }
 
+  void updateColumn(SchemaField? column, int index) {
+    List<SchemaField> fields = [...series.fields];
+    fields[index] = column!;
+    series = series.copyWith(fields: fields);
+  }
+
   @override
   Widget build(BuildContext context) {
     DataCenter dataCenter = widget.dataCenter;
@@ -148,7 +154,23 @@ class SeriesEditorState extends State<SeriesEditor> {
                   },
                 ),
                 const SizedBox(height: 10),
-                ColumnEditor(theme: theme, dataCenter: dataCenter),
+                ColumnEditorFormField(
+                  theme: theme,
+                  dataCenter: dataCenter,
+                  initialValue: series.fields,
+                  onSaved: (List<SchemaField?>? fields) {
+                    print("saving!");
+                    series = series.copyWith(
+                        fields: fields!.map((e) => e!).toList());
+                    print("New series fields: ${series.fields}");
+                  },
+                  validator: (List<SchemaField?>? fields) {
+                    if (fields == null || fields.any((e) => e == null)) {
+                      return "All fields in the series must be initialized!";
+                    }
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 10),
                 /*DropdownButtonFormField<String>(
                   value: groupByColumn,
@@ -193,6 +215,7 @@ class SeriesEditorState extends State<SeriesEditor> {
                     IconButton(
                       onPressed: () {
                         if (_formKey.currentState!.validate()) {
+                          _formKey.currentState!.save();
                           widget.dispatch(SeriesUpdateAction(
                             series: series,
                             groupByColumn: groupByColumn,
@@ -212,14 +235,56 @@ class SeriesEditorState extends State<SeriesEditor> {
   }
 }
 
+class ColumnEditorFormField extends FormField<List<SchemaField?>> {
+  final AppTheme theme;
+  final DataCenter dataCenter;
+
+  ColumnEditorFormField({
+    super.key,
+    required this.theme,
+    required this.dataCenter,
+    required FormFieldSetter<List<SchemaField?>> onSaved,
+    required FormFieldValidator<List<SchemaField?>> validator,
+    required List<SchemaField?> initialValue,
+    bool autovalidate = false,
+  }) : super(
+            onSaved: onSaved,
+            validator: validator,
+            initialValue: initialValue,
+            builder: (FormFieldState<List<SchemaField?>> formState) {
+              return Container(
+                child: ListView.builder(
+                  itemCount: initialValue.length,
+                  shrinkWrap: true,
+                  itemBuilder: (BuildContext context, int index) {
+                    return ColumnEditor(
+                      theme: theme,
+                      dataCenter: dataCenter,
+                      initialValue: initialValue[index],
+                      onChanged: (SchemaField? field) {
+                        List<SchemaField?> fields = [...formState.value!];
+                        fields[index] = field;
+                        formState.didChange(fields);
+                      },
+                    );
+                  },
+                ),
+              );
+            });
+}
+
 class ColumnEditor extends StatefulWidget {
   final AppTheme theme;
   final DataCenter dataCenter;
+  final ValueChanged<SchemaField?> onChanged;
+  final SchemaField? initialValue;
 
   const ColumnEditor({
     super.key,
     required this.theme,
     required this.dataCenter,
+    required this.onChanged,
+    required this.initialValue,
   });
 
   @override
@@ -229,76 +294,91 @@ class ColumnEditor extends StatefulWidget {
 class ColumnEditorState extends State<ColumnEditor> {
   AppTheme get theme => widget.theme;
   DataCenter get dataCenter => widget.dataCenter;
+
+  @override
+  void initState() {
+    super.initState();
+    _field = widget.initialValue;
+  }
+
+  @override
+  void didUpdateWidget(ColumnEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialValue != oldWidget.initialValue) {
+      _field = widget.initialValue;
+    }
+  }
+
   Database? _database;
   Schema? _table;
   SchemaField? _field;
 
   @override
   Widget build(BuildContext context) {
-    final List<DropdownMenuItem<Database>> databaseEntries = dataCenter
+    if (_field != null) {
+      _table = _field!.schema;
+      _database = _table!.database;
+    }
+
+    List<DropdownMenuItem<Database>> databaseEntries = dataCenter
         .databases.entries
         .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
         .toList();
 
-    _database ??= dataCenter.databases.values.first;
+    List<DropdownMenuItem<Schema>> tableEntries = [];
+    List<DropdownMenuItem<SchemaField>> columnEntries = [];
 
-    final List<DropdownMenuItem<Schema>> tableEntries = _database!
-        .tables.entries
-        .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
-        .toList();
+    if (_database != null) {
+      tableEntries = _database!.tables.entries
+          .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
+          .toList();
+    }
 
-    _table ??= _database!.tables.values.first;
-
-    final List<DropdownMenuItem<SchemaField>> columnEntries = _table!
-        .fields.values
-        .map((e) => DropdownMenuItem(value: e, child: Text(e.name)))
-        .toList();
-
-    List<Widget> children = [
-      DropdownButtonFormField(
-        value: _database,
-        items: databaseEntries,
-        onChanged: (Database? database) {
-          setState(() {
-            _database = _database;
-          });
-        },
-      ),
-      DropdownButtonFormField(
-        value: _table,
-        items: tableEntries,
-        onChanged: (Schema? table) {
-          setState(() {
-            _table = table;
-          });
-        },
-      ),
-      DropdownButtonFormField(
-        value: _field,
-        items: columnEntries,
-        onChanged: (SchemaField? field) {
-          setState(() {
-            _field = field;
-          });
-        },
-        validator: (SchemaField? value) {
-          /*List<int>? mismatched =
-              info.canAddSeries(series: series, dataCenter: dataCenter);
-          if (mismatched == null) {
-            return "Mismatch between columns and plot axes";
-          }
-          if (mismatched.contains(i)) {
-            return "Column is not compatible with plot axes";
-          }*/
-          return null;
-        },
-      ),
-    ];
+    if (_table != null) {
+      columnEntries = _table!.fields.values
+          .map((e) => DropdownMenuItem(value: e, child: Text(e.name)))
+          .toList();
+    }
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
-      children: children,
+      children: [
+        DropdownButton<Database>(
+          value: _database,
+          items: databaseEntries,
+          onChanged: (Database? newDatabase) {
+            setState(() {
+              _database = newDatabase;
+              _table = null;
+              _field = null;
+            });
+            widget.onChanged(_field);
+          },
+        ),
+        DropdownButton<Schema>(
+          value: _table,
+          items: tableEntries,
+          onChanged: (Schema? newTable) {
+            setState(() {
+              _table = newTable;
+              _field = null;
+            });
+            widget.onChanged(_field);
+          },
+        ),
+        DropdownButton<SchemaField>(
+          value: _field,
+          items: columnEntries,
+          onChanged: (SchemaField? newField) {
+            setState(() {
+              newField ??= _table!.fields.values.first;
+              _field = newField;
+            });
+            widget.onChanged(newField);
+          },
+        ),
+      ],
     );
   }
 }
