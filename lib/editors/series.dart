@@ -49,7 +49,7 @@ class Series {
   Series copy() => copyWith();
 
   @override
-  String toString() => "Series<$id:name>";
+  String toString() => "Series<$id:$name>";
 }
 
 /// Notify the [WorkspaceViewer] that the series has been updated
@@ -127,44 +127,41 @@ class SeriesEditorState extends State<SeriesEditor> {
         padding: const EdgeInsets.all(20),
         child: SizedBox(
           width: 400,
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  onChanged: (String value) {
-                    series = series.copyWith(name: value);
-                  },
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    label: Text("name"),
-                  ),
-                  validator: (String? value) {
-                    if (value == null || value.isEmpty) {
-                      return "The series must have a name";
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 10),
-                ColumnEditorFormField(
-                  theme: theme,
-                  dataCenter: dataCenter,
-                  initialValue: series.fields,
-                  onSaved: (List<SchemaField?>? fields) {
-                    series = series.copyWith(
-                        fields: fields!.map((e) => e!).toList());
-                  },
-                  validator: (List<SchemaField?>? fields) {
-                    if (fields == null || fields.any((e) => e == null)) {
-                      return "All fields in the series must be initialized!";
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 10),
-                /*DropdownButtonFormField<String>(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            TextFormField(
+              controller: nameController,
+              onChanged: (String value) {
+                series = series.copyWith(name: value);
+              },
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                label: Text("name"),
+              ),
+              validator: (String? value) {
+                if (value == null || value.isEmpty) {
+                  return "The series must have a name";
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 10),
+            ColumnEditorFormField(
+              theme: theme,
+              dataCenter: dataCenter,
+              initialValue: series.fields,
+              onSaved: (List<SchemaField?>? fields) {
+                series = series.copyWith(fields: fields!.map((e) => e!).toList());
+              },
+              validator: (List<SchemaField?>? fields) {
+                if (fields == null || fields.any((e) => e == null)) {
+                  return "All fields in the series must be initialized!";
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 10),
+            /*DropdownButtonFormField<String>(
                   value: groupByColumn,
                   items: groupNameEntries,
                   decoration: widget.theme.queryTextDecoration.copyWith(
@@ -176,51 +173,49 @@ class SeriesEditorState extends State<SeriesEditor> {
                     });
                   },
                 ),*/
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        showDialog(
-                            context: context,
-                            builder: (BuildContext context) => Dialog(
-                                  child: QueryEditor(
-                                    theme: theme,
-                                    expression: QueryExpression(
-                                      queries: series.query == null
-                                          ? []
-                                          : [series.query!],
-                                      dataCenter: dataCenter,
-                                    ),
-                                    onCompleted: updateQuery,
-                                  ),
-                                ));
-                      },
-                      icon: const Icon(Icons.query_stats),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      icon: const Icon(Icons.cancel, color: Colors.red),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        if (_formKey.currentState!.validate()) {
-                          _formKey.currentState!.save();
-                          widget.dispatch(SeriesUpdateAction(
-                            series: series,
-                            groupByColumn: groupByColumn,
-                            dataCenter: dataCenter,
-                          ));
-                          Navigator.pop(context);
-                        }
-                      },
-                      icon: const Icon(Icons.check_circle, color: Colors.green),
-                    ),
-                  ],
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () {
+                    showDialog(
+                        context: context,
+                        builder: (BuildContext context) => Dialog(
+                              child: QueryEditor(
+                                theme: theme,
+                                expression: QueryExpression(
+                                  queries: series.query == null ? [] : [series.query!],
+                                  dataCenter: dataCenter,
+                                ),
+                                onCompleted: updateQuery,
+                              ),
+                            ));
+                  },
+                  icon: const Icon(Icons.query_stats),
                 ),
-              ]),
+                const Spacer(),
+                IconButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.cancel, color: Colors.red),
+                ),
+                IconButton(
+                  onPressed: () {
+                    if (_formKey.currentState!.validate()) {
+                      _formKey.currentState!.save();
+                      widget.dispatch(SeriesUpdateAction(
+                        series: series,
+                        groupByColumn: groupByColumn,
+                        dataCenter: dataCenter,
+                      ));
+                      Navigator.pop(context);
+                    }
+                  },
+                  icon: const Icon(Icons.check_circle, color: Colors.green),
+                ),
+              ],
+            ),
+          ]),
         ),
       ),
     );
@@ -261,9 +256,7 @@ class ColumnEditorFormField extends FormField<List<SchemaField?>> {
                               dataCenter: dataCenter,
                               initialValue: initialValue[index],
                               onChanged: (SchemaField? field) {
-                                List<SchemaField?> fields = [
-                                  ...formState.value!
-                                ];
+                                List<SchemaField?> fields = [...formState.value!];
                                 fields[index] = field;
                                 formState.didChange(fields);
                               },
@@ -321,8 +314,7 @@ class ColumnEditorState extends State<ColumnEditor> {
       _database = _table!.database;
     }
 
-    List<DropdownMenuItem<Database>> databaseEntries = dataCenter
-        .databases.entries
+    List<DropdownMenuItem<Database>> databaseEntries = dataCenter.databases.entries
         .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
         .toList();
 
@@ -330,15 +322,13 @@ class ColumnEditorState extends State<ColumnEditor> {
     List<DropdownMenuItem<SchemaField>> columnEntries = [];
 
     if (_database != null) {
-      tableEntries = _database!.tables.entries
-          .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
-          .toList();
+      tableEntries =
+          _database!.tables.entries.map((e) => DropdownMenuItem(value: e.value, child: Text(e.key))).toList();
     }
 
     if (_table != null) {
-      columnEntries = _table!.fields.values
-          .map((e) => DropdownMenuItem(value: e, child: Text(e.name)))
-          .toList();
+      columnEntries =
+          _table!.fields.values.map((e) => DropdownMenuItem(value: e, child: Text(e.name))).toList();
     }
 
     return Column(

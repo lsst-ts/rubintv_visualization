@@ -102,10 +102,8 @@ class EqualityQuery extends Query {
     required this.field,
     this.rightOperator,
     this.rightValue,
-  }) : assert((leftValue == null && leftOperator == null ||
-                leftValue != null && leftOperator != null) &&
-            (rightValue == null && rightOperator == null ||
-                rightValue != null && rightOperator != null));
+  }) : assert((leftValue == null && leftOperator == null || leftValue != null && leftOperator != null) &&
+            (rightValue == null && rightOperator == null || rightValue != null && rightOperator != null));
 
   @override
   String toString() {
@@ -132,7 +130,7 @@ class EqualityQuery extends Query {
       leftQuery = {
         "name": "EqualityQuery",
         "content": {
-          "column": field.name,
+          "column": "${field.schema.name}.${field.name}",
           "operator": leftOperator!.queryLeft,
           "value": "$leftValue",
         }
@@ -142,7 +140,7 @@ class EqualityQuery extends Query {
       rightQuery = {
         "name": "EqualityQuery",
         "content": {
-          "column": field.name,
+          "column": "${field.schema.name}.${field.name}",
           "operator": rightOperator!.queryRight,
           "value": "$rightValue",
         }

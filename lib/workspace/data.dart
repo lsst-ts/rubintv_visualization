@@ -88,12 +88,11 @@ typedef ExtremaCallback<T> = bool Function(T lhs, T rhs);
 
 class Schema {
   final String name;
-  final String indexColumn;
+  final List<String> indexColumns;
   final Map<String, SchemaField> fields;
   late final Database database;
 
-  Schema(
-      {required this.name, required this.indexColumn, required this.fields}) {
+  Schema({required this.name, required this.indexColumns, required this.fields}) {
     for (SchemaField field in fields.values) {
       field.schema = this;
     }
@@ -131,8 +130,8 @@ class DataCenter {
 
   Map<String, Database> get databases => {..._databases};
 
-  void addDatabase(Map<String, dynamic> schema_dict) {
-    if (!schema_dict.containsKey("name")) {
+  void addDatabase(Map<String, dynamic> schemaDict) {
+    if (!schemaDict.containsKey("name")) {
       String msg = "Schema does not contain a name";
       Fluttertoast.showToast(
           msg: msg,
@@ -148,7 +147,7 @@ class DataCenter {
 
     try {
       Map<String, Schema> tables = {};
-      for (Map<String, dynamic> tableDict in schema_dict["tables"]) {
+      for (Map<String, dynamic> tableDict in schemaDict["tables"]) {
         List<SchemaField> fields = [];
         for (Map<String, dynamic> column in tableDict["columns"]) {
           fields.add(
@@ -161,15 +160,13 @@ class DataCenter {
         }
         Schema schema = Schema(
             name: tableDict["name"],
-            indexColumn: tableDict["index_column"],
+            indexColumns: tableDict["index_columns"].map<String>((e) => e.toString()).toList(),
             fields: Map.fromIterable(fields, key: (e) => e.name));
         tables[tableDict["name"]!] = schema;
       }
 
-      Database database = Database(
-          name: schema_dict["name"],
-          description: schema_dict["description"],
-          tables: tables);
+      Database database =
+          Database(name: schemaDict["name"], description: schemaDict["description"], tables: tables);
       _databases[database.name] = database;
     } catch (e, s) {
       print("error: $e");
@@ -207,8 +204,7 @@ class DataCenter {
   }
 
   /// Check if two [SchemaField]s are compatible
-  bool isFieldCompatible(SchemaField field1, SchemaField field2) =>
-      throw UnimplementedError();
+  bool isFieldCompatible(SchemaField field1, SchemaField field2) => throw UnimplementedError();
 
   @override
   String toString() => "DataCenter:[${databases.keys}]";

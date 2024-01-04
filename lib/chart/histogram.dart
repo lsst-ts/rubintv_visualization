@@ -4,14 +4,66 @@ import 'package:rubintv_visualization/chart/axis.dart';
 import 'package:rubintv_visualization/chart/cartesian.dart';
 import 'package:rubintv_visualization/chart/chart.dart';
 import 'package:rubintv_visualization/chart/legend.dart';
+import 'package:rubintv_visualization/chart/marker.dart';
 import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
+import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 
-class ScatterChart extends Chart {
-  ScatterChart({
+enum HistogramAggregation {
+  count,
+  sum,
+  mean,
+  median;
+
+  String get axisName => toString().split(".").last;
+}
+
+class HistogramSeries extends Series {
+  final HistogramAggregation aggregation;
+  final int nBins;
+
+  HistogramSeries({
+    required super.id,
+    required super.name,
+    required super.fields,
+    required super.chart,
+    super.marker,
+    super.errorBarSettings,
+    super.query,
+    required this.aggregation,
+    required this.nBins,
+  });
+
+  @override
+  HistogramSeries copyWith({
+    UniqueId? id,
+    String? name,
+    List<SchemaField>? fields,
+    Chart? chart,
+    MarkerSettings? marker,
+    ErrorBarSettings? errorBarSettings,
+    Query? query,
+    HistogramAggregation? aggregation,
+    int? nBins,
+  }) =>
+      HistogramSeries(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        fields: fields ?? this.fields,
+        chart: chart ?? this.chart,
+        marker: marker ?? this.marker,
+        errorBarSettings: errorBarSettings ?? this.errorBarSettings,
+        query: query ?? this.query,
+        aggregation: aggregation ?? this.aggregation,
+        nBins: nBins ?? this.nBins,
+      );
+}
+
+class Histogram extends Chart {
+  Histogram({
     required super.id,
     required super.offset,
     super.title,
@@ -33,7 +85,7 @@ class ScatterChart extends Chart {
     ChartLegend? legend,
     bool? useGlobalQuery,
   }) =>
-      ScatterChart(
+      Histogram(
         id: id ?? this.id,
         offset: offset ?? this.offset,
         size: size ?? this.size,
@@ -79,41 +131,34 @@ class ScatterChart extends Chart {
         variables: {
           "x": graphic.Variable(
             accessor: (Map<String, dynamic> d) =>
-                d[series.values.first.fields[0].name] as num,
+                d[series.values.first.fields[0].name] as String,
           ),
           "y": graphic.Variable(
-            accessor: (Map<String, dynamic> d) =>
-                d[series.values.first.fields[1].name] as num,
+            accessor: (Map<String, dynamic> d) => d["value"] as num,
           ),
           "series": graphic.Variable(
               accessor: (Map<String, dynamic> d) => d["series"] as String),
         },
         marks: [
-          graphic.PointMark(
+          graphic.IntervalMark(
             position: graphic.Varset("x") *
                 graphic.Varset("y") /
                 graphic.Varset("series"),
-            size: graphic.SizeEncode(value: 15),
-            color: graphic.ColorEncode(
+            size: graphic.SizeEncode(value: 10),
+            /*color: graphic.ColorEncode(
               variable: "series",
-              values: [...defaultColorCycle, ...defaultColorCycle],
+              values: [...defaultColorCycle, ...defaultColorCycle, ...defaultColorCycle],
               updaters: {
                 "choose": {true: (_) => Colors.red}
               },
-            ),
+            ),*/
           ),
         ],
         axes: [
-          graphic.Defaults.horizontalAxis,
+          graphic.Defaults.horizontalAxis..tickLine = graphic.TickLine(),
           graphic.Defaults.verticalAxis,
         ],
-        coord: graphic.RectCoord(
-          horizontalRange: [0.05, 0.95],
-          verticalRange: [0.05, 0.95],
-          horizontalRangeUpdater: graphic.Defaults.horizontalRangeEvent,
-          verticalRangeUpdater: graphic.Defaults.verticalRangeEvent,
-        ),
-        selections: {'choose': graphic.PointSelection(toggle: true)},
+        selections: {'tap': graphic.PointSelection(dim: graphic.Dim.x)},
       );
     }
 
@@ -154,11 +199,11 @@ class ScatterChart extends Chart {
     return Series(
       id: newId,
       name: "Series $newId",
-      fields: table.fields.values.toList().sublist(0, 2),
+      fields: table.fields.values.toList().sublist(0, 1),
       chart: this,
     );
   }
 
   @override
-  int get nMaxAxes => 2;
+  int get nMaxAxes => 1;
 }
