@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:graphic/graphic.dart' as graphic;
 import 'package:rubintv_visualization/chart/axis.dart';
 import 'package:rubintv_visualization/chart/cartesian.dart';
 import 'package:rubintv_visualization/chart/chart.dart';
@@ -78,21 +77,16 @@ class ScatterChart extends Chart {
         data: seriesData,
         variables: {
           "x": graphic.Variable(
-            accessor: (Map<String, dynamic> d) =>
-                d[series.values.first.fields[0].name] as num,
+            accessor: (Map<String, dynamic> d) => d[series.values.first.fields[0].name] as num,
           ),
           "y": graphic.Variable(
-            accessor: (Map<String, dynamic> d) =>
-                d[series.values.first.fields[1].name] as num,
+            accessor: (Map<String, dynamic> d) => d[series.values.first.fields[1].name] as num,
           ),
-          "series": graphic.Variable(
-              accessor: (Map<String, dynamic> d) => d["series"] as String),
+          "series": graphic.Variable(accessor: (Map<String, dynamic> d) => d["series"] as String),
         },
         marks: [
           graphic.PointMark(
-            position: graphic.Varset("x") *
-                graphic.Varset("y") /
-                graphic.Varset("series"),
+            position: graphic.Varset("x") * graphic.Varset("y") / graphic.Varset("series"),
             size: graphic.SizeEncode(value: 15),
             color: graphic.ColorEncode(
               variable: "series",

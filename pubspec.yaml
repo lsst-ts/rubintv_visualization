@@ -46,8 +46,6 @@ dependencies:
   web_socket_channel: ^2.4.0
   # Display feedback to the user
   fluttertoast: ^8.2.2
-  # Graphic plotting library
-  graphic: ^2.2.1
 
 dev_dependencies:
   flutter_test:

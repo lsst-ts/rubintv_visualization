@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:graphic/graphic.dart' as graphic;
 import 'package:rubintv_visualization/chart/axis.dart';
 import 'package:rubintv_visualization/chart/cartesian.dart';
 import 'package:rubintv_visualization/chart/chart.dart';
@@ -126,24 +125,20 @@ class Histogram extends Chart {
     if (seriesData.isEmpty) {
       plot = Container();
     } else {
-      plot = graphic.Chart(
+      /*plot = graphic.Chart(
         data: seriesData,
         variables: {
           "x": graphic.Variable(
-            accessor: (Map<String, dynamic> d) =>
-                d[series.values.first.fields[0].name] as String,
+            accessor: (Map<String, dynamic> d) => d[series.values.first.fields[0].name] as String,
           ),
           "y": graphic.Variable(
             accessor: (Map<String, dynamic> d) => d["value"] as num,
           ),
-          "series": graphic.Variable(
-              accessor: (Map<String, dynamic> d) => d["series"] as String),
+          "series": graphic.Variable(accessor: (Map<String, dynamic> d) => d["series"] as String),
         },
         marks: [
           graphic.IntervalMark(
-            position: graphic.Varset("x") *
-                graphic.Varset("y") /
-                graphic.Varset("series"),
+            position: graphic.Varset("x") * graphic.Varset("y") / graphic.Varset("series"),
             size: graphic.SizeEncode(value: 10),
             /*color: graphic.ColorEncode(
               variable: "series",
@@ -159,7 +154,7 @@ class Histogram extends Chart {
           graphic.Defaults.verticalAxis,
         ],
         selections: {'tap': graphic.PointSelection(dim: graphic.Dim.x)},
-      );
+      );*/
     }
 
     return SizedBox(
