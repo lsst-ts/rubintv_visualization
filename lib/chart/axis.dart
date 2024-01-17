@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:rubintv_visualization/chart/mapping.dart';
 import 'package:rubintv_visualization/utils.dart';
 
 /// The orientation of a plot axis
@@ -10,6 +12,7 @@ enum AxisOrientation {
 }
 
 /// Major or minor ticks for a [PlotAxis].
+@immutable
 class AxisTicks {
   /// Factor that all of the ticks are multiples of.
   final double tickFactor;
@@ -134,6 +137,7 @@ List<String> tickToString({
 }
 
 /// Parameters needed to define an axis.
+@immutable
 class PlotAxis {
   /// The orientation of the axis.
   final AxisOrientation orientation;
@@ -150,12 +154,17 @@ class PlotAxis {
   /// True if the displayed axis is inverted
   final bool isInverted;
 
+  /// The mapping from the axis to the plot.
+  /// This is usually linear but can be log, exponential, etc.
+  final Mapping mapping;
+
   const PlotAxis({
     required this.label,
     required this.bounds,
     required this.orientation,
     this.boundsFixed = false,
     this.isInverted = false,
+    this.mapping = const LinearMapping(),
   });
 
   PlotAxis copyWith({
@@ -164,6 +173,7 @@ class PlotAxis {
     AxisOrientation? orientation,
     bool? boundsFixed,
     bool? isInverted,
+    Mapping? mapping,
   }) =>
       PlotAxis(
         label: label ?? this.label,
@@ -171,6 +181,7 @@ class PlotAxis {
         orientation: orientation ?? this.orientation,
         boundsFixed: boundsFixed ?? this.boundsFixed,
         isInverted: isInverted ?? this.isInverted,
+        mapping: mapping ?? this.mapping,
       );
 
   /// Make a copy of this [PlotAxis].

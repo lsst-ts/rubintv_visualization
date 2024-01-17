@@ -12,8 +12,7 @@ import 'package:rubintv_visualization/workspace/data.dart';
 typedef SeriesQueryCallback = void Function(Query? query);
 
 /// Callback to update an [EqualityOperator] in an [EqualityQueryWidget].
-typedef UpdateEqualityOperatorCallback = void Function(
-    EqualityOperator? operator);
+typedef UpdateEqualityOperatorCallback = void Function(EqualityOperator? operator);
 
 /// Callback to update a [QueryOperator] in an [EqualityQueryWidget].
 typedef UpdateQueryOperatorCallback = void Function(QueryOperator? operator);
@@ -59,8 +58,7 @@ class EqualityOperatorWidgetState extends State<EqualityOperatorWidget> {
           .map((EqualityOperator operator) => DropdownMenuItem(
                 value: operator,
                 child: Container(
-                  constraints:
-                      const BoxConstraints(minWidth: kMinInteractiveDimension),
+                  constraints: const BoxConstraints(minWidth: kMinInteractiveDimension),
                   child: Text(
                     operator.symbol,
                     style: widget.theme.queryOperatorStyle,
@@ -126,8 +124,7 @@ class EqualityQueryWidgetState extends State<EqualityQueryWidget> {
       query.leftOperator = null;
     } else {
       query.leftOperator = operator;
-      query.leftValue =
-          query.field.bounds == null ? 0 : query.field.bounds!.max;
+      query.leftValue = query.field.bounds == null ? 0 : query.field.bounds!.max;
     }
     widget.dispatch(const QueryUpdate());
     setState(() {});
@@ -140,8 +137,7 @@ class EqualityQueryWidgetState extends State<EqualityQueryWidget> {
       query.rightOperator = null;
     } else {
       query.rightOperator = operator;
-      query.rightValue =
-          query.field.bounds == null ? 0 : query.field.bounds!.min;
+      query.rightValue = query.field.bounds == null ? 0 : query.field.bounds!.min;
     }
     widget.dispatch(const QueryUpdate());
     setState(() {});
@@ -163,8 +159,7 @@ class EqualityQueryWidgetState extends State<EqualityQueryWidget> {
     List<Widget> children = [];
     if (query.leftValue != null) {
       // Add a TextField for the left (<, <=) condition
-      leftController ??=
-          TextEditingController(text: query.leftValue!.toString());
+      leftController ??= TextEditingController(text: query.leftValue!.toString());
       children.add(SizedBox(
         width: 100,
         child: TextField(
@@ -185,11 +180,7 @@ class EqualityQueryWidgetState extends State<EqualityQueryWidget> {
       children.add(EqualityOperatorWidget(
         theme: theme,
         operator: EqualityOperator.blank,
-        availableOperators: const {
-          EqualityOperator.lt,
-          EqualityOperator.lte,
-          EqualityOperator.blank
-        },
+        availableOperators: const {EqualityOperator.lt, EqualityOperator.lte, EqualityOperator.blank},
         updateEqualityOperatorCallback: addLeftCondition,
       ));
     }
@@ -233,8 +224,7 @@ class EqualityQueryWidgetState extends State<EqualityQueryWidget> {
 
     if (query.rightValue != null) {
       // Create a TextField for the right condition value
-      rightController ??=
-          TextEditingController(text: query.rightValue!.toString());
+      rightController ??= TextEditingController(text: query.rightValue!.toString());
       children.add(SizedBox(
         width: 100,
         child: TextField(
@@ -303,8 +293,7 @@ class QueryOperatorWidgetState extends State<QueryOperatorWidget> {
           .map((QueryOperator operator) => DropdownMenuItem(
                 value: operator,
                 child: Container(
-                  constraints:
-                      const BoxConstraints(minWidth: kMinInteractiveDimension),
+                  constraints: const BoxConstraints(minWidth: kMinInteractiveDimension),
                   child: Text(
                     operator.symbol,
                     style: widget.theme.queryOperatorStyle,
@@ -369,23 +358,15 @@ class QueryOperationWidgetState extends State<QueryOperationWidget> {
   }
 
   /// To be used when the [Column] is changed changed to an [AnimatedList].
-  Widget _buildItem(
-      BuildContext context, int index, Animation<double> animation) {
+  Widget _buildItem(BuildContext context, int index, Animation<double> animation) {
     return QueryWidget(
-        theme: theme,
-        dispatch: dispatch,
-        depth: widget.depth + 1,
-        query: query.children[index]);
+        theme: theme, dispatch: dispatch, depth: widget.depth + 1, query: query.children[index]);
   }
 
   @override
   Widget build(BuildContext context) {
     List<Widget> children = query.children
-        .map((Query q) => QueryWidget(
-            theme: theme,
-            dispatch: dispatch,
-            depth: widget.depth + 1,
-            query: q))
+        .map((Query q) => QueryWidget(theme: theme, dispatch: dispatch, depth: widget.depth + 1, query: q))
         .toList();
 
     return Row(
@@ -454,8 +435,7 @@ class NewQueryWidgetState extends State<NewQueryWidget> {
       _field = _table!.fields.values.first;
     }
 
-    List<DropdownMenuItem<Database>> databaseEntries = widget
-        .dataCenter.databases.entries
+    List<DropdownMenuItem<Database>> databaseEntries = widget.dataCenter.databases.entries
         .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
         .toList();
 
@@ -463,15 +443,13 @@ class NewQueryWidgetState extends State<NewQueryWidget> {
     List<DropdownMenuItem<SchemaField>> columnEntries = [];
 
     if (_database != null) {
-      tableEntries = _database!.tables.entries
-          .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
-          .toList();
+      tableEntries =
+          _database!.tables.entries.map((e) => DropdownMenuItem(value: e.value, child: Text(e.key))).toList();
     }
 
     if (_table != null) {
-      columnEntries = _table!.fields.values
-          .map((e) => DropdownMenuItem(value: e, child: Text(e.name)))
-          .toList();
+      columnEntries =
+          _table!.fields.values.map((e) => DropdownMenuItem(value: e, child: Text(e.name))).toList();
     }
 
     return ClipRRect(
@@ -618,8 +596,7 @@ class QueryEditorState extends State<QueryEditor> {
       int targetIndex = expression.queries.indexOf(target);
       int queryIndex = expression.queries.indexOf(query);
       if (targetIndex < 0 || queryIndex < 0) {
-        throw QueryError(
-            "Could not find $target and $query in unattached queries");
+        throw QueryError("Could not find $target and $query in unattached queries");
       }
       expression.removeQuery(target);
       expression.removeQuery(query);
@@ -694,8 +671,7 @@ class QueryEditorState extends State<QueryEditor> {
   @override
   Widget build(BuildContext context) {
     List<Widget> children = expression.queries
-        .map<Widget>((Query query) => QueryWidget(
-            theme: theme, dispatch: dispatcher, depth: 0, query: query))
+        .map<Widget>((Query query) => QueryWidget(theme: theme, dispatch: dispatcher, depth: 0, query: query))
         .toList();
 
     children.add(NewQueryWidget(
@@ -728,9 +704,7 @@ class QueryEditorState extends State<QueryEditor> {
                   textColor: Colors.white,
                   fontSize: 16.0);
             } else if (validate(expression.queries.first)) {
-              widget.onCompleted(expression.queries.length == 1
-                  ? expression.queries.first
-                  : null);
+              widget.onCompleted(expression.queries.length == 1 ? expression.queries.first : null);
               Navigator.pop(context);
             }
           },
@@ -842,8 +816,7 @@ class QueryWidgetState extends State<QueryWidget> {
                   width: kMinInteractiveDimension,
                   height: kMinInteractiveDimension,
                   decoration: BoxDecoration(
-                    color:
-                        theme.themeData.colorScheme.secondary.withOpacity(0.5),
+                    color: theme.themeData.colorScheme.secondary.withOpacity(0.5),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -853,9 +826,7 @@ class QueryWidgetState extends State<QueryWidget> {
                   width: kMinInteractiveDimension,
                   height: kMinInteractiveDimension,
                   decoration: BoxDecoration(
-                    color: accepted.isEmpty
-                        ? theme.themeData.colorScheme.secondary
-                        : theme.wireColor,
+                    color: accepted.isEmpty ? theme.themeData.colorScheme.secondary : theme.wireColor,
                     shape: BoxShape.circle,
                   ),
                 ),

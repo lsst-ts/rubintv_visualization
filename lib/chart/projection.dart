@@ -1,43 +1,49 @@
-import 'dart:math';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:rubintv_visualization/chart/axis.dart';
 import 'package:rubintv_visualization/utils.dart';
 
+typedef ProjectionInitializer = Projection<num> Function({
+  required List<PlotAxis> axes,
+  required Size plotSize,
+});
+
 /// Conversion factor from degrees to radians.
-const degToRadians = pi / 180;
+const degToRadians = math.pi / 180;
 
 /// Conversion factor from radians to degrees.
 const radiansToDeg = 1 / degToRadians;
 
-/// Transformation from [PlotAxis] coordinates to plot coordinates.
-class PlotTransform {
+/// Transformation from [PlotAxis] plot coordinates to pixel coordinates for
+/// either the x or y axis.
+class PixelTransform {
   final double origin;
   final double scale;
   final double? invertSize;
 
-  PlotTransform({
+  PixelTransform({
     required this.origin,
     required this.scale,
     this.invertSize,
   });
 
   /// Load a plot transformation for a given [PlotAxis].
-  static PlotTransform fromAxis({
+  static PixelTransform fromAxis({
     required PlotAxis axis,
     required double plotSize,
     double? invertSize,
   }) {
     Bounds bounds = axis.bounds!;
     //bounds = axis.tickBounds!;
-    return PlotTransform(
+    return PixelTransform(
       origin: bounds.min.toDouble(),
       scale: plotSize / bounds.range,
       invertSize: invertSize,
     );
   }
 
-  /// Convert a number from the axis coordinates to the plot coordinates
+  /// Convert a number from the axis coordinates to the pixel coordinates
   double map(num x) {
     double result = (x - origin) * scale;
     if (invertSize != null) {
@@ -46,7 +52,7 @@ class PlotTransform {
     return result;
   }
 
-  /// Convert a number from plot coordinates to axes coordinates
+  /// Convert a number from pixel coordinates to axes coordinates
   double inverse(double x) {
     double result = x;
     if (invertSize != null) {
@@ -56,10 +62,10 @@ class PlotTransform {
     return result;
   }
 
-  /// Two [PlotTransform]s are equal when their origin and scale are the same.
+  /// Two [PixelTransform]s are equal when their origin and scale are the same.
   /// This is used by  eg. [TickMarkPainter] to check whether or not a repaint is necessary.
   @override
-  bool operator ==(Object other) => other is PlotTransform && other.origin == origin && other.scale == scale;
+  bool operator ==(Object other) => other is PixelTransform && other.origin == origin && other.scale == scale;
 
   /// Overriding the [==] operator also requires overriding the [hashCode].
   @override
@@ -69,57 +75,69 @@ class PlotTransform {
   String toString() => "PlotTransform(origin=$origin, scale=$scale)";
 }
 
-/// A projection from the axis to the plot co\anvas.
+/// A projection from a set of axes, potentially multidimensional or
+/// non-cartesian, to cartesian x and y coordinates in axis unit coordinates.
+/// The additional [PixelTransform]s are used to convert from the axis coordinates
+/// to pixel coordinates.
 abstract class Projection<T> {
   /// Transform from cartesian x to plot x.
-  final PlotTransform xTransform;
+  final PixelTransform xTransform;
 
   /// Transform from cartesian y to plot y.
-  final PlotTransform yTransform;
+  final PixelTransform yTransform;
 
   const Projection({
     required this.xTransform,
     required this.yTransform,
   });
 
-  Point<double> project({
+  Offset project({
     required List<T> coordinates,
     required List<PlotAxis> axes,
   });
+
+  Offset map(List<T> coordinates);
 }
 
 /// A 2D projection
 mixin Projection2D implements Projection<num> {
   @override
-  Point<double> project({
+  Offset project({
     required List<num> coordinates,
     required List<PlotAxis> axes,
   }) {
-    Point projection = map(coordinates[0].toDouble(), coordinates[1].toDouble());
-    double x = xTransform.map(projection.x);
-    double y = yTransform.map(projection.y);
-    return Point(x, y);
+    assert(coordinates.length == 2, "Projection2D requires two coordinates, got ${coordinates.length}");
+    Offset projection = map(coordinates);
+    double x = xTransform.map(projection.dx);
+    double y = yTransform.map(projection.dy);
+    return Offset(x, y);
   }
 
-  Point map(double coord1, double coord2) => Point(coord1, coord2);
+  @override
+  Offset map(List<num> coordinates) {
+    assert(coordinates.length == 2, "Projection2D requires two coordinates, got ${coordinates.length}");
+    return Offset(coordinates[0].toDouble(), coordinates[1].toDouble());
+  }
 }
 
-class Linear2DProjection extends Projection<num> with Projection2D {
-  const Linear2DProjection({
+class CartesianProjection extends Projection<num> with Projection2D {
+  const CartesianProjection({
     required super.xTransform,
     required super.yTransform,
   });
 
-  static Linear2DProjection fromAxes({
-    required PlotAxis xAxis,
-    required PlotAxis yAxis,
+  static CartesianProjection fromAxes({
+    required List<PlotAxis> axes,
     required Size plotSize,
   }) {
+    assert(axes.length == 2, "CartesianProjection requires two axes, got ${axes.length}");
+    PlotAxis xAxis = axes[0];
+    PlotAxis yAxis = axes[1];
     double? xInvertSize = xAxis.isInverted ? plotSize.width : null;
     double? yInvertSize = yAxis.isInverted ? plotSize.height : null;
-    return Linear2DProjection(
-      xTransform: PlotTransform.fromAxis(axis: xAxis, plotSize: plotSize.width, invertSize: xInvertSize),
-      yTransform: PlotTransform.fromAxis(axis: yAxis, plotSize: plotSize.height, invertSize: yInvertSize),
+    return CartesianProjection(
+      xTransform: PixelTransform.fromAxis(axis: xAxis, plotSize: plotSize.width, invertSize: xInvertSize),
+      yTransform: PixelTransform.fromAxis(axis: yAxis, plotSize: plotSize.height, invertSize: yInvertSize),
     );
   }
 }
@@ -131,30 +149,33 @@ class Polar2DProjection extends Projection<num> with Projection2D {
   });
 
   static Polar2DProjection fromAxes({
-    required PlotAxis rAxis,
-    required PlotAxis thetaAxis,
+    required List<PlotAxis> axes,
     required Size plotSize,
   }) {
-    // TODO: fix this
-    //double rMax = rAxis.scaledBounds!.max;
-    double rMax = 90;
+    assert(axes.length == 2, "PolarProjection requires two axes, got ${axes.length}");
+    PlotAxis rAxis = axes[0];
+    //PlotAxis thetaAxis = axes[1];
+    double rMax = rAxis.bounds.max.toDouble();
     double x0 = -rMax;
     double y0 = -rMax;
     double xScale = plotSize.width / (2 * rMax);
     double yScale = plotSize.height / (2 * rMax);
 
     return Polar2DProjection(
-      xTransform: PlotTransform(origin: x0, scale: xScale),
-      yTransform: PlotTransform(origin: y0, scale: yScale),
+      xTransform: PixelTransform(origin: x0, scale: xScale),
+      yTransform: PixelTransform(origin: y0, scale: yScale),
     );
   }
 
   @override
-  Point map(double coord1, double coord2) => Point(
-        // TODO: fix this
-        //coord1 * cos(coord2*degToRadians),
-        //coord1 * sin(coord2*degToRadians),
-        coord1 * sin(coord2 * degToRadians),
-        coord1 * cos(coord2 * degToRadians),
-      );
+  Offset map(List<num> coordinates) {
+    assert(coordinates.length == 2, "Polar2DProjection requires two coordinates, got ${coordinates.length}");
+    return Offset(
+      // TODO: fix this, I think that the trig functions are backwards
+      //coord1 * cos(coord2*degToRadians),
+      //coord1 * sin(coord2*degToRadians),
+      coordinates[0] * math.sin(coordinates[1] * degToRadians),
+      coordinates[0] * math.cos(coordinates[1] * degToRadians),
+    );
+  }
 }

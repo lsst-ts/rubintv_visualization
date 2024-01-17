@@ -141,7 +141,7 @@ class ScatterChart extends Chart {
   /// Create a new empty Series for this [Chart].
   @override
   Series nextSeries({required DataCenter dataCenter}) {
-    Database database = dataCenter.databases.values.first;
+    DataSource database = dataCenter.databases.values.first;
     Schema table = database.tables.values.first;
     UniqueId newId = UniqueId.next();
     print("adding a new Series with $newId");

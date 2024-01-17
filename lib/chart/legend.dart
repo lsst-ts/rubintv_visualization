@@ -35,8 +35,7 @@ class VerticalChartLegendViewer extends StatefulWidget {
   });
 
   @override
-  VerticalChartLegendViewerState createState() =>
-      VerticalChartLegendViewerState();
+  VerticalChartLegendViewerState createState() => VerticalChartLegendViewerState();
 }
 
 class VerticalChartLegendViewerState extends State<VerticalChartLegendViewer> {
@@ -66,8 +65,7 @@ class VerticalChartLegendViewerState extends State<VerticalChartLegendViewer> {
 
     final List<Widget> children = [];
     for (Series item in series) {
-      MarkerSettings marker =
-          widget.chart.getMarkerSettings(series: item, theme: theme);
+      MarkerSettings marker = widget.chart.getMarkerSettings(series: item, theme: theme);
       children.add(GestureDetector(
           onTap: () {
             _editState(context, item, widget.chart).then((_) {

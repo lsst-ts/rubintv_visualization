@@ -38,8 +38,8 @@ class Workspace {
   final AppTheme theme;
 
   /// Keys for selected data points.
-  /// The key is name of the [Database] containing the point, and the [Set] is the
-  /// set of keys in that [Database] that are selected.
+  /// The key is name of the [DataSource] containing the point, and the [Set] is the
+  /// set of keys in that [DataSource] that are selected.
   final Map<String, Set<dynamic>> _selected;
 
   /// A query that applies to all plots (that opt in to gloabl queries)
@@ -143,12 +143,10 @@ TimeMachine<Workspace> webSocketReceiveMessageReducer(
   if (message["type"]! == "database schema") {
     action.dataCenter.addDatabase(message["content"]);
   } else if (message["type"] == "table columns") {
-    print(
-        "received ${message["content"]["data"].length} rows for ${message["requestId"]}");
+    print("received ${message["content"]["data"].length} rows for ${message["requestId"]}");
     action.dataCenter.updateSeriesData(
       seriesId: UniqueId.from(id: BigInt.parse(message["requestId"])),
-      columnNames:
-          List<String>.from(message["content"]["columns"].map((e) => e)),
+      columnNames: List<String>.from(message["content"]["columns"].map((e) => e)),
       data: List<List<dynamic>>.from(message["content"]["data"].map((e) => e)),
     );
     print("dataCenter data: ${action.dataCenter.data.keys}");
@@ -163,8 +161,7 @@ TimeMachine<Workspace> updateWindowReducer(
 ) {
   Workspace workspace = state.currentState;
   Map<UniqueId, Window> windows = {...workspace.windows};
-  Window window = windows[action.windowId]!
-      .copyWith(offset: action.offset, size: action.size);
+  Window window = windows[action.windowId]!.copyWith(offset: action.offset, size: action.size);
   windows[window.id] = window;
   workspace = workspace.copyWith(windows: windows);
 
@@ -356,11 +353,9 @@ TimeMachine<Workspace> updateSeriesReducer(
     Map<UniqueId, Series> newSeries = {...chart.series};
     newSeries[action.series.id] = action.series;
     chart = chart.copyWith(series: newSeries);
-    chart = chart.onSeriesUpdate(
-        series: action.series, dataCenter: action.dataCenter);
+    chart = chart.onSeriesUpdate(series: action.series, dataCenter: action.dataCenter);
   } else {
-    chart =
-        chart.addSeries(series: action.series, dataCenter: action.dataCenter);
+    chart = chart.addSeries(series: action.series, dataCenter: action.dataCenter);
     comment = "add new Series";
   }
 
@@ -389,8 +384,7 @@ TimeMachine<Workspace> updateSeriesReducer(
 }
 
 /// Reduce a [TimeMachineAction] and (potentially) update the history and workspace.
-TimeMachine<Workspace> timeMachineReducer(
-    TimeMachine<Workspace> state, TimeMachineAction action) {
+TimeMachine<Workspace> timeMachineReducer(TimeMachine<Workspace> state, TimeMachineAction action) {
   if (action.action == TimeMachineActions.first) {
     return state.first;
   } else if (action.action == TimeMachineActions.previous) {
@@ -420,21 +414,15 @@ TimeMachine<Workspace> removeWindowReducer(
 }
 
 /// Handle a workspace action
-Reducer<TimeMachine<Workspace>> workspaceReducer =
-    combineReducers<TimeMachine<Workspace>>([
+Reducer<TimeMachine<Workspace>> workspaceReducer = combineReducers<TimeMachine<Workspace>>([
   TypedReducer<TimeMachine<Workspace>, TimeMachineAction>(timeMachineReducer),
   TypedReducer<TimeMachine<Workspace>, ApplyWindowUpdate>(updateWindowReducer),
-  TypedReducer<TimeMachine<Workspace>, WebSocketReceiveMessageAction>(
-      webSocketReceiveMessageReducer),
-  TypedReducer<TimeMachine<Workspace>, NewScatterChartAction>(
-      newScatterChartReducer),
-  TypedReducer<TimeMachine<Workspace>, UpdateGlobalQueryAction>(
-      updateGlobalQueryReducer),
-  TypedReducer<TimeMachine<Workspace>, UpdateGlobalObsDateAction>(
-      updateGlobalObsDateReducer),
+  TypedReducer<TimeMachine<Workspace>, WebSocketReceiveMessageAction>(webSocketReceiveMessageReducer),
+  TypedReducer<TimeMachine<Workspace>, NewScatterChartAction>(newScatterChartReducer),
+  TypedReducer<TimeMachine<Workspace>, UpdateGlobalQueryAction>(updateGlobalQueryReducer),
+  TypedReducer<TimeMachine<Workspace>, UpdateGlobalObsDateAction>(updateGlobalObsDateReducer),
   TypedReducer<TimeMachine<Workspace>, SeriesUpdateAction>(updateSeriesReducer),
-  TypedReducer<TimeMachine<Workspace>, UpdateChartGlobalQueryAction>(
-      updateChartGlobalQueryReducer),
+  TypedReducer<TimeMachine<Workspace>, UpdateChartGlobalQueryAction>(updateChartGlobalQueryReducer),
   TypedReducer<TimeMachine<Workspace>, RemoveWindowAction>(removeWindowReducer),
   /*TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
   TypedReducer<TimeMachine<Workspace>, RectSelectionAction>(
@@ -469,19 +457,15 @@ class WorkspaceViewer extends StatefulWidget {
   /// Implement the [WorkspaceViewer.of] method to allow children
   /// to find this container based on their [BuildContext].
   static WorkspaceViewerState of(BuildContext context) {
-    final WorkspaceViewerState? result =
-        context.findAncestorStateOfType<WorkspaceViewerState>();
+    final WorkspaceViewerState? result = context.findAncestorStateOfType<WorkspaceViewerState>();
     assert(() {
       if (result == null) {
         throw FlutterError.fromParts(<DiagnosticsNode>[
-          ErrorSummary(
-              'WorkspaceViewer.of() called with a context that does not '
+          ErrorSummary('WorkspaceViewer.of() called with a context that does not '
               'contain a WorkspaceViewer.'),
-          ErrorDescription(
-              'No WorkspaceViewer ancestor could be found starting from the context '
+          ErrorDescription('No WorkspaceViewer ancestor could be found starting from the context '
               'that was passed to WorkspaceViewer.of().'),
-          ErrorHint(
-              'This probably happened when an interactive child was created '
+          ErrorHint('This probably happened when an interactive child was created '
               'outside of an WorkspaceViewer'),
           context.describeElement('The context used was')
         ]);
@@ -522,8 +506,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
               for (Window window in info.windows.values) {
                 Offset offset = window.offset;
                 Size size = window.size;
-                if (interactionInfo != null &&
-                    window.id == interactionInfo!.id) {
+                if (interactionInfo != null && window.id == interactionInfo!.id) {
                   offset = interactionInfo!.offset;
                   size = interactionInfo!.size;
                 }
@@ -599,8 +582,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
     }
     setState(() {
       WindowDragInfo interaction = interactionInfo as WindowDragInfo;
-      interaction.offset = update.details.localPosition +
-          (interactionInfo as WindowDragInfo).pointerOffset;
+      interaction.offset = update.details.localPosition + (interactionInfo as WindowDragInfo).pointerOffset;
     });
   }
 
@@ -639,8 +621,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
       throw Exception("Mismatched interactionInfo, got $interactionInfo");
     }
     WindowResizeInfo interaction = interactionInfo as WindowResizeInfo;
-    Offset deltaPosition =
-        update.details.globalPosition - interaction.initialPointerOffset;
+    Offset deltaPosition = update.details.globalPosition - interaction.initialPointerOffset;
 
     double left = interaction.initialOffset.dx;
     double top = interaction.initialOffset.dy;

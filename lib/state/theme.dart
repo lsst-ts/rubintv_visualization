@@ -94,16 +94,11 @@ class AppTheme {
         _legendStyle = legendStyle,
         _axisLabelStyle = axisLabelStyle;
 
-  TextStyle get queryStyle =>
-      _queryStyle.copyWith(color: themeData.colorScheme.primary);
-  TextStyle get queryOperatorStyle =>
-      _queryStyle.copyWith(color: themeData.colorScheme.secondary);
-  TextStyle get titleStyle =>
-      _titleStyle.copyWith(color: themeData.colorScheme.primary);
-  TextStyle get legendStyle =>
-      _legendStyle.copyWith(color: themeData.colorScheme.secondary);
-  TextStyle get axisLabelStyle =>
-      _axisLabelStyle.copyWith(color: themeData.colorScheme.primary);
+  TextStyle get queryStyle => _queryStyle.copyWith(color: themeData.colorScheme.primary);
+  TextStyle get queryOperatorStyle => _queryStyle.copyWith(color: themeData.colorScheme.secondary);
+  TextStyle get titleStyle => _titleStyle.copyWith(color: themeData.colorScheme.primary);
+  TextStyle get legendStyle => _legendStyle.copyWith(color: themeData.colorScheme.secondary);
+  TextStyle get axisLabelStyle => _axisLabelStyle.copyWith(color: themeData.colorScheme.primary);
 
   InputDecorationTheme get queryTextDecorationTheme => InputDecorationTheme(
         border: OutlineInputBorder(
@@ -134,4 +129,28 @@ class AppTheme {
 
   Color get selectionColor => themeData.colorScheme.primaryContainer;
   Color get selectionEdgeColor => themeData.primaryColor;
+}
+
+class PlotTheme {
+  final Color? backgroundColor;
+  final Color? tickColor;
+  final double tickThickness;
+  final TextStyle? tickLabelStyle;
+  final Color? gridColor;
+  final double gridLineThickness;
+  final Color? frameColor;
+  final double frameLineThickness;
+  final List<Color> colorCycle;
+
+  const PlotTheme({
+    required this.backgroundColor,
+    this.tickColor = Colors.black,
+    this.tickThickness = 2,
+    this.tickLabelStyle,
+    this.gridColor = Colors.grey,
+    this.gridLineThickness = 1,
+    this.frameColor = Colors.black,
+    this.frameLineThickness = 2,
+    this.colorCycle = defaultColorCycle,
+  });
 }

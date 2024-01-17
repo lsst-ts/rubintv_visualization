@@ -1,3 +1,4 @@
+import "dart:math" as math;
 import 'package:flutter/material.dart';
 
 enum MarkerTypes {
@@ -9,7 +10,7 @@ enum MarkerTypes {
 class MarkerSettings {
   final double size;
   final MarkerTypes type;
-  final Color color;
+  final Color? color;
   final Color? edgeColor;
 
   const MarkerSettings({
@@ -31,6 +32,21 @@ class MarkerSettings {
         color: color ?? this.color,
         edgeColor: edgeColor ?? this.edgeColor,
       );
+
+  /// Paint a marker on the [Canvas] at a given [math.Point].
+  void paint(Canvas canvas, Paint? paintFill, Paint? paintEdge, Offset point) {
+    // TODO: support marker types other than circles
+    if (type == MarkerTypes.circle) {
+      if (paintFill != null) {
+        canvas.drawCircle(Offset(point.dx, point.dy), 5, paintFill);
+      }
+      if (paintEdge != null) {
+        canvas.drawCircle(Offset(point.dx, point.dy), 5, paintEdge);
+      }
+    } else {
+      throw UnimplementedError("Only circle markers are supported at this time");
+    }
+  }
 }
 
 class ErrorBarSettings {
@@ -60,7 +76,7 @@ class ErrorBarSettings {
 class Marker extends StatelessWidget {
   final double size;
   final MarkerTypes markerType;
-  final Color color;
+  final Color? color;
   final Color? edgeColor;
   final double edgeWidth;
 
@@ -87,8 +103,7 @@ class Marker extends StatelessWidget {
         ),
       );
     } else {
-      throw UnimplementedError(
-          "Marker type $markerType has not yet been implemented");
+      throw UnimplementedError("Marker type $markerType has not yet been implemented");
     }
     return result;
   }

@@ -42,16 +42,23 @@ enum DataType {
   }
 }
 
-Map<Type, DataType> _dataTypeLookup = {
+const Map<Type, DataType> _typeToDataType = {
   String: DataType.string,
   int: DataType.integer,
   double: DataType.double,
   DateTime: DataType.dateTime,
 };
 
+const Map<DataType, Type> _dataTypeToType = {
+  DataType.string: String,
+  DataType.integer: int,
+  DataType.double: double,
+  DataType.dateTime: DateTime,
+};
+
 class SchemaField {
   final String name;
-  final DataType? type;
+  final DataType dataType;
   final String? unit;
   final String? description;
   late final Schema schema;
@@ -59,7 +66,7 @@ class SchemaField {
 
   SchemaField({
     required this.name,
-    required this.type,
+    required this.dataType,
     this.unit,
     this.description,
     this.bounds,
@@ -75,13 +82,15 @@ class SchemaField {
   String toString() => "SchemaField<$unit>($name, $unit)";
 
   /// Whether or not the field is a string.
-  bool get isString => type == DataType.string;
+  bool get isString => dataType == DataType.string;
 
   /// Whether or not the field is a number.
-  bool get isNumerical => type == DataType.integer || type == DataType.double;
+  bool get isNumerical => dataType == DataType.integer || dataType == DataType.double;
 
   /// Whether or not the field is a date/time.
-  bool get isDateTime => type == DataType.dateTime;
+  bool get isDateTime => dataType == DataType.dateTime;
+
+  Type get type => _dataTypeToType[dataType]!;
 }
 
 typedef ExtremaCallback<T> = bool Function(T lhs, T rhs);
@@ -99,18 +108,27 @@ class Schema {
   }
 }
 
-class Database {
+abstract class DataSource {
   final int id;
   final String name;
   final String description;
+
+  DataSource({
+    int? id,
+    required this.name,
+    required this.description,
+  }) : id = id ?? _nextDataset++;
+}
+
+class Database extends DataSource {
   final Map<String, Schema> tables;
 
   Database({
-    int? id,
-    required this.name,
+    super.id,
+    required super.name,
+    required super.description,
     required this.tables,
-    required this.description,
-  }) : id = id ?? _nextDataset++ {
+  }) {
     for (Schema schema in tables.values) {
       schema.database = this;
     }
@@ -120,11 +138,37 @@ class Database {
   String toString() => "Database<$name>";
 }
 
+class Butler extends DataSource {
+  final String repo;
+  final List<String> collections;
+
+  Butler({
+    super.id,
+    required super.name,
+    required super.description,
+    required this.repo,
+    required this.collections,
+  });
+}
+
+class EfdClient extends DataSource {
+  final String connectionString;
+
+  EfdClient({
+    super.id,
+    required super.name,
+    required super.description,
+    required this.connectionString,
+  });
+}
+
 class DataCenterUpdate {}
 
 class DataCenter {
   final Map<String, Database> _databases = {};
-  final Map<UniqueId, List<Map<String, dynamic>>> _data = {};
+  final Map<String, Butler> butlers = {};
+  EfdClient? efdClient;
+  final Map<UniqueId, SeriesData> _data = {};
 
   DataCenter();
 
@@ -153,7 +197,7 @@ class DataCenter {
           fields.add(
             SchemaField(
                 name: column["name"]!,
-                type: DataType.fromString(column["datatype"]!),
+                dataType: DataType.fromString(column["datatype"]!),
                 unit: column["unit"],
                 description: column["description"]),
           );
@@ -184,23 +228,38 @@ class DataCenter {
     }
   }
 
-  List<Map<String, dynamic>>? getSeriesData(UniqueId id) => _data[id];
+  SeriesData? getSeriesData(UniqueId id) => _data[id];
 
   void updateSeriesData({
+    required DataSource dataSource,
     required UniqueId seriesId,
-    required List<dynamic> columnNames,
-    required List<List<dynamic>> data,
+    required List<String> plotColumns,
+    required Map<String, List<dynamic>> data,
+    required List<DataId> dataIds,
   }) {
-    List<Map<String, dynamic>> result = [];
-    for (List<dynamic> row in data) {
-      Map<String, dynamic> rowDict = {};
-      for (int i = 0; i < columnNames.length; i++) {
-        rowDict[columnNames[i]] = row[i];
+    if (dataSource is Database) {
+      Map<String, List<dynamic>> columns = {};
+      for (String plotColumn in plotColumns) {
+        List<String> split = plotColumn.split(".");
+        String tableName = split[0];
+        String columnName = split[1];
+
+        SchemaField field = dataSource.tables[tableName]!.fields[columnName]!;
+        if (field.isString) {
+          columns[plotColumn] = List<String>.from(data[plotColumn]!.map((e) => e));
+        } else if (field.isNumerical) {
+          columns[plotColumn] = List<double>.from(data[plotColumn]!.map((e) => e));
+        } else if (field.isDateTime) {
+          columns[plotColumn] = List<DateTime>.from(data[plotColumn]!.map((e) => e));
+        }
       }
-      rowDict["series"] = seriesId.id.toString();
-      result.add(rowDict);
+      _data[seriesId] = SeriesData.fromData(
+        data: columns,
+        plotColumns: plotColumns,
+        dataIds: dataIds,
+      );
     }
-    _data[seriesId] = result;
+    throw DataAccessException("Unknown data source: $dataSource");
   }
 
   /// Check if two [SchemaField]s are compatible
@@ -209,5 +268,109 @@ class DataCenter {
   @override
   String toString() => "DataCenter:[${databases.keys}]";
 
-  Map<UniqueId, List<Map<String, dynamic>>> get data => {..._data};
+  Map<UniqueId, SeriesData> get data => {..._data};
+}
+
+class DataId {
+  final List<dynamic> keys;
+  final String dataSource;
+
+  DataId(this.keys, this.dataSource);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! DataId) return false;
+    if (keys.length != other.keys.length) return false;
+    for (int i = 0; i < keys.length; i++) {
+      if (keys[i] != other.keys[i]) return false;
+    }
+    return dataSource == other.dataSource; // Added check for dataSource
+  }
+
+  @override
+  int get hashCode {
+    int hash = dataSource.hashCode; // Added dataSource to the initial hash value
+    return keys.fold(hash, (int hash, dynamic key) => hash * 31 + key.hashCode);
+  }
+}
+
+/// Convert a number, date/time, or string into a double.
+double _toDouble(dynamic value, [Map<String, double>? uniqueValues]) {
+  if (value is num) {
+    return value.toDouble();
+  } else if (value is DateTime) {
+    return value.microsecondsSinceEpoch.toDouble();
+  } else if (value is String && uniqueValues != null && uniqueValues.containsKey(value)) {
+    return uniqueValues[value]!;
+  } else {
+    throw DataAccessException("Cannot convert $value to a number");
+  }
+}
+
+/// Get a map of unique values to their numerical index.
+Map<String, double> _getUniqueValues(List<String> values) {
+  List<String> uniqueValues = [];
+  for (String value in values) {
+    if (!uniqueValues.contains(value)) {
+      uniqueValues.add(value);
+    }
+  }
+  uniqueValues.sort();
+  return uniqueValues.asMap().map((key, value) => MapEntry(value, key.toDouble()));
+}
+
+/// A collection of data points.
+/// The data points can be multidimensional, however
+/// the [SeriesData] class must be able to convert
+/// the data points into a collection of numbers that
+/// can be projected onto a 2D plane.
+class SeriesData<T, U> {
+  final Map<T, List<dynamic>> data;
+  final List<T> plotColumns;
+  final Map<T, Map<String, double>> stringToDouble;
+  final List<U>? dataIds;
+
+  SeriesData._(this.data, this.plotColumns, this.stringToDouble, this.dataIds);
+
+  /// The number of data points in the series.
+  int get length => data.length;
+
+  static SeriesData fromData<T, U>({
+    required Map<T, List<dynamic>> data,
+    required List<T> plotColumns,
+    List<U>? dataIds,
+  }) {
+    Map<T, Map<String, double>> stringToDouble = {};
+
+    // Check that all of the columns are the same length.
+    int length = data[plotColumns[0]]!.length;
+    if (!data.values.every((element) => element.length == length)) {
+      throw DataAccessException("All columns must have the same length");
+    }
+    // Check the data IDs are the same length as the data (if provided).
+    if (dataIds != null && dataIds.length != length) {
+      throw DataAccessException("Data IDs must be the same length as the data");
+    }
+
+    // Find the unique string values in all columns of strings.
+    // If the user initialized a column as dynamic, check the first
+    // value to see if it is a string.
+    for (T plotColumn in plotColumns) {
+      if (data[plotColumn] is List<String> ||
+          (data[plotColumn].runtimeType == List && data[plotColumn]![0] is String)) {
+        stringToDouble[plotColumn] = _getUniqueValues(data[plotColumn] as List<String>);
+      }
+    }
+    return SeriesData._(data, plotColumns, stringToDouble, dataIds);
+  }
+
+  /// Calculate the numerical coordinate of a single data point.
+  List<double> toCoordinates(int index) {
+    List<double> result = [];
+    for (T plotColumn in plotColumns) {
+      result.add(_toDouble(data[plotColumn]![index], stringToDouble[plotColumn]));
+    }
+    return result;
+  }
 }

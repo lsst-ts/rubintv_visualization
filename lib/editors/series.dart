@@ -8,24 +8,27 @@ import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 
+@immutable
 class Series {
   final UniqueId id;
   final String name;
   final List<SchemaField> fields;
   final MarkerSettings? marker;
-  final ErrorBarSettings? errorBarSettings;
+  final ErrorBarSettings? errorBars;
   final Query? query;
   final Chart chart;
+  final int axisIndex;
 
-  Series({
-    required this.id,
-    required this.name,
-    required this.fields,
-    required this.chart,
-    this.marker,
-    this.errorBarSettings,
-    this.query,
-  });
+  Series(
+      {required this.id,
+      required this.name,
+      required this.fields,
+      required this.chart,
+      this.marker,
+      this.errorBars,
+      this.query,
+      this.axisIndex = 0})
+      : assert([0, 1].contains(axisIndex));
 
   Series copyWith({
     UniqueId? id,
@@ -33,7 +36,7 @@ class Series {
     List<SchemaField>? fields,
     Chart? chart,
     MarkerSettings? marker,
-    ErrorBarSettings? errorBarSettings,
+    ErrorBarSettings? errorBars,
     Query? query,
   }) =>
       Series(
@@ -42,7 +45,7 @@ class Series {
         fields: fields ?? this.fields,
         chart: chart ?? this.chart,
         marker: marker ?? this.marker,
-        errorBarSettings: errorBarSettings ?? this.errorBarSettings,
+        errorBars: errorBars ?? this.errorBars,
         query: query ?? this.query,
       );
 

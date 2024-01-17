@@ -30,7 +30,7 @@ class HistogramSeries extends Series {
     required super.fields,
     required super.chart,
     super.marker,
-    super.errorBarSettings,
+    super.errorBars,
     super.query,
     required this.aggregation,
     required this.nBins,
@@ -43,7 +43,7 @@ class HistogramSeries extends Series {
     List<SchemaField>? fields,
     Chart? chart,
     MarkerSettings? marker,
-    ErrorBarSettings? errorBarSettings,
+    ErrorBarSettings? errorBars,
     Query? query,
     HistogramAggregation? aggregation,
     int? nBins,
@@ -54,7 +54,7 @@ class HistogramSeries extends Series {
         fields: fields ?? this.fields,
         chart: chart ?? this.chart,
         marker: marker ?? this.marker,
-        errorBarSettings: errorBarSettings ?? this.errorBarSettings,
+        errorBarSettings: errorBars ?? this.errorBars,
         query: query ?? this.query,
         aggregation: aggregation ?? this.aggregation,
         nBins: nBins ?? this.nBins,
@@ -187,7 +187,7 @@ class Histogram extends Chart {
   /// Create a new empty Series for this [Chart].
   @override
   Series nextSeries({required DataCenter dataCenter}) {
-    Database database = dataCenter.databases.values.first;
+    DataSource database = dataCenter.databases.values.first;
     Schema table = database.tables.values.first;
     UniqueId newId = UniqueId.next();
     print("adding a new Series with $newId");

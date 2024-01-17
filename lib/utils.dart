@@ -136,3 +136,30 @@ class Bounds {
   @override
   String toString() => "Bounds<$min-$max>";
 }
+
+enum ComparisonOperators {
+  eq,
+  ne,
+  lt,
+  gt,
+  le,
+  ge,
+}
+
+/// A function that compares two values.
+bool compare<T extends Comparable<T>>(T x, T y, ComparisonOperators op) {
+  switch (op) {
+    case ComparisonOperators.eq:
+      return x == y;
+    case ComparisonOperators.ne:
+      return x != y;
+    case ComparisonOperators.lt:
+      return x.compareTo(y) < 0;
+    case ComparisonOperators.gt:
+      return x.compareTo(y) > 0;
+    case ComparisonOperators.le:
+      return x.compareTo(y) <= 0;
+    case ComparisonOperators.ge:
+      return x.compareTo(y) >= 0;
+  }
+}

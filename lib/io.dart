@@ -87,7 +87,7 @@ class LoadColumnsCommand extends ServiceCommand {
     if (obsDate != null) {
       Query obsQuery = EqualityQuery(
           id: UniqueId.next(),
-          field: SchemaField(name: "obsNight", type: DataType.dateTime),
+          field: SchemaField(name: "obsNight", dataType: DataType.dateTime),
           rightValue: obsDate,
           rightOperator: EqualityOperator.eq);
       if (fullQuery == null) {
