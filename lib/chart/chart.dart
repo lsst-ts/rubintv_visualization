@@ -85,9 +85,7 @@ abstract class Chart extends Window {
         axis = PlotAxis(
           label: field.asLabel,
           bounds: field.bounds,
-          orientation: i % 2 == 0
-              ? AxisOrientation.horizontal
-              : AxisOrientation.vertical,
+          orientation: i % 2 == 0 ? AxisOrientation.horizontal : AxisOrientation.vertical,
         );
       } else if (field.bounds != null && axis.bounds != null) {
         // Update the [PlotAxis] bounds
@@ -119,8 +117,7 @@ abstract class Chart extends Window {
     for (int i = 0; i < series.fields.length; i++) {
       for (Series otherSeries in _series.values) {
         // Check that the new series is compatible with the existing series
-        if (!dataCenter.isFieldCompatible(
-            otherSeries.fields[i], series.fields[i])) {
+        if (!dataCenter.isFieldCompatible(otherSeries.fields[i], series.fields[i])) {
           developer.log(
             "Incompatible fields ${otherSeries.fields[i]} and ${series.fields[i]}",
             name: "rubin_chart.core.chart.dart",
@@ -159,8 +156,7 @@ abstract class Chart extends Window {
     // The user did not specify a marker, so use the default marker with the color updated
     return MarkerSettings(
       color: theme.getMarkerColor(_series.keys.toList().indexOf(series.id)),
-      edgeColor:
-          theme.getMarkerEdgeColor(_series.keys.toList().indexOf(series.id)),
+      edgeColor: theme.getMarkerEdgeColor(_series.keys.toList().indexOf(series.id)),
     );
   }
 
@@ -222,8 +218,7 @@ class RubinChart extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Expanded(child: LayoutBuilder(
-                builder: (BuildContext context, BoxConstraints constraints) {
+            Expanded(child: LayoutBuilder(builder: (BuildContext context, BoxConstraints constraints) {
               return chart.createInternalChart(
                 theme: workspace.theme,
                 dataCenter: dataCenter,
@@ -242,25 +237,21 @@ class RubinChart extends StatelessWidget {
         ),
       );
     }
-    throw UnimplementedError(
-        "ChartLegendLocation ${chart.legend.location} not yet supported");
+    throw UnimplementedError("ChartLegendLocation ${chart.legend.location} not yet supported");
   }
 
   /// Implement the [RubinChart.of] method to allow children
   /// to find this container based on their [BuildContext].
   static RubinChart of(BuildContext context) {
-    final RubinChart? result =
-        context.findAncestorWidgetOfExactType<RubinChart>();
+    final RubinChart? result = context.findAncestorWidgetOfExactType<RubinChart>();
     assert(() {
       if (result == null) {
         throw FlutterError.fromParts(<DiagnosticsNode>[
           ErrorSummary('RubinChart.of() called with a context that does not '
               'contain a RubinChart.'),
-          ErrorDescription(
-              'No RubinChart ancestor could be found starting from the context '
+          ErrorDescription('No RubinChart ancestor could be found starting from the context '
               'that was passed to RubinChart.of().'),
-          ErrorHint(
-              'This probably happened when an interactive child was created '
+          ErrorHint('This probably happened when an interactive child was created '
               'outside of a RubinChart'),
           context.describeElement('The context used was')
         ]);
