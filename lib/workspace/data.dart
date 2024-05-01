@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:rubintv_visualization/id.dart';
-import 'package:rubintv_visualization/utils.dart';
+import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/state/chart.dart';
+import 'package:rubintv_visualization/state/workspace.dart';
+import 'package:rubintv_visualization/workspace/series.dart';
 
 int _nextDataset = 0;
 
@@ -16,52 +18,44 @@ class DataAccessException implements IOException {
   String toString() => "$runtimeType:\n\t$message";
 }
 
-enum DataType {
-  string,
-  integer,
-  double,
-  dateTime;
-
-  static DataType fromString(String dataType) {
-    switch (dataType) {
-      case "char":
-        return DataType.string;
-      case "int":
-        return DataType.integer;
-      case "long":
-        return DataType.integer;
-      case "float":
-        return DataType.double;
-      case "double":
-        return DataType.double;
-      case "timestamp":
-        return DataType.dateTime;
-      default:
-        throw DataAccessException("Unknown data type: $dataType");
-    }
+ColumnDataType dataTypeFromString(String dataType) {
+  switch (dataType) {
+    case "char":
+      return ColumnDataType.string;
+    case "int":
+      return ColumnDataType.number;
+    case "long":
+      return ColumnDataType.number;
+    case "float":
+      return ColumnDataType.number;
+    case "double":
+      return ColumnDataType.number;
+    case "timestamp":
+      return ColumnDataType.dateTime;
+    default:
+      throw DataAccessException("Unknown data type: $dataType");
   }
 }
 
-const Map<Type, DataType> _typeToDataType = {
-  String: DataType.string,
-  int: DataType.integer,
-  double: DataType.double,
-  DateTime: DataType.dateTime,
+const Map<Type, ColumnDataType> _typeToDataType = {
+  String: ColumnDataType.string,
+  int: ColumnDataType.number,
+  double: ColumnDataType.number,
+  DateTime: ColumnDataType.dateTime,
 };
 
-const Map<DataType, Type> _dataTypeToType = {
-  DataType.string: String,
-  DataType.integer: int,
-  DataType.double: double,
-  DataType.dateTime: DateTime,
+const Map<ColumnDataType, Type> _dataTypeToType = {
+  ColumnDataType.string: String,
+  ColumnDataType.number: double,
+  ColumnDataType.dateTime: DateTime,
 };
 
 class SchemaField {
   final String name;
-  final DataType dataType;
+  final ColumnDataType dataType;
   final String? unit;
   final String? description;
-  late final Schema schema;
+  late final TableSchema schema;
   final Bounds? bounds;
 
   SchemaField({
@@ -73,7 +67,7 @@ class SchemaField {
   });
 
   /// Get the database that contains the [SchemaField].
-  Database get database => schema.database;
+  DatabaseSchema get database => schema.database;
 
   /// Return the [SchemaField] label to be shown (for example as a [PlotAxis] label.
   String get asLabel => unit == null ? name : "$name ($unit)";
@@ -82,26 +76,26 @@ class SchemaField {
   String toString() => "SchemaField<$unit>($name, $unit)";
 
   /// Whether or not the field is a string.
-  bool get isString => dataType == DataType.string;
+  bool get isString => dataType == ColumnDataType.string;
 
   /// Whether or not the field is a number.
-  bool get isNumerical => dataType == DataType.integer || dataType == DataType.double;
+  bool get isNumerical => dataType == ColumnDataType.number;
 
   /// Whether or not the field is a date/time.
-  bool get isDateTime => dataType == DataType.dateTime;
+  bool get isDateTime => dataType == ColumnDataType.dateTime;
 
   Type get type => _dataTypeToType[dataType]!;
 }
 
 typedef ExtremaCallback<T> = bool Function(T lhs, T rhs);
 
-class Schema {
+class TableSchema {
   final String name;
   final List<String> indexColumns;
   final Map<String, SchemaField> fields;
-  late final Database database;
+  late final DatabaseSchema database;
 
-  Schema({required this.name, required this.indexColumns, required this.fields}) {
+  TableSchema({required this.name, required this.indexColumns, required this.fields}) {
     for (SchemaField field in fields.values) {
       field.schema = this;
     }
@@ -120,16 +114,16 @@ abstract class DataSource {
   }) : id = id ?? _nextDataset++;
 }
 
-class Database extends DataSource {
-  final Map<String, Schema> tables;
+class DatabaseSchema extends DataSource {
+  final Map<String, TableSchema> tables;
 
-  Database({
+  DatabaseSchema({
     super.id,
     required super.name,
     required super.description,
     required this.tables,
   }) {
-    for (Schema schema in tables.values) {
+    for (TableSchema schema in tables.values) {
       schema.database = this;
     }
   }
@@ -165,16 +159,20 @@ class EfdClient extends DataSource {
 class DataCenterUpdate {}
 
 class DataCenter {
-  final Map<String, Database> _databases = {};
+  final Map<String, DatabaseSchema> _databaseSchemas = {};
   final Map<String, Butler> butlers = {};
   EfdClient? efdClient;
-  final Map<UniqueId, SeriesData> _data = {};
+  final Map<SeriesId, SeriesData> _seriesData = {};
 
   DataCenter();
 
-  Map<String, Database> get databases => {..._databases};
+  Map<String, DatabaseSchema> get databases => {..._databaseSchemas};
 
-  void addDatabase(Map<String, dynamic> schemaDict) {
+  SeriesData? getSeriesData(SeriesId id) => _seriesData[id];
+
+  Set<SeriesId> get seriesIds => _seriesData.keys.toSet();
+
+  void addDatabaseSchema(Map<String, dynamic> schemaDict) {
     if (!schemaDict.containsKey("name")) {
       String msg = "Schema does not contain a name";
       Fluttertoast.showToast(
@@ -190,28 +188,28 @@ class DataCenter {
     }
 
     try {
-      Map<String, Schema> tables = {};
+      Map<String, TableSchema> tables = {};
       for (Map<String, dynamic> tableDict in schemaDict["tables"]) {
         List<SchemaField> fields = [];
         for (Map<String, dynamic> column in tableDict["columns"]) {
           fields.add(
             SchemaField(
                 name: column["name"]!,
-                dataType: DataType.fromString(column["datatype"]!),
+                dataType: dataTypeFromString(column["datatype"]!),
                 unit: column["unit"],
                 description: column["description"]),
           );
         }
-        Schema schema = Schema(
+        TableSchema schema = TableSchema(
             name: tableDict["name"],
             indexColumns: tableDict["index_columns"].map<String>((e) => e.toString()).toList(),
             fields: Map.fromIterable(fields, key: (e) => e.name));
         tables[tableDict["name"]!] = schema;
       }
 
-      Database database =
-          Database(name: schemaDict["name"], description: schemaDict["description"], tables: tables);
-      _databases[database.name] = database;
+      DatabaseSchema database =
+          DatabaseSchema(name: schemaDict["name"], description: schemaDict["description"], tables: tables);
+      _databaseSchemas[database.name] = database;
     } catch (e, s) {
       print("error: $e");
       print(s);
@@ -228,38 +226,65 @@ class DataCenter {
     }
   }
 
-  SeriesData? getSeriesData(UniqueId id) => _data[id];
-
   void updateSeriesData({
-    required DataSource dataSource,
-    required UniqueId seriesId,
+    required String dataSourceName,
+    required SeriesId seriesId,
     required List<String> plotColumns,
     required Map<String, List<dynamic>> data,
-    required List<DataId> dataIds,
+    required Workspace workspace,
   }) {
-    if (dataSource is Database) {
-      Map<String, List<dynamic>> columns = {};
-      for (String plotColumn in plotColumns) {
+    DataSource dataSource = _databaseSchemas[dataSourceName]!;
+
+    if (dataSource is DatabaseSchema) {
+      Map<SchemaField, List<dynamic>> columns = {};
+      Map<AxisId, SchemaField> seriesColumns = {};
+      Set<TableSchema> tables = {};
+
+      // Add the series data for each column in the plot
+      for (int i = 0; i < plotColumns.length; i++) {
+        String plotColumn = plotColumns[i];
         List<String> split = plotColumn.split(".");
         String tableName = split[0];
         String columnName = split[1];
+        TableSchema table = dataSource.tables[tableName]!;
+        tables.add(table);
 
         SchemaField field = dataSource.tables[tableName]!.fields[columnName]!;
-        if (field.isString) {
-          columns[plotColumn] = List<String>.from(data[plotColumn]!.map((e) => e));
-        } else if (field.isNumerical) {
-          columns[plotColumn] = List<double>.from(data[plotColumn]!.map((e) => e));
-        } else if (field.isDateTime) {
-          columns[plotColumn] = List<DateTime>.from(data[plotColumn]!.map((e) => e));
+        SeriesInfo series = (workspace.windows[seriesId.windowId] as ChartWindow).series[seriesId]!;
+        if (series.fields.containsValue(field)) {
+          if (field.isString) {
+            columns[field] = List<String>.from(data[plotColumn]!.map((e) => e));
+          } else if (field.isNumerical) {
+            columns[field] = List<double>.from(data[plotColumn]!.map((e) => e));
+          } else if (field.isDateTime) {
+            columns[field] = List<DateTime>.from(data[plotColumn]!.map((e) => e));
+          }
+
+          // Add the column to the series columns
+          AxisId axisId = series.axes[series.fields.values.toList().indexOf(field)];
+          seriesColumns[axisId] = field;
         }
       }
-      _data[seriesId] = SeriesData.fromData(
+      List<DataId> dataIds = [];
+      List<String> dataIdKeys = tables.first.indexColumns;
+      for (int i = 0; i < columns.values.first.length; i++) {
+        Map<String, Object> keys = {};
+        for (String key in dataIdKeys) {
+          keys[key] = data["${plotColumns.first.split('.').first}.$key"]![i];
+        }
+        dataIds.add(DataId(keys));
+      }
+
+      SeriesData seriesData = SeriesData.fromData(
         data: columns,
-        plotColumns: plotColumns,
+        plotColumns: seriesColumns,
         dataIds: dataIds,
       );
+
+      _seriesData[seriesId] = seriesData;
+    } else {
+      throw DataAccessException("Unknown data source: $dataSource");
     }
-    throw DataAccessException("Unknown data source: $dataSource");
   }
 
   /// Check if two [SchemaField]s are compatible
@@ -267,30 +292,31 @@ class DataCenter {
 
   @override
   String toString() => "DataCenter:[${databases.keys}]";
-
-  Map<UniqueId, SeriesData> get data => {..._data};
 }
 
 class DataId {
-  final List<dynamic> keys;
-  final String dataSource;
+  final Map<String, Object> keys;
 
-  DataId(this.keys, this.dataSource);
+  DataId(this.keys);
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! DataId) return false;
     if (keys.length != other.keys.length) return false;
-    for (int i = 0; i < keys.length; i++) {
-      if (keys[i] != other.keys[i]) return false;
+    for (String key in keys.keys) {
+      if (keys[key] != other.keys[key]) return false;
     }
-    return dataSource == other.dataSource; // Added check for dataSource
+    return true;
   }
 
   @override
   int get hashCode {
-    int hash = dataSource.hashCode; // Added dataSource to the initial hash value
-    return keys.fold(hash, (int hash, dynamic key) => hash * 31 + key.hashCode);
+    int hash = keys.keys.first.hashCode;
+    for (Object key in keys.keys.toList().sublist(1)) {
+      hash ^= key.hashCode;
+      hash ^= keys[key].hashCode;
+    }
+    return hash;
   }
 }

@@ -1,5 +1,3 @@
-import 'package:flutter/widgets.dart';
-
 /// The ID for the next [UniqueId].
 BigInt _nextId = BigInt.zero;
 
@@ -8,22 +6,23 @@ BigInt _nextId = BigInt.zero;
 /// which automatically increments the counter.
 class UniqueId {
   final BigInt id;
-  final GlobalKey key;
 
-  UniqueId._(this.id, this.key);
+  UniqueId._(this.id);
 
   /// Create a new ID and increment the [_nextId] counter.
   static UniqueId next() {
     BigInt myId = _nextId;
     _nextId += BigInt.one;
-    return UniqueId._(myId, GlobalKey());
+    return UniqueId._(myId);
   }
 
   /// Create a new child id from an existing code
   static UniqueId from({
     required BigInt id,
   }) =>
-      UniqueId._(id, GlobalObjectKey(id));
+      UniqueId._(id);
+
+  static UniqueId fromString(String id) => UniqueId._(BigInt.parse(id));
 
   @override
   int get hashCode => id.hashCode;
@@ -38,7 +37,7 @@ class UniqueId {
   }
 
   /// Dummy id, used in place of a null value.
-  static get dummy => UniqueId._(BigInt.from(-1), GlobalKey());
+  static get dummy => UniqueId._(BigInt.from(-1));
 
   @override
   String toString() => "Id<$id>";

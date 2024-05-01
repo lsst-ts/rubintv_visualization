@@ -415,11 +415,11 @@ class NewQueryWidget extends StatefulWidget {
 
 /// [State] for teh [NewQueryWidget].
 class NewQueryWidgetState extends State<NewQueryWidget> {
-  /// The currently selected [Database].
-  Database? _database;
+  /// The currently selected [DatabaseSchema].
+  DatabaseSchema? _database;
 
-  /// The currently selected [Schema].
-  Schema? _table;
+  /// The currently selected [TableSchema].
+  TableSchema? _table;
 
   /// The currently selected [SchemaField].
   SchemaField? _field;
@@ -435,11 +435,11 @@ class NewQueryWidgetState extends State<NewQueryWidget> {
       _field = _table!.fields.values.first;
     }
 
-    List<DropdownMenuItem<Database>> databaseEntries = widget.dataCenter.databases.entries
+    List<DropdownMenuItem<DatabaseSchema>> databaseEntries = widget.dataCenter.databases.entries
         .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
         .toList();
 
-    List<DropdownMenuItem<Schema>> tableEntries = [];
+    List<DropdownMenuItem<TableSchema>> tableEntries = [];
     List<DropdownMenuItem<SchemaField>> columnEntries = [];
 
     if (_database != null) {
@@ -459,14 +459,14 @@ class NewQueryWidgetState extends State<NewQueryWidget> {
             color: widget.theme.themeData.colorScheme.background,
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            DropdownButton<Database>(
+            DropdownButton<DatabaseSchema>(
               /*decoration: const InputDecoration(
                 labelText: "Database",
                 border: OutlineInputBorder(),
               ),*/
               value: _database,
               items: databaseEntries,
-              onChanged: (Database? newDatabase) {
+              onChanged: (DatabaseSchema? newDatabase) {
                 setState(() {
                   _database = newDatabase;
                   _table = _database!.tables.values.first;
@@ -475,14 +475,14 @@ class NewQueryWidgetState extends State<NewQueryWidget> {
               },
             ),
             const SizedBox(height: 10),
-            DropdownButton<Schema>(
+            DropdownButton<TableSchema>(
               /*decoration: const InputDecoration(
                 labelText: "Table",
                 border: OutlineInputBorder(),
               ),*/
               value: _table,
               items: tableEntries,
-              onChanged: (Schema? newTable) {
+              onChanged: (TableSchema? newTable) {
                 setState(() {
                   _table = newTable;
                   _field = _table!.fields.values.first;

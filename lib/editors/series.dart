@@ -1,63 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:rubintv_visualization/chart/chart.dart';
-import 'package:rubintv_visualization/chart/marker.dart';
-import 'package:rubintv_visualization/id.dart';
+import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/editors/query.dart';
 import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
-
-@immutable
-class Series {
-  final UniqueId id;
-  final String name;
-  final List<SchemaField> fields;
-  final MarkerSettings? marker;
-  final ErrorBarSettings? errorBars;
-  final Query? query;
-  final Chart chart;
-  final int axisIndex;
-
-  Series(
-      {required this.id,
-      required this.name,
-      required this.fields,
-      required this.chart,
-      this.marker,
-      this.errorBars,
-      this.query,
-      this.axisIndex = 0})
-      : assert([0, 1].contains(axisIndex));
-
-  Series copyWith({
-    UniqueId? id,
-    String? name,
-    List<SchemaField>? fields,
-    Chart? chart,
-    MarkerSettings? marker,
-    ErrorBarSettings? errorBars,
-    Query? query,
-  }) =>
-      Series(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        fields: fields ?? this.fields,
-        chart: chart ?? this.chart,
-        marker: marker ?? this.marker,
-        errorBars: errorBars ?? this.errorBars,
-        query: query ?? this.query,
-      );
-
-  Series copy() => copyWith();
-
-  @override
-  String toString() => "Series<$id:$name>";
-}
+import 'package:rubintv_visualization/workspace/series.dart';
 
 /// Notify the [WorkspaceViewer] that the series has been updated
 class SeriesUpdateAction extends UiAction {
-  final Series series;
+  final SeriesInfo series;
   final DataCenter dataCenter;
   final SchemaField? groupByColumn;
 
@@ -72,7 +24,7 @@ typedef SeriesQueryCallback = void Function(Query? query);
 
 class SeriesEditor extends StatefulWidget {
   final AppTheme theme;
-  final Series series;
+  final SeriesInfo series;
   final bool isNew;
   final DataCenter dataCenter;
   final DispatchAction dispatch;
@@ -94,12 +46,12 @@ class SeriesEditorState extends State<SeriesEditor> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   AppTheme get theme => widget.theme;
-  late Series series;
+  late SeriesInfo series;
 
   /// [TextEditingController] for the series name.
   TextEditingController nameController = TextEditingController();
 
-  /// Create a collection of [Series] based on unique values of the [groupName] column.
+  /// Create a collection of [SeriesInfo] based on unique values of the [groupName] column.
   SchemaField? groupByColumn;
 
   @override
@@ -114,8 +66,9 @@ class SeriesEditorState extends State<SeriesEditor> {
   }
 
   void updateColumn(SchemaField? column, int index) {
-    List<SchemaField> fields = [...series.fields];
-    fields[index] = column!;
+    Map<AxisId, SchemaField> fields = {...series.fields};
+    AxisId key = fields.keys.toList()[fields.values.toList().indexOf(column!)];
+    fields[key] = column;
     series = series.copyWith(fields: fields);
   }
 
@@ -153,11 +106,19 @@ class SeriesEditorState extends State<SeriesEditor> {
               theme: theme,
               dataCenter: dataCenter,
               initialValue: series.fields,
-              onSaved: (List<SchemaField?>? fields) {
-                series = series.copyWith(fields: fields!.map((e) => e!).toList());
+              onSaved: (Map<AxisId, SchemaField?>? fields) {
+                if (fields == null) return;
+                Map<AxisId, SchemaField> nonNullFields = {};
+                for (MapEntry<AxisId, SchemaField?> entry in fields.entries) {
+                  if (entry.value == null) {
+                    return;
+                  }
+                  nonNullFields[entry.key] = entry.value!;
+                }
+                series = series.copyWith(fields: nonNullFields);
               },
-              validator: (List<SchemaField?>? fields) {
-                if (fields == null || fields.any((e) => e == null)) {
+              validator: (Map<AxisId, SchemaField?>? fields) {
+                if (fields == null || fields.values.any((e) => e == null)) {
                   return "All fields in the series must be initialized!";
                 }
                 return null;
@@ -225,7 +186,7 @@ class SeriesEditorState extends State<SeriesEditor> {
   }
 }
 
-class ColumnEditorFormField extends FormField<List<SchemaField?>> {
+class ColumnEditorFormField extends FormField<Map<AxisId, SchemaField?>> {
   final AppTheme theme;
   final DataCenter dataCenter;
 
@@ -233,20 +194,21 @@ class ColumnEditorFormField extends FormField<List<SchemaField?>> {
     super.key,
     required this.theme,
     required this.dataCenter,
-    required FormFieldSetter<List<SchemaField?>> onSaved,
-    required FormFieldValidator<List<SchemaField?>> validator,
-    required List<SchemaField?> initialValue,
+    required FormFieldSetter<Map<AxisId, SchemaField?>> onSaved,
+    required FormFieldValidator<Map<AxisId, SchemaField?>> validator,
+    required Map<AxisId, SchemaField?> initialValue,
     bool autovalidate = false,
   }) : super(
             onSaved: onSaved,
             validator: validator,
             initialValue: initialValue,
-            builder: (FormFieldState<List<SchemaField?>> formState) {
-              return Container(
+            builder: (FormFieldState<Map<AxisId, SchemaField?>> formState) {
+              return SizedBox(
                 child: ListView.builder(
                   itemCount: initialValue.length,
                   shrinkWrap: true,
                   itemBuilder: (BuildContext context, int index) {
+                    AxisId axisId = initialValue.keys.toList()[index];
                     return Container(
                         margin: const EdgeInsets.all(10),
                         child: InputDecorator(
@@ -259,8 +221,8 @@ class ColumnEditorFormField extends FormField<List<SchemaField?>> {
                               dataCenter: dataCenter,
                               initialValue: initialValue[index],
                               onChanged: (SchemaField? field) {
-                                List<SchemaField?> fields = [...formState.value!];
-                                fields[index] = field;
+                                Map<AxisId, SchemaField?> fields = {...formState.value!};
+                                fields[axisId] = field;
                                 formState.didChange(fields);
                               },
                             )));
@@ -306,8 +268,8 @@ class ColumnEditorState extends State<ColumnEditor> {
     }
   }
 
-  Database? _database;
-  Schema? _table;
+  DatabaseSchema? _database;
+  TableSchema? _table;
   SchemaField? _field;
 
   @override
@@ -317,11 +279,11 @@ class ColumnEditorState extends State<ColumnEditor> {
       _database = _table!.database;
     }
 
-    List<DropdownMenuItem<Database>> databaseEntries = dataCenter.databases.entries
+    List<DropdownMenuItem<DatabaseSchema>> databaseEntries = dataCenter.databases.entries
         .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
         .toList();
 
-    List<DropdownMenuItem<Schema>> tableEntries = [];
+    List<DropdownMenuItem<TableSchema>> tableEntries = [];
     List<DropdownMenuItem<SchemaField>> columnEntries = [];
 
     if (_database != null) {
@@ -338,14 +300,14 @@ class ColumnEditorState extends State<ColumnEditor> {
       mainAxisAlignment: MainAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        DropdownButtonFormField<Database>(
+        DropdownButtonFormField<DatabaseSchema>(
           decoration: const InputDecoration(
             labelText: "Database",
             border: OutlineInputBorder(),
           ),
           value: _database,
           items: databaseEntries,
-          onChanged: (Database? newDatabase) {
+          onChanged: (DatabaseSchema? newDatabase) {
             setState(() {
               _database = newDatabase;
               _table = _database!.tables.values.first;
@@ -355,14 +317,14 @@ class ColumnEditorState extends State<ColumnEditor> {
           },
         ),
         const SizedBox(height: 10),
-        DropdownButtonFormField<Schema>(
+        DropdownButtonFormField<TableSchema>(
           decoration: const InputDecoration(
             labelText: "Table",
             border: OutlineInputBorder(),
           ),
           value: _table,
           items: tableEntries,
-          onChanged: (Schema? newTable) {
+          onChanged: (TableSchema? newTable) {
             setState(() {
               _table = newTable;
               _field = _table!.fields.values.first;

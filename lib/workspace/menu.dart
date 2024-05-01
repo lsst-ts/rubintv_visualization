@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:menu_bar/menu_bar.dart';
 import 'package:rubintv_visualization/state/action.dart';
+import 'package:rubintv_visualization/state/chart.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 
@@ -32,7 +33,15 @@ VoidCallback showNotImplemented(BuildContext context) {
 }
 
 /// Add a new [CartesianPlot] to the [WorkspaceViewer].
-class NewScatterChartAction extends UiAction {}
+class CreateNewChartAction extends UiAction {
+  final InteractiveChartTypes chartType;
+  final AppTheme theme;
+
+  CreateNewChartAction({
+    this.chartType = InteractiveChartTypes.cartesianScatter,
+    required this.theme,
+  });
+}
 
 class DataSetSelectorDialog extends StatelessWidget {
   final AppTheme theme;
@@ -46,8 +55,7 @@ class DataSetSelectorDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<DropdownMenuItem<String>> dataSetEntries = dataCenter
-        .databases.keys
+    final List<DropdownMenuItem<String>> dataSetEntries = dataCenter.databases.keys
         .map((String name) => DropdownMenuItem(value: name, child: Text(name)))
         .toList();
 
@@ -103,16 +111,14 @@ class AppMenu extends StatelessWidget {
 
       // Style the menu bar buttons. Hover over [ButtonStyle] for all the options
       barButtonStyle: const ButtonStyle(
-        padding:
-            MaterialStatePropertyAll(EdgeInsets.symmetric(horizontal: 6.0)),
+        padding: MaterialStatePropertyAll(EdgeInsets.symmetric(horizontal: 6.0)),
         minimumSize: MaterialStatePropertyAll(Size(0.0, 32.0)),
       ),
 
       // Style the menu and submenu buttons. Hover over [ButtonStyle] for all the options
       menuButtonStyle: const ButtonStyle(
         minimumSize: MaterialStatePropertyAll(Size.fromHeight(36.0)),
-        padding: MaterialStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0)),
+        padding: MaterialStatePropertyAll(EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0)),
       ),
 
       // Enable or disable the bar
@@ -130,8 +136,7 @@ class AppMenu extends StatelessWidget {
                 onTap: showNotImplemented(context),
                 text: const Text('Save Workspace'),
                 shortcutText: 'Ctrl+S',
-                shortcut: const SingleActivator(LogicalKeyboardKey.keyS,
-                    control: true),
+                shortcut: const SingleActivator(LogicalKeyboardKey.keyS, control: true),
               ),
               MenuButton(
                 onTap: showNotImplemented(context),
@@ -247,17 +252,39 @@ class AppMenu extends StatelessWidget {
                 submenu: SubMenu(menuItems: [
                   MenuButton(
                     onTap: () {
-                      dispatch(NewScatterChartAction());
+                      dispatch(CreateNewChartAction(
+                        chartType: InteractiveChartTypes.cartesianScatter,
+                        theme: theme,
+                      ));
                     },
-                    text: const Text("Cartesian Plot"),
+                    text: const Text("Cartesian Scatter Plot"),
                   ),
                   MenuButton(
-                    onTap: showNotImplemented(context),
-                    text: const Text("Polar Plot"),
+                    onTap: () {
+                      dispatch(CreateNewChartAction(
+                        chartType: InteractiveChartTypes.polarScatter,
+                        theme: theme,
+                      ));
+                    },
+                    text: const Text("Polar Scatter Plot"),
                   ),
                   MenuButton(
-                    onTap: showNotImplemented(context),
+                    onTap: () {
+                      dispatch(CreateNewChartAction(
+                        chartType: InteractiveChartTypes.histogram,
+                        theme: theme,
+                      ));
+                    },
                     text: const Text("Histogram"),
+                  ),
+                  MenuButton(
+                    onTap: () {
+                      dispatch(CreateNewChartAction(
+                        chartType: InteractiveChartTypes.box,
+                        theme: theme,
+                      ));
+                    },
+                    text: const Text("Box Chart"),
                   ),
                 ]),
               ),

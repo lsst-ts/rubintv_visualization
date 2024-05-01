@@ -19,12 +19,8 @@ class AppState {
   /// Make a copy of the state with the specified terms updated
   AppState copyWith({
     TimeMachine<Workspace>? timeMachine,
-    String? serviceAddress,
-    String? servicePort,
   }) =>
-      AppState(
-        timeMachine: timeMachine ?? this.timeMachine,
-      );
+      AppState(timeMachine: timeMachine ?? this.timeMachine);
 
   /// Make an exact copy of the state
   AppState copy() => copyWith();
@@ -32,10 +28,8 @@ class AppState {
 
 /// Main reducer for the entire app
 AppState appReducer(AppState state, action) {
-  TimeMachine<Workspace> workspaceState =
-      workspaceReducer(state.timeMachine, action);
-  if (workspaceState != state.timeMachine ||
-      action is WebSocketReceiveMessageAction) {
+  TimeMachine<Workspace> workspaceState = workspaceReducer(state.timeMachine, action);
+  if (workspaceState != state.timeMachine || action is WebSocketReceiveMessageAction) {
     return state.copyWith(timeMachine: workspaceState);
   }
   return state;

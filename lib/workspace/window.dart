@@ -178,8 +178,7 @@ class WindowTitle extends StatelessWidget {
                 }),
             Expanded(
               child: Center(
-                child: Text(text ?? "",
-                    style: theme.titleStyle, textAlign: TextAlign.center),
+                child: Text(text ?? "", style: theme.titleStyle, textAlign: TextAlign.center),
               ),
             ),
             toolbar!,
@@ -205,8 +204,7 @@ class WindowTitle extends StatelessWidget {
             }),
         Expanded(
           child: Center(
-            child: Text(text ?? "",
-                style: theme.titleStyle, textAlign: TextAlign.center),
+            child: Text(text ?? "", style: theme.titleStyle, textAlign: TextAlign.center),
           ),
         ),
       ]),
@@ -225,7 +223,7 @@ abstract class Window {
   /// The [id] of this [Window] in [Workspace.windows].
   final UniqueId id;
 
-  /// The location of the entry in the entire workspace
+  /// The location of the window in the entire workspace
   final Offset offset;
 
   /// The size of the entry in the entire workspace
@@ -313,133 +311,124 @@ class ResizableWindow extends StatelessWidget {
       child: Container(
         color: theme.themeData.colorScheme.background,
         child: IntrinsicWidth(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-              GestureDetector(
-                onPanStart: (DragStartDetails details) {
-                  dispatch(StartDragWindowUpdate(
-                      windowId: info.id, details: details));
-                },
-                onPanUpdate: (DragUpdateDetails details) {
-                  dispatch(UpdateDragWindowUpdate(
-                      windowId: info.id, details: details));
-                },
-                onPanEnd: (DragEndDetails details) {
-                  dispatch(WindowDragEnd(windowId: info.id, details: details));
-                },
-                child: WindowTitle(
-                  text: title,
-                  theme: theme,
-                  toolbar: toolbar,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          GestureDetector(
+            onPanStart: (DragStartDetails details) {
+              dispatch(StartDragWindowUpdate(windowId: info.id, details: details));
+            },
+            onPanUpdate: (DragUpdateDetails details) {
+              dispatch(UpdateDragWindowUpdate(windowId: info.id, details: details));
+            },
+            onPanEnd: (DragEndDetails details) {
+              dispatch(WindowDragEnd(windowId: info.id, details: details));
+            },
+            child: WindowTitle(
+              text: title,
+              theme: theme,
+              toolbar: toolbar,
+            ),
+          ),
+          SizedBox(
+            width: size.width,
+            height: size.height,
+            child: Stack(children: [
+              Container(
+                margin: const EdgeInsets.all(5),
+                child: child,
+              ),
+
+              // Left resize
+              Positioned(
+                left: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onHorizontalDragStart: _onResizeStart,
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.left),
+                  onHorizontalDragEnd: _onResizeEnd,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeLeftRight,
+                    child: SizedBox(
+                      height: size.height,
+                      width: theme.resizeInteractionWidth,
+                    ),
+                  ),
                 ),
               ),
-              SizedBox(
-                width: size.width,
-                height: size.height,
-                child: Stack(children: [
-                  Container(
-                    margin: const EdgeInsets.all(5),
-                    child: child,
-                  ),
 
-                  // Left resize
-                  Positioned(
-                    left: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      onHorizontalDragStart: _onResizeStart,
-                      onHorizontalDragUpdate:
-                          _onResizeUpdate(WindowResizeDirections.left),
-                      onHorizontalDragEnd: _onResizeEnd,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeLeftRight,
-                        child: SizedBox(
-                          height: size.height,
-                          width: theme.resizeInteractionWidth,
-                        ),
-                      ),
+              // right resize
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onHorizontalDragStart: _onResizeStart,
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.right),
+                  onHorizontalDragEnd: _onResizeEnd,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeLeftRight,
+                    child: SizedBox(
+                      height: size.height,
+                      width: theme.resizeInteractionWidth,
                     ),
                   ),
-
-                  // right resize
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      onHorizontalDragStart: _onResizeStart,
-                      onHorizontalDragUpdate:
-                          _onResizeUpdate(WindowResizeDirections.right),
-                      onHorizontalDragEnd: _onResizeEnd,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeLeftRight,
-                        child: SizedBox(
-                          height: size.height,
-                          width: theme.resizeInteractionWidth,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // bottom resize
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      onHorizontalDragStart: _onResizeStart,
-                      onHorizontalDragUpdate:
-                          _onResizeUpdate(WindowResizeDirections.down),
-                      onHorizontalDragEnd: _onResizeEnd,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeUpDown,
-                        child: SizedBox(
-                          height: theme.resizeInteractionWidth,
-                          width: size.width,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // bottom-left resize
-                  Positioned(
-                    left: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      onHorizontalDragStart: _onResizeStart,
-                      onHorizontalDragUpdate:
-                          _onResizeUpdate(WindowResizeDirections.downLeft),
-                      onHorizontalDragEnd: _onResizeEnd,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeDownLeft,
-                        child: SizedBox(
-                          height: theme.resizeInteractionWidth,
-                          width: theme.resizeInteractionWidth,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // bottom-right resize
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      onHorizontalDragStart: _onResizeStart,
-                      onHorizontalDragUpdate:
-                          _onResizeUpdate(WindowResizeDirections.downRight),
-                      onHorizontalDragEnd: _onResizeEnd,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeDownRight,
-                        child: SizedBox(
-                          height: theme.resizeInteractionWidth,
-                          width: theme.resizeInteractionWidth,
-                        ),
-                      ),
-                    ),
-                  ),
-                ]),
+                ),
               ),
-            ])),
+
+              // bottom resize
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onHorizontalDragStart: _onResizeStart,
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.down),
+                  onHorizontalDragEnd: _onResizeEnd,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeUpDown,
+                    child: SizedBox(
+                      height: theme.resizeInteractionWidth,
+                      width: size.width,
+                    ),
+                  ),
+                ),
+              ),
+
+              // bottom-left resize
+              Positioned(
+                left: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onHorizontalDragStart: _onResizeStart,
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.downLeft),
+                  onHorizontalDragEnd: _onResizeEnd,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeDownLeft,
+                    child: SizedBox(
+                      height: theme.resizeInteractionWidth,
+                      width: theme.resizeInteractionWidth,
+                    ),
+                  ),
+                ),
+              ),
+
+              // bottom-right resize
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onHorizontalDragStart: _onResizeStart,
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.downRight),
+                  onHorizontalDragEnd: _onResizeEnd,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeDownRight,
+                    child: SizedBox(
+                      height: theme.resizeInteractionWidth,
+                      width: theme.resizeInteractionWidth,
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ])),
       ),
     );
   }

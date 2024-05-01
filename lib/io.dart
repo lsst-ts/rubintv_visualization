@@ -1,8 +1,10 @@
 import 'dart:convert';
 
+import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
+import 'package:rubintv_visualization/workspace/series.dart';
 
 /// A command to be sent to the analysis service.
 class ServiceCommand {
@@ -57,11 +59,11 @@ class FutureLoadColumnsCommand extends ServiceCommand {
 class LoadColumnsCommand extends ServiceCommand {
   LoadColumnsCommand({
     required List<SchemaField> fields,
-    required UniqueId seriesId,
+    required SeriesId seriesId,
     Query? query,
   }) : super(
           name: "load columns",
-          requestId: "${seriesId.id}",
+          requestId: seriesId.shortString,
           parameters: {
             "database": fields.first.database.name,
             "columns": fields.map((e) => "${e.schema.name}.${e.name}").toList(),
@@ -70,7 +72,7 @@ class LoadColumnsCommand extends ServiceCommand {
         );
   static LoadColumnsCommand build({
     required List<SchemaField> fields,
-    required UniqueId seriesId,
+    required SeriesId seriesId,
     required bool useGlobalQuery,
     required Query? query,
     required Query? globalQuery,
@@ -87,7 +89,7 @@ class LoadColumnsCommand extends ServiceCommand {
     if (obsDate != null) {
       Query obsQuery = EqualityQuery(
           id: UniqueId.next(),
-          field: SchemaField(name: "obsNight", dataType: DataType.dateTime),
+          field: SchemaField(name: "obsNight", dataType: ColumnDataType.dateTime),
           rightValue: obsDate,
           rightOperator: EqualityOperator.eq);
       if (fullQuery == null) {

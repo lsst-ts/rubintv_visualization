@@ -2,9 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:redux/redux.dart';
-import 'package:rubintv_visualization/chart/chart.dart';
-import 'package:rubintv_visualization/chart/legend.dart';
-import 'package:rubintv_visualization/chart/scatter.dart';
+import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/state/chart.dart';
 import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/io.dart';
@@ -14,6 +13,7 @@ import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/state/time_machine.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/menu.dart';
+import 'package:rubintv_visualization/workspace/series.dart';
 import 'package:rubintv_visualization/workspace/toolbar.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -37,11 +37,6 @@ class Workspace {
   /// The theme for the app
   final AppTheme theme;
 
-  /// Keys for selected data points.
-  /// The key is name of the [DataSource] containing the point, and the [Set] is the
-  /// set of keys in that [DataSource] that are selected.
-  final Map<String, Set<dynamic>> _selected;
-
   /// A query that applies to all plots (that opt in to gloabl queries)
   final Query? globalQuery;
 
@@ -57,25 +52,21 @@ class Workspace {
   const Workspace({
     required this.theme,
     Map<UniqueId, Window> windows = const {},
-    Map<String, Set<dynamic>> selected = const {},
     this.multiSelectionTool = MultiSelectionTool.select,
     this.webSocket,
     this.globalQuery,
     this.obsDate,
-  })  : _windows = windows,
-        _selected = selected;
+  }) : _windows = windows;
 
   Workspace copyWith({
     AppTheme? theme,
     Map<UniqueId, Window>? windows,
-    Map<String, Set<dynamic>>? selected,
     MultiSelectionTool? multiSelectionTool,
     WebSocketChannel? webSocket,
   }) =>
       Workspace(
         theme: theme ?? this.theme,
         windows: windows ?? this.windows,
-        selected: selected ?? this.selected,
         multiSelectionTool: multiSelectionTool ?? this.multiSelectionTool,
         webSocket: webSocket ?? this.webSocket,
         globalQuery: globalQuery,
@@ -86,7 +77,6 @@ class Workspace {
   Workspace updateGlobalQuery(Query? query) => Workspace(
         theme: theme,
         windows: windows,
-        selected: selected,
         multiSelectionTool: multiSelectionTool,
         webSocket: webSocket,
         globalQuery: query,
@@ -97,7 +87,6 @@ class Workspace {
   Workspace updateObsDate(DateTime? obsDate) => Workspace(
         theme: theme,
         windows: windows,
-        selected: selected,
         multiSelectionTool: multiSelectionTool,
         webSocket: webSocket,
         globalQuery: globalQuery,
@@ -106,9 +95,6 @@ class Workspace {
 
   /// Protect [_windows] so that it can only be updated through the app.
   Map<UniqueId, Window> get windows => {..._windows};
-
-  /// Protect [_selected] so that it can only be updated through the app.
-  Map<String, Set<dynamic>> get selected => {..._selected};
 
   /// Add a new [Window] to the [WorkspaceWidgetState].
   /// Normally the [index] is already created, unless
@@ -141,15 +127,18 @@ TimeMachine<Workspace> webSocketReceiveMessageReducer(
 ) {
   Map<String, dynamic> message = jsonDecode(action.message);
   if (message["type"]! == "database schema") {
-    action.dataCenter.addDatabase(message["content"]);
+    action.dataCenter.addDatabaseSchema(message["content"]);
   } else if (message["type"] == "table columns") {
-    print("received ${message["content"]["data"].length} rows for ${message["requestId"]}");
+    print("received ${message["content"]["data"].length} columns for ${message["requestId"]}");
     action.dataCenter.updateSeriesData(
-      seriesId: UniqueId.from(id: BigInt.parse(message["requestId"])),
-      columnNames: List<String>.from(message["content"]["columns"].map((e) => e)),
-      data: List<List<dynamic>>.from(message["content"]["data"].map((e) => e)),
+      seriesId: SeriesId.fromString(message["requestId"] as String),
+      dataSourceName: message["content"]["schema"],
+      plotColumns: List<String>.from(message["content"]["columns"].map((e) => e)),
+      data: Map<String, List<dynamic>>.from(
+          message["content"]["data"].map((key, value) => MapEntry(key, List<dynamic>.from(value)))),
+      workspace: state.currentState,
     );
-    print("dataCenter data: ${action.dataCenter.data.keys}");
+    print("dataCenter data: ${action.dataCenter.seriesIds}");
   }
   return state;
 }
@@ -193,22 +182,22 @@ String? getFormattedDate(DateTime? obsDate) {
   return '$year-$month-$day';
 }
 
-void getSeriesData(Workspace workspace, {Chart? chart}) {
+void getSeriesData(Workspace workspace, {ChartWindow? chart}) {
   String? obsDate = getFormattedDate(workspace.obsDate);
 
-  late final List<Chart> charts;
+  late final List<ChartWindow> charts;
   if (chart != null) {
     charts = [chart];
   } else {
-    charts = workspace.windows.values.whereType<Chart>().toList();
+    charts = workspace.windows.values.whereType<ChartWindow>().toList();
   }
   // Request the data from the server.
   if (workspace.webSocket != null) {
-    for (Chart chart in charts) {
-      for (Series series in chart.series.values) {
+    for (ChartWindow chart in charts) {
+      for (SeriesInfo series in chart.series.values) {
         workspace.webSocket!.sink.add(LoadColumnsCommand.build(
           seriesId: series.id,
-          fields: series.fields,
+          fields: series.fields.values.toList(),
           query: series.query,
           useGlobalQuery: chart.useGlobalQuery,
           globalQuery: workspace.globalQuery,
@@ -225,7 +214,7 @@ TimeMachine<Workspace> updateChartGlobalQueryReducer(
 ) {
   Workspace workspace = state.currentState;
   Map<UniqueId, Window> windows = {...workspace.windows};
-  Chart chart = windows[action.chartId] as Chart;
+  ChartWindow chart = windows[action.chartId] as ChartWindow;
   chart = chart.copyWith(useGlobalQuery: action.useGlobalQuery);
   windows[chart.id] = chart;
 
@@ -278,9 +267,9 @@ TimeMachine<Workspace> updateGlobalObsDateReducer(
 }
 
 /// Add a new cartesian plot to the workspace
-TimeMachine<Workspace> newScatterChartReducer(
+TimeMachine<Workspace> newChartReducer(
   TimeMachine<Workspace> state,
-  NewScatterChartAction action,
+  CreateNewChartAction action,
 ) {
   Workspace workspace = state.currentState;
   Offset offset = workspace.theme.newWindowOffset;
@@ -290,14 +279,11 @@ TimeMachine<Workspace> newScatterChartReducer(
     offset += workspace.windows.values.last.offset;
   }
 
-  workspace = workspace.addWindow(ScatterChart(
+  workspace = workspace.addWindow(ChartWindow.fromChartType(
     id: UniqueId.next(),
     offset: offset,
     size: workspace.theme.newPlotSize,
-    series: {},
-    axes: [null, null],
-    legend: ChartLegend(location: ChartLegendLocation.right),
-    useGlobalQuery: true,
+    chartType: action.chartType,
   ));
 
   return state.updated(TimeMachineUpdate(
@@ -306,12 +292,29 @@ TimeMachine<Workspace> newScatterChartReducer(
   ));
 }
 
-/// Add a new cartesian plot to the workspace
+TimeMachine<Workspace> createSeriesReducer(
+  TimeMachine<Workspace> state,
+  CreateSeriesAction action,
+) {
+  Workspace workspace = state.currentState;
+  ChartWindow chart = workspace.windows[action.series.id.windowId] as ChartWindow;
+  chart = chart.addSeries(series: action.series);
+  print("chart series keys are ${chart.series.keys}");
+  workspace = workspace.copyWith(windows: {...workspace.windows, chart.id: chart});
+  print("in workspace: ${(workspace.windows[chart.id]! as ChartWindow).series.keys}");
+
+  return state.updated(TimeMachineUpdate(
+    comment: "add new Series",
+    state: workspace,
+  ));
+}
+
+/// Update [SeriesData] in the [DataCenter].
 TimeMachine<Workspace> updateSeriesReducer(
   TimeMachine<Workspace> state,
   SeriesUpdateAction action,
 ) {
-  Chart chart = action.series.chart;
+  ChartWindow chart = state.currentState._windows[action.series.id.windowId] as ChartWindow;
   late String comment = "update Series";
 
   if (action.groupByColumn != null) {
@@ -350,12 +353,11 @@ TimeMachine<Workspace> updateSeriesReducer(
       chart = chart.addSeries(series: series, dataCenter: action.dataCenter);
     }*/
   } else if (chart.series.keys.contains(action.series.id)) {
-    Map<UniqueId, Series> newSeries = {...chart.series};
+    Map<SeriesId, SeriesInfo> newSeries = {...chart.series};
     newSeries[action.series.id] = action.series;
     chart = chart.copyWith(series: newSeries);
-    chart = chart.onSeriesUpdate(series: action.series, dataCenter: action.dataCenter);
   } else {
-    chart = chart.addSeries(series: action.series, dataCenter: action.dataCenter);
+    chart = chart.addSeries(series: action.series);
     comment = "add new Series";
   }
 
@@ -369,7 +371,7 @@ TimeMachine<Workspace> updateSeriesReducer(
     Query? query = action.series.query;
     workspace.webSocket!.sink.add(LoadColumnsCommand.build(
             seriesId: action.series.id,
-            fields: action.series.fields,
+            fields: action.series.fields.values.toList(),
             query: query,
             globalQuery: workspace.globalQuery,
             useGlobalQuery: chart.useGlobalQuery,
@@ -418,12 +420,13 @@ Reducer<TimeMachine<Workspace>> workspaceReducer = combineReducers<TimeMachine<W
   TypedReducer<TimeMachine<Workspace>, TimeMachineAction>(timeMachineReducer),
   TypedReducer<TimeMachine<Workspace>, ApplyWindowUpdate>(updateWindowReducer),
   TypedReducer<TimeMachine<Workspace>, WebSocketReceiveMessageAction>(webSocketReceiveMessageReducer),
-  TypedReducer<TimeMachine<Workspace>, NewScatterChartAction>(newScatterChartReducer),
+  TypedReducer<TimeMachine<Workspace>, CreateNewChartAction>(newChartReducer),
   TypedReducer<TimeMachine<Workspace>, UpdateGlobalQueryAction>(updateGlobalQueryReducer),
   TypedReducer<TimeMachine<Workspace>, UpdateGlobalObsDateAction>(updateGlobalObsDateReducer),
   TypedReducer<TimeMachine<Workspace>, SeriesUpdateAction>(updateSeriesReducer),
   TypedReducer<TimeMachine<Workspace>, UpdateChartGlobalQueryAction>(updateChartGlobalQueryReducer),
   TypedReducer<TimeMachine<Workspace>, RemoveWindowAction>(removeWindowReducer),
+  TypedReducer<TimeMachine<Workspace>, CreateSeriesAction>(createSeriesReducer),
   /*TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
   TypedReducer<TimeMachine<Workspace>, RectSelectionAction>(
       rectSelectionReducer),
@@ -482,9 +485,17 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
   Workspace get info => widget.workspace;
   DataCenter get dataCenter => widget.dataCenter;
   DispatchAction get dispatch => widget.dispatch;
-  Map<String, Set<dynamic>> get selected => widget.workspace.selected;
 
   WindowInteractionInfo? interactionInfo;
+  late SelectionController selectionController;
+  late SelectionController drillDownController;
+
+  @override
+  void initState() {
+    super.initState();
+    selectionController = SelectionController();
+    drillDownController = SelectionController();
+  }
 
   @override
   Widget build(BuildContext context) {

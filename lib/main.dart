@@ -27,8 +27,7 @@ class DemoApp extends StatefulWidget {
 }
 
 class DemoAppState extends State<DemoApp> {
-  final StreamController<String> streamController =
-      StreamController<String>.broadcast();
+  final StreamController<String> streamController = StreamController<String>.broadcast();
 
   /// The websocket connection to the analysis service.
   late final WebSocketChannel webSocket;
@@ -52,30 +51,26 @@ class DemoAppState extends State<DemoApp> {
 
   Future<void> _connect() async {
     try {
-      webSocket = WebSocketChannel.connect(
-          Uri.parse('ws://$serviceAddress:$servicePort/ws/client'));
+      webSocket = WebSocketChannel.connect(Uri.parse('ws://$serviceAddress:$servicePort/ws/client'));
       webSocket.stream.listen(
         (event) {
           streamController.add(event);
         },
         onDone: () {
-          developer.log('WebSocket connection closed.',
-              name: "rubinTV.visualization.main");
+          developer.log('WebSocket connection closed.', name: "rubinTV.visualization.main");
           setState(() {
             _isConnected = false;
           });
         },
         onError: (error) {
-          developer.log('WebSocket error: $error.',
-              name: "rubinTV.visualization.main");
+          developer.log('WebSocket error: $error.', name: "rubinTV.visualization.main");
         },
       );
 
       webSocket.sink.add(LoadSchemaCommand().toJson());
       _isConnected = true;
     } catch (e) {
-      developer.log('WebSocket connection failed: $e',
-          name: "rubinTV.visualization.main");
+      developer.log('WebSocket connection failed: $e', name: "rubinTV.visualization.main");
     }
   }
 
@@ -94,8 +89,7 @@ class DemoAppState extends State<DemoApp> {
       colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF058b8c)),
       useMaterial3: true,
     );
-    themeData = themeData.copyWith(
-        scaffoldBackgroundColor: themeData.colorScheme.secondaryContainer);
+    themeData = themeData.copyWith(scaffoldBackgroundColor: themeData.colorScheme.secondaryContainer);
 
     AppTheme theme = AppTheme(
       themeData: themeData,
@@ -103,7 +97,7 @@ class DemoAppState extends State<DemoApp> {
 
     Workspace workspace = Workspace(theme: theme, webSocket: webSocket);
 
-    // By default use scalar algebra over the complex field
+    // Initialize the Redux store
     Store<AppState> store = Store<AppState>(
       appReducer,
       initialState: AppState(
@@ -115,8 +109,7 @@ class DemoAppState extends State<DemoApp> {
 
     // Listen to WebSocket messages and dispatch actions
     streamController.stream.listen((message) {
-      store.dispatch(WebSocketReceiveMessageAction(
-          dataCenter: widget.dataCenter, message: message));
+      store.dispatch(WebSocketReceiveMessageAction(dataCenter: widget.dataCenter, message: message));
     });
 
     Size screenSize = MediaQuery.of(context).size;
@@ -134,8 +127,7 @@ class DemoAppState extends State<DemoApp> {
               appState: store.state,
               dispatch: store.dispatch,
             ),
-            builder: (BuildContext context, _WorkspaceViewModel model) =>
-                WorkspaceViewer(
+            builder: (BuildContext context, _WorkspaceViewModel model) => WorkspaceViewer(
               size: screenSize,
               workspace: model.info,
               dataCenter: widget.dataCenter,
@@ -164,8 +156,7 @@ class _WorkspaceViewModel {
   AppState get state => appState;
 
   @override
-  bool operator ==(dynamic other) =>
-      other is _WorkspaceViewModel && state == other.state;
+  bool operator ==(Object other) => other is _WorkspaceViewModel && state == other.state;
 
   @override
   int get hashCode => state.hashCode;
