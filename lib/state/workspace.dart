@@ -492,6 +492,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   @override
   void initState() {
+    print("Initializing WorkspaceViewerState");
     super.initState();
     selectionController = SelectionController();
     drillDownController = SelectionController();

@@ -219,9 +219,12 @@ class RemoveWindowAction extends UiAction {
 }
 
 /// A single, persistable, item displayed in a [Workspace].
+@immutable
 abstract class Window {
   /// The [id] of this [Window] in [Workspace.windows].
   final UniqueId id;
+
+  final GlobalKey key;
 
   /// The location of the window in the entire workspace
   final Offset offset;
@@ -232,12 +235,13 @@ abstract class Window {
   /// The title to display in the window bar.
   final String? title;
 
-  const Window({
+  Window({
+    GlobalKey? key,
     required this.id,
     required this.offset,
     required this.size,
     this.title,
-  });
+  }) : key = key ?? GlobalKey();
 
   Window copyWith({
     UniqueId? id,

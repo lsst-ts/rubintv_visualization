@@ -5,7 +5,6 @@ import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/state/action.dart';
-import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/series.dart';
@@ -40,6 +39,7 @@ class ChartWindow extends Window {
   final bool useGlobalQuery;
 
   ChartWindow({
+    super.key,
     required super.id,
     required super.offset,
     super.title,
@@ -137,6 +137,7 @@ class ChartWindow extends Window {
         legend: legend ?? this.legend,
         useGlobalQuery: useGlobalQuery ?? this.useGlobalQuery,
         chartType: chartType ?? this.chartType,
+        key: key,
       );
 
   ChartInfo buildChartInfo(DataCenter dataCenter) {
@@ -154,6 +155,7 @@ class ChartWindow extends Window {
           allSeries: allSeries,
           legend: legend,
           axisInfo: _axisInfo,
+          nBins: 20,
         );
       case InteractiveChartTypes.cartesianScatter:
         return CartesianScatterPlotInfo(
@@ -179,6 +181,7 @@ class ChartWindow extends Window {
   Widget createWidget(BuildContext context) {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
     return RubinChart(
+      key: key,
       info: buildChartInfo(workspace.dataCenter),
       selectionController: workspace.selectionController,
       drillDownController: workspace.drillDownController,
@@ -337,5 +340,37 @@ class ChartWindow extends Window {
         ),
       )
     ]);
+  }
+}
+
+class ChartWindowViewer extends StatefulWidget {
+  final ChartWindow chartWindow;
+
+  const ChartWindowViewer({
+    super.key,
+    required this.chartWindow,
+  });
+
+  @override
+  ChartWindowViewerState createState() => ChartWindowViewerState();
+}
+
+class ChartWindowViewerState extends State<ChartWindowViewer> {
+  late RubinChart chart;
+
+  @override
+  void initState() {
+    super.initState();
+    WorkspaceViewerState workspace = WorkspaceViewer.of(context);
+    chart = RubinChart(
+      info: widget.chartWindow.buildChartInfo(workspace.dataCenter),
+      selectionController: workspace.selectionController,
+      drillDownController: workspace.drillDownController,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return chart;
   }
 }

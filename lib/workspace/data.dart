@@ -37,6 +37,15 @@ ColumnDataType dataTypeFromString(String dataType) {
   }
 }
 
+/// Convert dates without a dash into a format that rubin_chart recognizes.
+DateTime convertRubinDate(String date) {
+  List<String> dateSplit = date.split("-");
+  if (dateSplit.length == 1) {
+    date = "${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6)}";
+  }
+  return dateFromString(date);
+}
+
 const Map<Type, ColumnDataType> _typeToDataType = {
   String: ColumnDataType.string,
   int: ColumnDataType.number,
@@ -257,7 +266,7 @@ class DataCenter {
           } else if (field.isNumerical) {
             columns[field] = List<double>.from(data[plotColumn]!.map((e) => e));
           } else if (field.isDateTime) {
-            columns[field] = List<DateTime>.from(data[plotColumn]!.map((e) => e));
+            columns[field] = List<DateTime>.from(data[plotColumn]!.map((e) => convertRubinDate(e)));
           }
 
           // Add the column to the series columns
