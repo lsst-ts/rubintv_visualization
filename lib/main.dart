@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_redux/flutter_redux.dart';
 import 'package:redux/redux.dart';
 import 'package:rubintv_visualization/io.dart';
@@ -13,17 +15,28 @@ import 'package:rubintv_visualization/state/workspace.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-void main() {
+Future main() async {
   DataCenter dataCenter = DataCenter();
-  runApp(DemoApp(dataCenter: dataCenter));
+  await dotenv.load(fileName: ".env");
+  runApp(DemoApp(dataCenter: dataCenter, port: int.parse(dotenv.env['PORT'] as String)));
 }
 
 class DemoApp extends StatefulWidget {
   final DataCenter dataCenter;
-  const DemoApp({super.key, required this.dataCenter});
+  final int port;
+  const DemoApp({super.key, required this.dataCenter, required this.port});
 
   @override
   DemoAppState createState() => DemoAppState();
+}
+
+String getWebsocketUrl(int port) {
+  // Retrieves the current URL of the web app
+  Uri uri = Uri.parse(html.window.location.href);
+
+  // Builds the base URL using the host and the path
+  String wsUrl = 'ws://${uri.host}:$port${uri.path}ws/client';
+  return wsUrl;
 }
 
 class DemoAppState extends State<DemoApp> {
@@ -38,11 +51,6 @@ class DemoAppState extends State<DemoApp> {
   /// The last message received from the analysis service.
   List<String> messageQueue = [];
 
-  // The address of the analysis service.
-  String serviceAddress = "localhost";
-  // The port of the analysis service.
-  int servicePort = 2000;
-
   @override
   void initState() {
     super.initState();
@@ -51,7 +59,9 @@ class DemoAppState extends State<DemoApp> {
 
   Future<void> _connect() async {
     try {
-      webSocket = WebSocketChannel.connect(Uri.parse('ws://$serviceAddress:$servicePort/ws/client'));
+      String wsUrl = getWebsocketUrl(widget.port);
+      print("Connecting to websocket at $wsUrl");
+      webSocket = WebSocketChannel.connect(Uri.parse('$wsUrl'));
       webSocket.stream.listen(
         (event) {
           streamController.add(event);
