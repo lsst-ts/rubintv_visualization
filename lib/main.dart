@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -18,24 +17,25 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 Future main() async {
   DataCenter dataCenter = DataCenter();
   await dotenv.load(fileName: ".env");
-  runApp(DemoApp(dataCenter: dataCenter, port: int.parse(dotenv.env['PORT'] as String)));
+
+  String websocketUrl =
+      getWebsocketUrl(dotenv.env['ADDRESS'] as String, int.parse(dotenv.env['PORT'] as String));
+
+  runApp(DemoApp(dataCenter: dataCenter, websocketUrl: websocketUrl));
 }
 
 class DemoApp extends StatefulWidget {
   final DataCenter dataCenter;
-  final int port;
-  const DemoApp({super.key, required this.dataCenter, required this.port});
+  final String websocketUrl;
+  const DemoApp({super.key, required this.dataCenter, required this.websocketUrl});
 
   @override
   DemoAppState createState() => DemoAppState();
 }
 
-String getWebsocketUrl(int port) {
-  // Retrieves the current URL of the web app
-  Uri uri = Uri.parse(html.window.location.href);
-
+String getWebsocketUrl(String address, int port) {
   // Builds the base URL using the host and the path
-  String wsUrl = 'ws://${uri.host}:$port${uri.path}ws/client';
+  String wsUrl = 'ws://$address:$port/ws/client';
   return wsUrl;
 }
 
@@ -59,9 +59,8 @@ class DemoAppState extends State<DemoApp> {
 
   Future<void> _connect() async {
     try {
-      String wsUrl = getWebsocketUrl(widget.port);
-      print("Connecting to websocket at $wsUrl");
-      webSocket = WebSocketChannel.connect(Uri.parse('$wsUrl'));
+      print("Connecting to websocket at ${widget.websocketUrl}");
+      webSocket = WebSocketChannel.connect(Uri.parse(widget.websocketUrl));
       webSocket.stream.listen(
         (event) {
           streamController.add(event);
