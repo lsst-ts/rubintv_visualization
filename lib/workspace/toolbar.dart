@@ -46,9 +46,7 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
   @override
   Widget build(BuildContext context) {
     DateTime? date = selectedDate?.toLocal();
-    String dateString = date != null
-        ? "${date.year}-${date.month}-${date.day}"
-        : 'No date selected';
+    String dateString = date != null ? "${date.year}-${date.month}-${date.day}" : 'No date selected';
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -136,17 +134,13 @@ class ToolbarState extends State<Toolbar> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle, // Makes the container a circle
-              color: widget.isConnected
-                  ? Colors.green
-                  : Colors.red, // Fills the circle with blue color
+              color: widget.isConnected ? Colors.green : Colors.red, // Fills the circle with blue color
             ),
           )),
           const Spacer(),
           IconButton(
             icon: Icon(Icons.travel_explore,
-                color: workspace.widget.workspace.globalQuery == null
-                    ? Colors.grey
-                    : Colors.green),
+                color: workspace.widget.workspace.globalQuery == null ? Colors.grey : Colors.green),
             onPressed: () {
               showDialog(
                   context: context,
@@ -154,15 +148,13 @@ class ToolbarState extends State<Toolbar> {
                         child: QueryEditor(
                           theme: workspace.theme,
                           expression: QueryExpression(
-                            queries:
-                                workspace.widget.workspace.globalQuery == null
-                                    ? []
-                                    : [workspace.widget.workspace.globalQuery!],
+                            queries: workspace.widget.workspace.globalQuery == null
+                                ? []
+                                : [workspace.widget.workspace.globalQuery!],
                             dataCenter: workspace.dataCenter,
                           ),
                           onCompleted: (Query? query) {
-                            workspace.dispatch(
-                                UpdateGlobalQueryAction(query: query));
+                            workspace.dispatch(UpdateGlobalQueryAction(query: query));
                           },
                         ),
                       ));
@@ -180,27 +172,16 @@ class ToolbarState extends State<Toolbar> {
             segments: [
               ButtonSegment(
                 value: MultiSelectionTool.select,
-                icon: Icon(Icons.touch_app,
-                    color: workspace.theme.themeData.primaryColor),
+                icon: Icon(Icons.touch_app, color: workspace.theme.themeData.primaryColor),
               ),
               ButtonSegment(
-                value: MultiSelectionTool.zoom,
-                icon: Icon(Icons.zoom_in,
-                    color: workspace.theme.themeData.primaryColor),
-              ),
-              ButtonSegment(
-                value: MultiSelectionTool.drill,
-                icon: Icon(Icons.query_stats,
-                    color: workspace.theme.themeData.primaryColor),
-              ),
-              ButtonSegment(
-                value: MultiSelectionTool.pan,
-                icon: Icon(Icons.pan_tool,
-                    color: workspace.theme.themeData.primaryColor),
+                value: MultiSelectionTool.drillDown,
+                icon: Icon(Icons.query_stats, color: workspace.theme.themeData.primaryColor),
               ),
             ],
             onSelectionChanged: (Set<MultiSelectionTool> selection) {
               tool = selection.first;
+              print("selected tool: $tool");
               workspace.dispatch(UpdateMultiSelect(selection.first));
             },
           ),

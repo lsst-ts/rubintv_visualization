@@ -1,4 +1,5 @@
 import 'dart:developer' as developer;
+import 'dart:html';
 
 import 'package:flutter/material.dart';
 import 'package:rubin_chart/rubin_chart.dart';
@@ -38,6 +39,8 @@ class ChartWindow extends Window {
   /// Whether or not to use the global query for all series in this [ChartWindow].
   final bool useGlobalQuery;
 
+  final List<GlobalKey> childKeys;
+
   ChartWindow({
     super.key,
     required super.id,
@@ -49,6 +52,7 @@ class ChartWindow extends Window {
     required this.legend,
     required this.useGlobalQuery,
     required this.chartType,
+    required this.childKeys,
   })  : _series = Map<SeriesId, SeriesInfo>.unmodifiable(series),
         _axisInfo = List<ChartAxisInfo>.unmodifiable(axisInfo);
 
@@ -63,8 +67,10 @@ class ChartWindow extends Window {
     required Offset offset,
     required Size size,
     required InteractiveChartTypes chartType,
+    List<GlobalKey>? childKeys,
   }) {
     List<ChartAxisInfo> axisInfo = [];
+    childKeys ??= [GlobalKey()];
     switch (chartType) {
       case InteractiveChartTypes.histogram:
         axisInfo = [
@@ -112,6 +118,7 @@ class ChartWindow extends Window {
       legend: Legend(),
       useGlobalQuery: true,
       chartType: chartType,
+      childKeys: childKeys,
     );
   }
 
@@ -138,12 +145,13 @@ class ChartWindow extends Window {
         useGlobalQuery: useGlobalQuery ?? this.useGlobalQuery,
         chartType: chartType ?? this.chartType,
         key: key,
+        childKeys: childKeys,
       );
 
-  ChartInfo buildChartInfo(DataCenter dataCenter) {
+  ChartInfo buildChartInfo(WorkspaceViewerState workspace) {
     List<Series> allSeries = [];
     for (SeriesInfo seriesInfo in _series.values) {
-      Series? series = seriesInfo.toSeries(dataCenter);
+      Series? series = seriesInfo.toSeries(workspace.dataCenter);
       if (series != null) {
         allSeries.add(series);
       }
@@ -156,6 +164,7 @@ class ChartWindow extends Window {
           legend: legend,
           axisInfo: _axisInfo,
           nBins: 20,
+          key: childKeys.first,
         );
       case InteractiveChartTypes.cartesianScatter:
         return CartesianScatterPlotInfo(
@@ -163,6 +172,8 @@ class ChartWindow extends Window {
           allSeries: allSeries,
           legend: legend,
           axisInfo: _axisInfo,
+          cursorAction: workspace.widget.workspace.multiSelectionTool.cursorAction,
+          key: childKeys.first,
         );
       case InteractiveChartTypes.polarScatter:
         return PolarScatterPlotInfo(
@@ -170,6 +181,8 @@ class ChartWindow extends Window {
           allSeries: allSeries,
           legend: legend,
           axisInfo: _axisInfo,
+          cursorAction: workspace.widget.workspace.multiSelectionTool.cursorAction,
+          key: childKeys.first,
         );
       default:
         throw UnimplementedError("Unknown chart type: $chartType");
@@ -180,11 +193,21 @@ class ChartWindow extends Window {
   @override
   Widget createWidget(BuildContext context) {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
+    SelectionController? selectionController = workspace.selectionController;
+    SelectionController? drillDownController = workspace.drillDownController;
+    if (chartType == InteractiveChartTypes.histogram) {
+      if (workspace.widget.workspace.multiSelectionTool.cursorAction == CursorAction.select) {
+        drillDownController = null;
+      } else {
+        selectionController = null;
+      }
+    }
+
     return RubinChart(
       key: key,
-      info: buildChartInfo(workspace.dataCenter),
-      selectionController: workspace.selectionController,
-      drillDownController: workspace.drillDownController,
+      info: buildChartInfo(workspace),
+      selectionController: selectionController,
+      drillDownController: drillDownController,
     );
   }
 
@@ -363,7 +386,7 @@ class ChartWindowViewerState extends State<ChartWindowViewer> {
     super.initState();
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
     chart = RubinChart(
-      info: widget.chartWindow.buildChartInfo(workspace.dataCenter),
+      info: widget.chartWindow.buildChartInfo(workspace),
       selectionController: workspace.selectionController,
       drillDownController: workspace.drillDownController,
     );

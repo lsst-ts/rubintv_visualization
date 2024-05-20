@@ -20,13 +20,14 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Tools for selecting unique sources.
 enum MultiSelectionTool {
-  zoom(Icons.zoom_in),
-  select(Icons.touch_app),
-  drill(Icons.query_stats),
-  pan(Icons.pan_tool);
+  select(Icons.touch_app, CursorAction.select),
+  drillDown(Icons.query_stats, CursorAction.drillDown),
+  ;
 
   final IconData icon;
-  const MultiSelectionTool(this.icon);
+  final CursorAction cursorAction;
+
+  const MultiSelectionTool(this.icon, this.cursorAction);
 }
 
 /// The full working area of the app.
@@ -385,6 +386,18 @@ TimeMachine<Workspace> updateSeriesReducer(
   ));
 }
 
+TimeMachine<Workspace> updateMultiSelectReducer(
+  TimeMachine<Workspace> state,
+  UpdateMultiSelect action,
+) {
+  Workspace workspace = state.currentState;
+  workspace = workspace.copyWith(multiSelectionTool: action.tool);
+  return state.updated(TimeMachineUpdate(
+    comment: "update multi-selection tool",
+    state: workspace,
+  ));
+}
+
 /// Reduce a [TimeMachineAction] and (potentially) update the history and workspace.
 TimeMachine<Workspace> timeMachineReducer(TimeMachine<Workspace> state, TimeMachineAction action) {
   if (action.action == TimeMachineActions.first) {
@@ -427,14 +440,13 @@ Reducer<TimeMachine<Workspace>> workspaceReducer = combineReducers<TimeMachine<W
   TypedReducer<TimeMachine<Workspace>, UpdateChartGlobalQueryAction>(updateChartGlobalQueryReducer),
   TypedReducer<TimeMachine<Workspace>, RemoveWindowAction>(removeWindowReducer),
   TypedReducer<TimeMachine<Workspace>, CreateSeriesAction>(createSeriesReducer),
+  TypedReducer<TimeMachine<Workspace>, UpdateMultiSelect>(updateMultiSelectReducer),
   /*TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
   TypedReducer<TimeMachine<Workspace>, RectSelectionAction>(
       rectSelectionReducer),
   TypedReducer<TimeMachine<Workspace>, PointSelectionAction>(
       pointSelectionReducer),
-  TypedReducer<TimeMachine<Workspace>, RectZoomAction>(rectZoomReducer),
-  TypedReducer<TimeMachine<Workspace>, UpdateMultiSelect>(
-      updateMultiSelectReducer),*/
+  TypedReducer<TimeMachine<Workspace>, RectZoomAction>(rectZoomReducer),*/
 ]);
 
 /// A [Widget] used to display a set of re-sizable and translatable [Window] widgets in a container.
