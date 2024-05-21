@@ -8,12 +8,6 @@ class ToolbarAction extends UiAction {
   const ToolbarAction();
 }
 
-class UpdateMultiSelect extends ToolbarAction {
-  final MultiSelectionTool tool;
-
-  UpdateMultiSelect(this.tool);
-}
-
 class DatePickerWidget extends StatefulWidget {
   final DateTime? obsDate;
   const DatePickerWidget({
@@ -92,12 +86,10 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
 }
 
 class Toolbar extends StatefulWidget {
-  final MultiSelectionTool tool;
   final bool isConnected;
 
   const Toolbar({
     super.key,
-    required this.tool,
     required this.isConnected,
   });
 
@@ -106,14 +98,6 @@ class Toolbar extends StatefulWidget {
 }
 
 class ToolbarState extends State<Toolbar> {
-  late MultiSelectionTool tool;
-
-  @override
-  void initState() {
-    super.initState();
-    tool = widget.tool;
-  }
-
   @override
   Widget build(BuildContext context) {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
@@ -166,24 +150,6 @@ class ToolbarState extends State<Toolbar> {
               dispatch: workspace.widget.dispatch,
               obsDate: workspace.widget.workspace.obsDate,
             ),
-          ),
-          SegmentedButton<MultiSelectionTool>(
-            selected: {tool},
-            segments: [
-              ButtonSegment(
-                value: MultiSelectionTool.select,
-                icon: Icon(Icons.touch_app, color: workspace.theme.themeData.primaryColor),
-              ),
-              ButtonSegment(
-                value: MultiSelectionTool.drillDown,
-                icon: Icon(Icons.query_stats, color: workspace.theme.themeData.primaryColor),
-              ),
-            ],
-            onSelectionChanged: (Set<MultiSelectionTool> selection) {
-              tool = selection.first;
-              print("selected tool: $tool");
-              workspace.dispatch(UpdateMultiSelect(selection.first));
-            },
           ),
         ],
       ),

@@ -18,18 +18,6 @@ import 'package:rubintv_visualization/workspace/toolbar.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// Tools for selecting unique sources.
-enum MultiSelectionTool {
-  select(Icons.touch_app, CursorAction.select),
-  drillDown(Icons.query_stats, CursorAction.drillDown),
-  ;
-
-  final IconData icon;
-  final CursorAction cursorAction;
-
-  const MultiSelectionTool(this.icon, this.cursorAction);
-}
-
 /// The full working area of the app.
 class Workspace {
   /// Windows to display in the [Workspace].
@@ -44,16 +32,12 @@ class Workspace {
   /// The observation date for any tables that have an observation date column.
   final DateTime? obsDate;
 
-  /// Which tool to use for multi-selection/zoom
-  final MultiSelectionTool multiSelectionTool;
-
   // The websocket connection to the analysis service.
   final WebSocketChannel? webSocket;
 
   const Workspace({
     required this.theme,
     Map<UniqueId, Window> windows = const {},
-    this.multiSelectionTool = MultiSelectionTool.select,
     this.webSocket,
     this.globalQuery,
     this.obsDate,
@@ -62,13 +46,11 @@ class Workspace {
   Workspace copyWith({
     AppTheme? theme,
     Map<UniqueId, Window>? windows,
-    MultiSelectionTool? multiSelectionTool,
     WebSocketChannel? webSocket,
   }) =>
       Workspace(
         theme: theme ?? this.theme,
         windows: windows ?? this.windows,
-        multiSelectionTool: multiSelectionTool ?? this.multiSelectionTool,
         webSocket: webSocket ?? this.webSocket,
         globalQuery: globalQuery,
         obsDate: obsDate,
@@ -78,7 +60,6 @@ class Workspace {
   Workspace updateGlobalQuery(Query? query) => Workspace(
         theme: theme,
         windows: windows,
-        multiSelectionTool: multiSelectionTool,
         webSocket: webSocket,
         globalQuery: query,
         obsDate: obsDate,
@@ -88,7 +69,6 @@ class Workspace {
   Workspace updateObsDate(DateTime? obsDate) => Workspace(
         theme: theme,
         windows: windows,
-        multiSelectionTool: multiSelectionTool,
         webSocket: webSocket,
         globalQuery: globalQuery,
         obsDate: obsDate,
@@ -391,7 +371,17 @@ TimeMachine<Workspace> updateMultiSelectReducer(
   UpdateMultiSelect action,
 ) {
   Workspace workspace = state.currentState;
-  workspace = workspace.copyWith(multiSelectionTool: action.tool);
+  Map<UniqueId, Window> windows = {...workspace.windows};
+  ChartWindow chart = windows[action.chartId] as ChartWindow;
+  if (chart is ScatterChartWindow) {
+    chart = chart.copyWith(tool: action.tool);
+  } else if (chart is BinnedChartWindow) {
+    chart = chart.copyWith(tool: action.tool);
+  } else {
+    throw UnimplementedError("Unrecognized chart type: $chart");
+  }
+  windows[chart.id] = chart;
+  workspace = workspace.copyWith(windows: windows);
   return state.updated(TimeMachineUpdate(
     comment: "update multi-selection tool",
     state: workspace,
@@ -518,7 +508,6 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
       dataCenter: dataCenter,
       child: Column(children: [
         Toolbar(
-          tool: widget.workspace.multiSelectionTool,
           isConnected: widget.isConnected,
         ),
         SizedBox(

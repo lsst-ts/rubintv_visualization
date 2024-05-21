@@ -9,7 +9,27 @@ import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/series.dart';
+import 'package:rubintv_visualization/workspace/toolbar.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
+
+/// Tools for selecting unique sources.
+enum MultiSelectionTool {
+  select(Icons.touch_app, CursorAction.select),
+  drillDown(Icons.query_stats, CursorAction.drillDown),
+  ;
+
+  final IconData icon;
+  final CursorAction cursorAction;
+
+  const MultiSelectionTool(this.icon, this.cursorAction);
+}
+
+class UpdateMultiSelect extends ToolbarAction {
+  final MultiSelectionTool tool;
+  final UniqueId chartId;
+
+  UpdateMultiSelect(this.tool, this.chartId);
+}
 
 /// The type of chart to display.
 enum InteractiveChartTypes {
@@ -29,7 +49,7 @@ class CreateSeriesAction extends UiAction {
 }
 
 /// Persistable information to generate a chart
-class ChartWindow extends Window {
+abstract class ChartWindow extends Window {
   final Map<SeriesId, SeriesInfo> _series;
   final Legend? legend;
   final List<ChartAxisInfo> _axisInfo;
@@ -56,6 +76,10 @@ class ChartWindow extends Window {
   })  : _series = Map<SeriesId, SeriesInfo>.unmodifiable(series),
         _axisInfo = List<ChartAxisInfo>.unmodifiable(axisInfo);
 
+  bool get useSelectionController;
+
+  bool get useDrillDownController;
+
   /// Return a copy of the internal [Map] of [SeriesInfo], to prevent updates.
   Map<SeriesId, SeriesInfo> get series => {..._series};
 
@@ -72,15 +96,27 @@ class ChartWindow extends Window {
     List<ChartAxisInfo> axisInfo = [];
     childKeys ??= [GlobalKey()];
     switch (chartType) {
-      case InteractiveChartTypes.histogram:
+      case InteractiveChartTypes.histogram || InteractiveChartTypes.box:
         axisInfo = [
           ChartAxisInfo(
             label: "x",
             axisId: AxisId(AxisLocation.bottom),
           ),
         ];
-        break;
-      case InteractiveChartTypes.cartesianScatter || InteractiveChartTypes.box:
+        return BinnedChartWindow(
+          id: id,
+          offset: offset,
+          size: size,
+          series: {},
+          axisInfo: axisInfo,
+          legend: Legend(),
+          useGlobalQuery: true,
+          chartType: chartType,
+          childKeys: childKeys,
+          nBins: 20,
+          tool: MultiSelectionTool.drillDown,
+        );
+      case InteractiveChartTypes.cartesianScatter:
         axisInfo = [
           ChartAxisInfo(
             label: "x",
@@ -92,7 +128,18 @@ class ChartWindow extends Window {
             isInverted: true,
           ),
         ];
-        break;
+        return ScatterChartWindow(
+          id: id,
+          offset: offset,
+          size: size,
+          series: {},
+          axisInfo: axisInfo,
+          legend: Legend(),
+          useGlobalQuery: true,
+          chartType: chartType,
+          childKeys: childKeys,
+          tool: MultiSelectionTool.select,
+        );
       case InteractiveChartTypes.polarScatter:
         axisInfo = [
           ChartAxisInfo(
@@ -104,22 +151,21 @@ class ChartWindow extends Window {
             axisId: AxisId(AxisLocation.angular),
           ),
         ];
-        break;
+        return ScatterChartWindow(
+          id: id,
+          offset: offset,
+          size: size,
+          series: {},
+          axisInfo: axisInfo,
+          legend: Legend(),
+          useGlobalQuery: true,
+          chartType: chartType,
+          childKeys: childKeys,
+          tool: MultiSelectionTool.select,
+        );
       case InteractiveChartTypes.combination:
         throw UnimplementedError("Combination charts have not yet been implemented.");
     }
-
-    return ChartWindow(
-      id: id,
-      offset: offset,
-      size: size,
-      series: {},
-      axisInfo: axisInfo,
-      legend: Legend(),
-      useGlobalQuery: true,
-      chartType: chartType,
-      childKeys: childKeys,
-    );
   }
 
   @override
@@ -133,20 +179,9 @@ class ChartWindow extends Window {
     Legend? legend,
     bool? useGlobalQuery,
     InteractiveChartTypes? chartType,
-  }) =>
-      ChartWindow(
-        id: id ?? this.id,
-        offset: offset ?? this.offset,
-        size: size ?? this.size,
-        title: title ?? this.title,
-        series: series ?? _series,
-        axisInfo: axisInfo ?? _axisInfo,
-        legend: legend ?? this.legend,
-        useGlobalQuery: useGlobalQuery ?? this.useGlobalQuery,
-        chartType: chartType ?? this.chartType,
-        key: key,
-        childKeys: childKeys,
-      );
+  });
+
+  ChartInfo _internalBuildChartInfo({required List<Series> allSeries});
 
   ChartInfo buildChartInfo(WorkspaceViewerState workspace) {
     List<Series> allSeries = [];
@@ -156,37 +191,8 @@ class ChartWindow extends Window {
         allSeries.add(series);
       }
     }
-    switch (chartType) {
-      case InteractiveChartTypes.histogram:
-        return HistogramInfo(
-          id: id,
-          allSeries: allSeries,
-          legend: legend,
-          axisInfo: _axisInfo,
-          nBins: 20,
-          key: childKeys.first,
-        );
-      case InteractiveChartTypes.cartesianScatter:
-        return CartesianScatterPlotInfo(
-          id: id,
-          allSeries: allSeries,
-          legend: legend,
-          axisInfo: _axisInfo,
-          cursorAction: workspace.widget.workspace.multiSelectionTool.cursorAction,
-          key: childKeys.first,
-        );
-      case InteractiveChartTypes.polarScatter:
-        return PolarScatterPlotInfo(
-          id: id,
-          allSeries: allSeries,
-          legend: legend,
-          axisInfo: _axisInfo,
-          cursorAction: workspace.widget.workspace.multiSelectionTool.cursorAction,
-          key: childKeys.first,
-        );
-      default:
-        throw UnimplementedError("Unknown chart type: $chartType");
-    }
+
+    return _internalBuildChartInfo(allSeries: allSeries);
   }
 
   /// Create a new [Widget] to display in a [WorkspaceViewer].
@@ -196,9 +202,10 @@ class ChartWindow extends Window {
     SelectionController? selectionController = workspace.selectionController;
     SelectionController? drillDownController = workspace.drillDownController;
     if (chartType == InteractiveChartTypes.histogram) {
-      if (workspace.widget.workspace.multiSelectionTool.cursorAction == CursorAction.select) {
+      if (!useDrillDownController) {
         drillDownController = null;
-      } else {
+      }
+      if (!useSelectionController) {
         selectionController = null;
       }
     }
@@ -316,10 +323,9 @@ class ChartWindow extends Window {
     );
   }
 
-  @override
-  Widget? createToolbar(BuildContext context) {
+  List<Widget> getDefaultTools(BuildContext context) {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
-    return Row(children: [
+    return [
       Tooltip(
         message: "Add a new series to the chart",
         child: IconButton(
@@ -362,8 +368,224 @@ class ChartWindow extends Window {
           ),
         ),
       )
-    ]);
+    ];
   }
+}
+
+class ScatterChartWindow extends ChartWindow {
+  final MultiSelectionTool tool;
+
+  ScatterChartWindow({
+    super.key,
+    required super.id,
+    required super.offset,
+    super.title,
+    required super.size,
+    required super.series,
+    required super.axisInfo,
+    required super.legend,
+    required super.useGlobalQuery,
+    required super.chartType,
+    required super.childKeys,
+    required this.tool,
+  });
+
+  @override
+  ScatterChartWindow copyWith({
+    UniqueId? id,
+    Offset? offset,
+    Size? size,
+    String? title,
+    Map<SeriesId, SeriesInfo>? series,
+    List<ChartAxisInfo>? axisInfo,
+    Legend? legend,
+    bool? useGlobalQuery,
+    InteractiveChartTypes? chartType,
+    MultiSelectionTool? tool,
+  }) =>
+      ScatterChartWindow(
+        id: id ?? this.id,
+        offset: offset ?? this.offset,
+        size: size ?? this.size,
+        title: title ?? this.title,
+        series: series ?? _series,
+        axisInfo: axisInfo ?? _axisInfo,
+        legend: legend ?? this.legend,
+        useGlobalQuery: useGlobalQuery ?? this.useGlobalQuery,
+        chartType: chartType ?? this.chartType,
+        key: key,
+        childKeys: childKeys,
+        tool: tool ?? this.tool,
+      );
+
+  @override
+  ChartInfo _internalBuildChartInfo({required List<Series> allSeries}) {
+    if (chartType == InteractiveChartTypes.cartesianScatter) {
+      return CartesianScatterPlotInfo(
+        id: id,
+        allSeries: allSeries,
+        legend: legend,
+        axisInfo: _axisInfo,
+        key: childKeys.first,
+        cursorAction: tool.cursorAction,
+      );
+    } else if (chartType == InteractiveChartTypes.polarScatter) {
+      return PolarScatterPlotInfo(
+        id: id,
+        allSeries: allSeries,
+        legend: legend,
+        axisInfo: _axisInfo,
+        key: childKeys.first,
+        cursorAction: tool.cursorAction,
+      );
+    }
+    throw UnimplementedError("Unknown chart type: $chartType");
+  }
+
+  @override
+  Widget? createToolbar(BuildContext context) {
+    WorkspaceViewerState workspace = WorkspaceViewer.of(context);
+
+    List<Widget> tools = [
+      SegmentedButton<MultiSelectionTool>(
+        selected: {tool},
+        segments: [
+          ButtonSegment(
+            value: MultiSelectionTool.select,
+            icon: Icon(Icons.touch_app, color: workspace.theme.themeData.primaryColor),
+          ),
+          ButtonSegment(
+            value: MultiSelectionTool.drillDown,
+            icon: Icon(Icons.query_stats, color: workspace.theme.themeData.primaryColor),
+          ),
+        ],
+        onSelectionChanged: (Set<MultiSelectionTool> selection) {
+          MultiSelectionTool tool = selection.first;
+          print("selected tool: $tool");
+          workspace.dispatch(UpdateMultiSelect(selection.first, id));
+        },
+      ),
+      ...getDefaultTools(context)
+    ];
+
+    return Row(children: tools);
+  }
+
+  @override
+  bool get useSelectionController => tool == MultiSelectionTool.select;
+
+  @override
+  bool get useDrillDownController => tool == MultiSelectionTool.drillDown;
+}
+
+class BinnedChartWindow extends ChartWindow {
+  final int nBins;
+  final MultiSelectionTool tool;
+
+  BinnedChartWindow({
+    super.key,
+    required super.id,
+    required super.offset,
+    super.title,
+    required super.size,
+    required super.series,
+    required super.axisInfo,
+    required super.legend,
+    required super.useGlobalQuery,
+    required super.chartType,
+    required super.childKeys,
+    required this.nBins,
+    required this.tool,
+  });
+
+  @override
+  BinnedChartWindow copyWith({
+    UniqueId? id,
+    Offset? offset,
+    Size? size,
+    String? title,
+    Map<SeriesId, SeriesInfo>? series,
+    List<ChartAxisInfo>? axisInfo,
+    Legend? legend,
+    bool? useGlobalQuery,
+    InteractiveChartTypes? chartType,
+    int? nBins,
+    MultiSelectionTool? tool,
+  }) =>
+      BinnedChartWindow(
+        id: id ?? this.id,
+        offset: offset ?? this.offset,
+        size: size ?? this.size,
+        title: title ?? this.title,
+        series: series ?? _series,
+        axisInfo: axisInfo ?? _axisInfo,
+        legend: legend ?? this.legend,
+        useGlobalQuery: useGlobalQuery ?? this.useGlobalQuery,
+        chartType: chartType ?? this.chartType,
+        key: key,
+        childKeys: childKeys,
+        nBins: nBins ?? this.nBins,
+        tool: tool ?? this.tool,
+      );
+
+  @override
+  ChartInfo _internalBuildChartInfo({required List<Series> allSeries}) {
+    if (chartType == InteractiveChartTypes.histogram) {
+      return HistogramInfo(
+        id: id,
+        allSeries: allSeries,
+        legend: legend,
+        axisInfo: _axisInfo,
+        key: childKeys.first,
+        nBins: nBins,
+      );
+    } else if (chartType == InteractiveChartTypes.box) {
+      return BoxChartInfo(
+        id: id,
+        allSeries: allSeries,
+        legend: legend,
+        axisInfo: _axisInfo,
+        key: childKeys.first,
+        nBins: nBins,
+      );
+    }
+    throw UnimplementedError("Unknown chart type: $chartType");
+  }
+
+  @override
+  Widget? createToolbar(BuildContext context) {
+    WorkspaceViewerState workspace = WorkspaceViewer.of(context);
+
+    List<Widget> tools = [
+      SegmentedButton<MultiSelectionTool>(
+        selected: {tool},
+        segments: [
+          ButtonSegment(
+            value: MultiSelectionTool.select,
+            icon: Icon(Icons.touch_app, color: workspace.theme.themeData.primaryColor),
+          ),
+          ButtonSegment(
+            value: MultiSelectionTool.drillDown,
+            icon: Icon(Icons.query_stats, color: workspace.theme.themeData.primaryColor),
+          ),
+        ],
+        onSelectionChanged: (Set<MultiSelectionTool> selection) {
+          MultiSelectionTool tool = selection.first;
+          print("selected tool: $tool");
+          workspace.dispatch(UpdateMultiSelect(selection.first, id));
+        },
+      ),
+      ...getDefaultTools(context)
+    ];
+
+    return Row(children: tools);
+  }
+
+  @override
+  bool get useSelectionController => tool == MultiSelectionTool.select;
+
+  @override
+  bool get useDrillDownController => tool == MultiSelectionTool.drillDown;
 }
 
 class ChartWindowViewer extends StatefulWidget {
