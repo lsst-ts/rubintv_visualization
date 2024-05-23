@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:redux/redux.dart';
@@ -390,13 +391,18 @@ TimeMachine<Workspace> updateMultiSelectReducer(
 
 /// Reduce a [TimeMachineAction] and (potentially) update the history and workspace.
 TimeMachine<Workspace> timeMachineReducer(TimeMachine<Workspace> state, TimeMachineAction action) {
+  print("state was ${state.frame}, $state");
   if (action.action == TimeMachineActions.first) {
+    print("state is ${state.first}");
     return state.first;
   } else if (action.action == TimeMachineActions.previous) {
+    print("state is ${state.previous}");
     return state.previous;
   } else if (action.action == TimeMachineActions.next) {
+    print("state is ${state.next}");
     return state.next;
   } else if (action.action == TimeMachineActions.last) {
+    print("state is ${state.last}");
     return state.last;
   }
   return state;
@@ -446,6 +452,8 @@ class WorkspaceViewer extends StatefulWidget {
   final DataCenter dataCenter;
   final DispatchAction dispatch;
   final bool isConnected;
+  final bool isFirstFrame;
+  final bool isLastFrame;
 
   const WorkspaceViewer({
     super.key,
@@ -454,6 +462,8 @@ class WorkspaceViewer extends StatefulWidget {
     required this.dataCenter,
     required this.dispatch,
     required this.isConnected,
+    required this.isFirstFrame,
+    required this.isLastFrame,
   });
 
   @override
@@ -509,6 +519,8 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
       child: Column(children: [
         Toolbar(
           isConnected: widget.isConnected,
+          isFirstFrame: widget.isFirstFrame,
+          isLastFrame: widget.isLastFrame,
         ),
         SizedBox(
           width: size.width,

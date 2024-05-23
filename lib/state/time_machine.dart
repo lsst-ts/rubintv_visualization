@@ -1,8 +1,7 @@
 import 'package:rubintv_visualization/state/action.dart';
 
 /// A function to apply a time machine update to a state of type [T].
-typedef TimeMachineUpdateCallback<T> = T Function(
-    T state, TimeMachineUpdate update, bool forward);
+typedef TimeMachineUpdateCallback<T> = T Function(T state, TimeMachineUpdate update, bool forward);
 
 /// An update to a state that is stored in the history
 class TimeMachineUpdate<T> {
@@ -87,7 +86,9 @@ class TimeMachine<T> {
   /// Return a new time machine with the current state added
   TimeMachine<T> updated(TimeMachineUpdate<T> update) {
     final List<TimeMachineUpdate<T>> newUpdates = [];
-    newUpdates.addAll(updates.sublist(0, frame));
+    if (frame >= 0) {
+      newUpdates.addAll(updates.sublist(0, frame));
+    }
 
     // Add the new update
     newUpdates.add(update);
@@ -122,12 +123,12 @@ class TimeMachine<T> {
       );
 
   /// Get the previous state in the time machine
-  TimeMachine<T> get previous => frame > 0
+  TimeMachine<T> get previous => frame > 1
       ? copyWith(
           frame: frame - 1,
-          currentState: updates[frame - 1].state,
+          currentState: updates[frame - 2].state,
         )
-      : frame == 0
+      : frame == 1
           ? copyWith(frame: 0, currentState: firstState)
           : this;
 
@@ -138,4 +139,6 @@ class TimeMachine<T> {
           currentState: updates[frame].state,
         )
       : this;
+
+  String toString() => "TimeMachine<$frame, ${frame > 0 ? updates[frame - 1].comment : ''}>";
 }

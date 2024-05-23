@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/editors/query.dart';
 import 'package:rubintv_visualization/state/action.dart';
+import 'package:rubintv_visualization/state/time_machine.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
 
 class ToolbarAction extends UiAction {
@@ -87,10 +88,14 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
 
 class Toolbar extends StatefulWidget {
   final bool isConnected;
+  final bool isFirstFrame;
+  final bool isLastFrame;
 
   const Toolbar({
     super.key,
     required this.isConnected,
+    required this.isFirstFrame,
+    required this.isLastFrame,
   });
 
   @override
@@ -122,6 +127,18 @@ class ToolbarState extends State<Toolbar> {
             ),
           )),
           const Spacer(),
+          IconButton(
+            icon: Icon(Icons.undo, color: widget.isFirstFrame ? Colors.grey : Colors.green),
+            onPressed: () {
+              workspace.dispatch(const TimeMachineAction(action: TimeMachineActions.previous));
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.redo, color: widget.isLastFrame ? Colors.grey : Colors.green),
+            onPressed: () {
+              workspace.dispatch(const TimeMachineAction(action: TimeMachineActions.next));
+            },
+          ),
           IconButton(
             icon: Icon(Icons.travel_explore,
                 color: workspace.widget.workspace.globalQuery == null ? Colors.grey : Colors.green),

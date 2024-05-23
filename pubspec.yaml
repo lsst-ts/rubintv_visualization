@@ -50,6 +50,8 @@ dependencies:
   web_socket_channel: ^2.4.0
   # Display feedback to the user
   fluttertoast: ^8.2.2
+  # Retrieve package info (eg. the version)
+  package_info_plus: ^8.0.0
   # The rubin_charts plotting library
   rubin_chart:
     path: ../rubin_chart
