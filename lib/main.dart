@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:web/web.dart' as web;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_redux/flutter_redux.dart';
@@ -18,8 +19,15 @@ Future main() async {
   DataCenter dataCenter = DataCenter();
   await dotenv.load(fileName: ".env");
 
-  String websocketUrl =
-      getWebsocketUrl(dotenv.env['ADDRESS'] as String, int.parse(dotenv.env['PORT'] as String));
+  String host = web.window.location.host;
+  String address = dotenv.env['ADDRESS'] as String;
+  String port = dotenv.env['PORT'] as String;
+  String websocketUrl = Uri(
+    scheme:'ws', 
+    host: host, 
+    pathSegments: [address, 'client'],
+    port:int.tryParse(port)
+  ) as String;
 
   runApp(DemoApp(dataCenter: dataCenter, websocketUrl: websocketUrl));
 }
@@ -31,12 +39,6 @@ class DemoApp extends StatefulWidget {
 
   @override
   DemoAppState createState() => DemoAppState();
-}
-
-String getWebsocketUrl(String address, int port) {
-  // Builds the base URL using the host and the path
-  String wsUrl = 'ws://$address:$port/ws/client';
-  return wsUrl;
 }
 
 class DemoAppState extends State<DemoApp> {
