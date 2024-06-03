@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:web/web.dart' as web;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -19,18 +20,20 @@ Future<AppVersion> getAppVersion() async {
   return AppVersion.fromString(version, buildNumber);
 }
 
-String getWebsocketUrl(String address, int port) {
-  // Builds the base URL using the host and the path
-  String wsUrl = 'ws://$address:$port/ws/client';
-  return wsUrl;
-}
-
 Future main() async {
   DataCenter dataCenter = DataCenter();
   await dotenv.load(fileName: ".env");
 
-  String websocketUrl =
-      getWebsocketUrl(dotenv.env['ADDRESS'] as String, int.parse(dotenv.env['PORT'] as String));
+  String host = web.window.location.hostname;
+  String address = dotenv.env['ADDRESS'] as String;
+  String port = dotenv.env['PORT'] as String;
+
+  print("host is $host, address is $address, port is $port");
+
+  String websocketUrl = Uri.decodeFull(
+      Uri(scheme: 'ws', host: host, pathSegments: [address, 'ws/client'], port: int.tryParse(port))
+          .toString());
+  print(websocketUrl);
 
   AppVersion version = await getAppVersion();
 
