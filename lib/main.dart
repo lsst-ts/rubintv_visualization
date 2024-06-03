@@ -33,7 +33,7 @@ Future main() async {
       "${web.window.location.protocol}, host is $host, address is $address, port is $port, protocol is $protocol");
 
   String websocketUrl = Uri.decodeFull(
-      Uri(scheme: protocol, host: host, pathSegments: [address, 'ws/client'], port: port).toString());
+      Uri(scheme: protocol, host: host, pathSegments: [address, 'client'], port: port).toString());
   print(websocketUrl);
 
   AppVersion version = await getAppVersion();
