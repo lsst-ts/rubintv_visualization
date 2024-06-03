@@ -25,14 +25,13 @@ Future main() async {
   await dotenv.load(fileName: ".env");
 
   String host = web.window.location.hostname;
-  String address = dotenv.env['ADDRESS'] as String;
-  String port = dotenv.env['PORT'] as String;
+  String address = dotenv.get('ADDRESS');
+  int? port = int.tryParse(dotenv.get("PORT", fallback: ""));
 
   print("host is $host, address is $address, port is $port");
 
   String websocketUrl = Uri.decodeFull(
-      Uri(scheme: 'ws', host: host, pathSegments: [address, 'ws/client'], port: int.tryParse(port))
-          .toString());
+      Uri(scheme: 'ws', host: host, pathSegments: [address, 'ws/client'], port: port).toString());
   print(websocketUrl);
 
   AppVersion version = await getAppVersion();
