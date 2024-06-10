@@ -15,6 +15,7 @@ import 'package:rubintv_visualization/workspace/window.dart';
 enum MultiSelectionTool {
   select(Icons.touch_app, CursorAction.select),
   drillDown(Icons.query_stats, CursorAction.drillDown),
+  dateTimeSelect(Icons.calendar_month_outlined, CursorAction.dateTimeSelect),
   ;
 
   final IconData icon;
@@ -98,7 +99,7 @@ abstract class ChartWindow extends Window {
       case InteractiveChartTypes.histogram || InteractiveChartTypes.box:
         axisInfo = [
           ChartAxisInfo(
-            label: "x",
+            label: "<x>",
             axisId: AxisId(AxisLocation.bottom),
           ),
         ];
@@ -118,11 +119,11 @@ abstract class ChartWindow extends Window {
       case InteractiveChartTypes.cartesianScatter:
         axisInfo = [
           ChartAxisInfo(
-            label: "x",
+            label: "<x>",
             axisId: AxisId(AxisLocation.bottom),
           ),
           ChartAxisInfo(
-            label: "y",
+            label: "<y>",
             axisId: AxisId(AxisLocation.left),
             isInverted: true,
           ),
@@ -142,11 +143,11 @@ abstract class ChartWindow extends Window {
       case InteractiveChartTypes.polarScatter:
         axisInfo = [
           ChartAxisInfo(
-            label: "r",
+            label: "<r>",
             axisId: AxisId(AxisLocation.radial),
           ),
           ChartAxisInfo(
-            label: "θ",
+            label: "<θ>",
             axisId: AxisId(AxisLocation.angular),
           ),
         ];
@@ -451,11 +452,15 @@ class ScatterChartWindow extends ChartWindow {
         segments: [
           ButtonSegment(
             value: MultiSelectionTool.select,
-            icon: Icon(Icons.touch_app, color: workspace.theme.themeData.primaryColor),
+            icon: Icon(MultiSelectionTool.select.icon, color: workspace.theme.themeData.primaryColor),
           ),
           ButtonSegment(
             value: MultiSelectionTool.drillDown,
-            icon: Icon(Icons.query_stats, color: workspace.theme.themeData.primaryColor),
+            icon: Icon(MultiSelectionTool.drillDown.icon, color: workspace.theme.themeData.primaryColor),
+          ),
+          ButtonSegment(
+            value: MultiSelectionTool.dateTimeSelect,
+            icon: Icon(MultiSelectionTool.dateTimeSelect.icon, color: workspace.theme.themeData.primaryColor),
           ),
         ],
         onSelectionChanged: (Set<MultiSelectionTool> selection) {

@@ -337,7 +337,14 @@ TimeMachine<Workspace> updateSeriesReducer(
   } else if (chart.series.keys.contains(action.series.id)) {
     Map<SeriesId, SeriesInfo> newSeries = {...chart.series};
     newSeries[action.series.id] = action.series;
-    chart = chart.copyWith(series: newSeries);
+    List<ChartAxisInfo> axesInfo = [for (var axis in chart.axes) axis!];
+    for (int i = 0; i < axesInfo.length; i++) {
+      ChartAxisInfo axisInfo = axesInfo[i];
+      if (axisInfo.label.startsWith("<") && axisInfo.label.endsWith(">")) {
+        axesInfo[i] = axisInfo.copyWith(label: action.series.fields.values.toList()[i].name);
+      }
+    }
+    chart = chart.copyWith(series: newSeries, axisInfo: axesInfo);
   } else {
     chart = chart.addSeries(series: action.series);
     comment = "add new Series";

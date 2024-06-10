@@ -33,6 +33,15 @@ enum EqualityOperator {
     List<String> parts = op.toString().split('.');
     return parts[1];
   }
+
+  static EqualityOperator? fromString(String symbol) {
+    for (var op in EqualityOperator.values) {
+      if (op.symbol == symbol) {
+        return op;
+      }
+    }
+    return null; // or throw an exception if a symbol is not found
+  }
 }
 
 /// A boolean operator in a query to combine two or more query terms.
@@ -50,6 +59,15 @@ enum QueryOperator {
 
   /// The name of the operator
   final String name;
+
+  static QueryOperator? fromString(String symbol) {
+    for (var op in QueryOperator.values) {
+      if (op.symbol == symbol) {
+        return op;
+      }
+    }
+    return null; // or throw an exception if a symbol is not found
+  }
 }
 
 /// An error in a query.
@@ -69,6 +87,8 @@ abstract class Query {
   Query({required this.id, this.parent});
 
   Map<String, dynamic> toDict();
+
+  factory Query.fromDict(Map<String, dynamic> dict) => throw UnimplementedError();
 
   Query operator &(Query other) => QueryOperation(
         id: UniqueId.next(),
@@ -162,6 +182,13 @@ class EqualityQuery extends Query {
       throw QueryError("EqualityQuery has no left or right value!");
     }
   }
+
+  /*static EqualityQuery fromDict(Map<String, dynamic> dict) {
+    return EqualityQuery(
+      id: UniqueId.fromString(dict["id"]),
+      leftValue: Query.fromDict()
+    );
+  }*/
 }
 
 class QueryOperation extends Query {
@@ -205,12 +232,25 @@ class QueryOperation extends Query {
   Map<String, dynamic> toDict() {
     Map<String, dynamic> result = {
       "name": "ParentQuery",
+      "id": id.toSerializableString(),
       "content": {
         "operator": operator.name,
         "children": children.map((e) => e.toDict()).toList(),
       }
     };
     return result;
+  }
+
+  static QueryOperation fromDict(Map<String, dynamic> dict) {
+    List<Query> children = [];
+    for (Map<String, dynamic> child in dict["content"]["children"]) {
+      children.add(Query.fromDict(child));
+    }
+    return QueryOperation(
+      id: UniqueId.fromString(dict["id"]),
+      children: children,
+      operator: QueryOperator.values.firstWhere((element) => element.name == dict["content"]["operator"]),
+    );
   }
 }
 

@@ -41,4 +41,7 @@ class UniqueId {
 
   @override
   String toString() => "Id<$id>";
+
+  /// Convert the ID to a string
+  String toSerializableString() => id.toString();
 }
