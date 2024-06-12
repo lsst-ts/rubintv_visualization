@@ -1,15 +1,17 @@
 import 'dart:convert';
-import 'dart:isolate';
+import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:redux/redux.dart';
 import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/image/focal_plane.dart';
 import 'package:rubintv_visualization/state/chart.dart';
 import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/io.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/state/action.dart';
+import 'package:rubintv_visualization/state/focal_plane.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/state/time_machine.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
@@ -36,18 +38,25 @@ class Workspace {
   // The websocket connection to the analysis service.
   final WebSocketChannel? webSocket;
 
+  final Instrument? instrument;
+
+  final Detector? detector;
+
   const Workspace({
     required this.theme,
     Map<UniqueId, Window> windows = const {},
     this.webSocket,
     this.globalQuery,
     this.obsDate,
+    this.instrument,
+    this.detector,
   }) : _windows = windows;
 
   Workspace copyWith({
     AppTheme? theme,
     Map<UniqueId, Window>? windows,
     WebSocketChannel? webSocket,
+    Instrument? instrument,
   }) =>
       Workspace(
         theme: theme ?? this.theme,
@@ -55,6 +64,8 @@ class Workspace {
         webSocket: webSocket ?? this.webSocket,
         globalQuery: globalQuery,
         obsDate: obsDate,
+        instrument: instrument ?? this.instrument,
+        detector: detector ?? this.detector,
       );
 
   /// Because the global query can be null, we need a special copy method.
@@ -64,6 +75,8 @@ class Workspace {
         webSocket: webSocket,
         globalQuery: query,
         obsDate: obsDate,
+        instrument: instrument,
+        detector: detector,
       );
 
   /// Becayse the obsDate can be null, we need a special copy method.
@@ -73,6 +86,19 @@ class Workspace {
         webSocket: webSocket,
         globalQuery: globalQuery,
         obsDate: obsDate,
+        instrument: instrument,
+        detector: detector,
+      );
+
+  // Because the detector can be null, we need a special copy method.
+  Workspace updateSelectedDetector(Detector? detector) => Workspace(
+        theme: theme,
+        windows: windows,
+        webSocket: webSocket,
+        globalQuery: globalQuery,
+        obsDate: obsDate,
+        instrument: instrument,
+        detector: detector,
       );
 
   /// Protect [_windows] so that it can only be updated through the app.
@@ -89,6 +115,8 @@ class Workspace {
       windows: newWindows,
     );
   }
+
+  bool get isShowingFocalPlane => _windows.values.any((element) => element is FocalPlaneWindow);
 }
 
 /// Process a message received from the analysis service.
@@ -111,7 +139,8 @@ TimeMachine<Workspace> webSocketReceiveMessageReducer(
   if (message["type"]! == "database schema") {
     action.dataCenter.addDatabaseSchema(message["content"]);
   } else if (message["type"] == "table columns") {
-    print("received ${message["content"]["data"].length} columns for ${message["requestId"]}");
+    developer.log("received ${message["content"]["data"].length} columns for ${message["requestId"]}",
+        name: "rubin_chart.workspace");
     action.dataCenter.updateSeriesData(
       seriesId: SeriesId.fromString(message["requestId"] as String),
       dataSourceName: message["content"]["schema"],
@@ -120,7 +149,27 @@ TimeMachine<Workspace> webSocketReceiveMessageReducer(
           message["content"]["data"].map((key, value) => MapEntry(key, List<dynamic>.from(value)))),
       workspace: state.currentState,
     );
-    print("dataCenter data: ${action.dataCenter.seriesIds}");
+    developer.log("dataCenter data: ${action.dataCenter.seriesIds}", name: "rubin_chart.workspace");
+  } else if (message["type"] == "instrument info") {
+    //developer.log("received instrument info: $message", name: "rubin_chart.workspace");
+    Instrument instrument = Instrument.fromJson(message["content"]);
+    Workspace newState = state.currentState.copyWith(instrument: instrument);
+    if (newState.detector != null) {
+      newState = newState.updateSelectedDetector(null);
+    }
+    if (newState.isShowingFocalPlane) {
+      Map<UniqueId, Window> windows = {...newState.windows};
+      for (Window window in newState.windows.values) {
+        if (window is FocalPlaneWindow) {
+          windows[window.id] = window.copyWith(instrument: instrument);
+        }
+      }
+      newState = newState.copyWith(windows: windows);
+    }
+    return state.updated(TimeMachineUpdate(
+      comment: "update instrument info",
+      state: newState,
+    ));
   }
   return state;
 }
@@ -238,7 +287,7 @@ TimeMachine<Workspace> updateGlobalObsDateReducer(
   TimeMachine<Workspace> state,
   UpdateGlobalObsDateAction action,
 ) {
-  print("updating date to ${action.obsDate}!");
+  developer.log("updating date to ${action.obsDate}!", name: "rubin_chart.workspace");
   Workspace workspace = state.currentState;
   workspace = workspace.updateObsDate(action.obsDate);
   getSeriesData(workspace);
@@ -281,9 +330,7 @@ TimeMachine<Workspace> createSeriesReducer(
   Workspace workspace = state.currentState;
   ChartWindow chart = workspace.windows[action.series.id.windowId] as ChartWindow;
   chart = chart.addSeries(series: action.series);
-  print("chart series keys are ${chart.series.keys}");
   workspace = workspace.copyWith(windows: {...workspace.windows, chart.id: chart});
-  print("in workspace: ${(workspace.windows[chart.id]! as ChartWindow).series.keys}");
 
   return state.updated(TimeMachineUpdate(
     comment: "add new Series",
@@ -396,20 +443,69 @@ TimeMachine<Workspace> updateMultiSelectReducer(
   ));
 }
 
+TimeMachine<Workspace> showFocalPlaneReducer(
+  TimeMachine<Workspace> state,
+  ShowFocalPlane action,
+) {
+  for (Window window in state.currentState.windows.values) {
+    if (window is FocalPlaneWindow) {
+      return state;
+    }
+  }
+
+  Workspace workspace = state.currentState;
+  Offset offset = workspace.theme.newWindowOffset;
+
+  if (workspace.windows.isNotEmpty) {
+    // Shift from last window
+    offset += workspace.windows.values.last.offset;
+  }
+
+  workspace = workspace.addWindow(FocalPlaneWindow(
+    id: UniqueId.next(),
+    offset: offset,
+    size: workspace.theme.newPlotSize,
+    instrument: workspace.instrument!,
+  ));
+
+  return state.updated(TimeMachineUpdate(
+    comment: "add new Focal Plane",
+    state: workspace,
+  ));
+}
+
+TimeMachine<Workspace> selectDetectorReducer(
+  TimeMachine<Workspace> state,
+  SelectDetectorAction action,
+) {
+  Workspace workspace = state.currentState;
+  Map<UniqueId, Window> windows = {...workspace.windows};
+
+  if (workspace.detector == action.detector) {
+    // The user unselected the detector.
+    Workspace newState = workspace.updateSelectedDetector(null);
+    return state.updated(TimeMachineUpdate(
+      comment: "deselect detector",
+      state: newState,
+    ));
+  }
+
+  Workspace newState = workspace.updateSelectedDetector(action.detector);
+  return state.updated(TimeMachineUpdate(
+    comment: "select detector",
+    state: newState,
+  ));
+}
+
 /// Reduce a [TimeMachineAction] and (potentially) update the history and workspace.
 TimeMachine<Workspace> timeMachineReducer(TimeMachine<Workspace> state, TimeMachineAction action) {
-  print("state was ${state.frame}, $state");
   if (action.action == TimeMachineActions.first) {
-    print("state is ${state.first}");
     return state.first;
   } else if (action.action == TimeMachineActions.previous) {
-    print("state is ${state.previous}");
     return state.previous;
   } else if (action.action == TimeMachineActions.next) {
-    print("state is ${state.next}");
     return state.next;
   } else if (action.action == TimeMachineActions.last) {
-    print("state is ${state.last}");
     return state.last;
   }
   return state;
@@ -444,6 +540,8 @@ Reducer<TimeMachine<Workspace>> workspaceReducer = combineReducers<TimeMachine<W
   TypedReducer<TimeMachine<Workspace>, RemoveWindowAction>(removeWindowReducer),
   TypedReducer<TimeMachine<Workspace>, CreateSeriesAction>(createSeriesReducer),
   TypedReducer<TimeMachine<Workspace>, UpdateMultiSelect>(updateMultiSelectReducer),
+  TypedReducer<TimeMachine<Workspace>, ShowFocalPlane>(showFocalPlaneReducer),
+  TypedReducer<TimeMachine<Workspace>, SelectDetectorAction>(selectDetectorReducer),
   /*TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
   TypedReducer<TimeMachine<Workspace>, RectSelectionAction>(
       rectSelectionReducer),
@@ -511,7 +609,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   @override
   void initState() {
-    print("Initializing WorkspaceViewerState");
+    developer.log("Initializing WorkspaceViewerState", name: "rubin_chart.workspace");
     super.initState();
     selectionController = SelectionController();
     drillDownController = SelectionController();

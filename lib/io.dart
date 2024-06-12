@@ -8,7 +8,7 @@ import 'package:rubintv_visualization/workspace/series.dart';
 
 /// A command to be sent to the analysis service.
 class ServiceCommand {
-  /// The name of hte command
+  /// The name of the command
   String name;
 
   dynamic requestId;
@@ -41,6 +41,16 @@ class LoadSchemaCommand extends ServiceCommand {
           name: "load schema",
           parameters: {
             "database": "summitcdb",
+          },
+        );
+}
+
+class LoadInstrumentAction extends ServiceCommand {
+  LoadInstrumentAction({required String instrument})
+      : super(
+          name: "load instrument",
+          parameters: {
+            "instrument": instrument,
           },
         );
 }

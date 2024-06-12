@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rubintv_visualization/io.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/editors/query.dart';
 import 'package:rubintv_visualization/state/action.dart';
@@ -7,6 +8,10 @@ import 'package:rubintv_visualization/state/workspace.dart';
 
 class ToolbarAction extends UiAction {
   const ToolbarAction();
+}
+
+class ShowFocalPlane extends ToolbarAction {
+  ShowFocalPlane();
 }
 
 class DatePickerWidget extends StatefulWidget {
@@ -102,6 +107,17 @@ class Toolbar extends StatefulWidget {
   ToolbarState createState() => ToolbarState();
 }
 
+/// Returns the color of the status indicator based on the connection status and whether an instrument is available.
+Color _getStatusIndicator(bool isConnected, bool hasInstrument) {
+  if (!isConnected) {
+    return Colors.red;
+  } else if (!hasInstrument) {
+    return Colors.yellow;
+  } else {
+    return Colors.green;
+  }
+}
+
 class ToolbarState extends State<Toolbar> {
   @override
   Widget build(BuildContext context) {
@@ -115,6 +131,7 @@ class ToolbarState extends State<Toolbar> {
       ),
       child: Row(
         children: [
+          const SizedBox(width: 10),
           Center(
               child: Container(
             margin: const EdgeInsets.only(left: 4),
@@ -122,10 +139,46 @@ class ToolbarState extends State<Toolbar> {
             width: 10,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              shape: BoxShape.circle, // Makes the container a circle
-              color: widget.isConnected ? Colors.green : Colors.red, // Fills the circle with blue color
+              shape: BoxShape.circle,
+              color: _getStatusIndicator(widget.isConnected, workspace.info.instrument != null),
             ),
           )),
+          const SizedBox(width: 30),
+          DropdownButton<String?>(
+            value: workspace.info.instrument?.name,
+            items: const [
+              DropdownMenuItem<String?>(
+                value: null,
+                child: Text("Select Instrument"),
+              ),
+              DropdownMenuItem(
+                value: "LsstCam",
+                child: Text("LSSTCam"),
+              ),
+              DropdownMenuItem(
+                value: "LsstComCam",
+                child: Text("LsstComCam"),
+              ),
+              DropdownMenuItem(
+                value: "Latiss",
+                child: Text("Latiss"),
+              ),
+            ],
+            onChanged: (String? value) {
+              if (value != null) {
+                workspace.info.webSocket!.sink.add(LoadInstrumentAction(instrument: value).toJson());
+              }
+            },
+          ),
+          const SizedBox(width: 10),
+          IconButton(
+            onPressed: workspace.info.instrument == null && !workspace.info.isShowingFocalPlane
+                ? null
+                : () {
+                    workspace.dispatch(ShowFocalPlane());
+                  },
+            icon: const Icon(Icons.lens_blur),
+          ),
           const Spacer(),
           IconButton(
             icon: Icon(Icons.undo, color: widget.isFirstFrame ? Colors.grey : Colors.green),

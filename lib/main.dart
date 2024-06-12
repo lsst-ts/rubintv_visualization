@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:web/web.dart' as web;
 import 'package:flutter/material.dart';
@@ -14,8 +15,8 @@ Future<AppVersion> getAppVersion() async {
   String version = packageInfo.version;
   String buildNumber = packageInfo.buildNumber;
 
-  print('App Version: $version');
-  print('Build Number: $buildNumber');
+  developer.log('App Version: $version', name: 'rubinTV.visualization.main');
+  developer.log('Build Number: $buildNumber', name: 'rubinTV.visualization.main');
 
   return AppVersion.fromString(version, buildNumber);
 }
@@ -29,12 +30,14 @@ Future main() async {
   String address = dotenv.get("ADDRESS", fallback: "");
   int? port = int.tryParse(dotenv.get("PORT", fallback: ""));
 
-  print(
-      "${web.window.location.protocol}, host is $host, address is $address, port is $port, protocol is $protocol");
+  developer.log(
+    "${web.window.location.protocol}, host is $host, "
+    "address is $address, port is $port, protocol is $protocol",
+    name: 'rubinTV.visualization.main',
+  );
 
   String websocketUrl = Uri.decodeFull(
       Uri(scheme: protocol, host: host, pathSegments: [address, 'client'], port: port).toString());
-  print(websocketUrl);
 
   AppVersion version = await getAppVersion();
 

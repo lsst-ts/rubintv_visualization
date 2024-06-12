@@ -48,10 +48,11 @@ class MainAppState extends State<MainApp> {
 
   Future<void> _connect() async {
     try {
-      print("Connecting to websocket at ${widget.websocketUrl}");
+      developer.log("Connecting to websocket at ${widget.websocketUrl}", name: "rubinTV.visualization.app");
       webSocket = WebSocketChannel.connect(Uri.parse(widget.websocketUrl));
       webSocket.stream.listen(
         (event) {
+          //developer.log('WebSocket message: $event', name: "rubinTV.visualization.main");
           streamController.add(event);
         },
         onDone: () {
@@ -62,13 +63,19 @@ class MainAppState extends State<MainApp> {
         },
         onError: (error) {
           developer.log('WebSocket error: $error.', name: "rubinTV.visualization.main");
+          setState(() {
+            _isConnected = false;
+          });
         },
       );
 
-      webSocket.sink.add(LoadSchemaCommand().toJson());
+      //webSocket.sink.add(LoadSchemaCommand().toJson());
       _isConnected = true;
     } catch (e) {
       developer.log('WebSocket connection failed: $e', name: "rubinTV.visualization.main");
+      setState(() {
+        _isConnected = false;
+      });
     }
   }
 
@@ -82,7 +89,7 @@ class MainAppState extends State<MainApp> {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    print("building main app");
+    developer.log("building main app", name: "rubinTV.visualization.app");
     ThemeData themeData = ThemeData(
       colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF058b8c)),
       useMaterial3: true,
