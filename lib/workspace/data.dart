@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -328,4 +329,9 @@ class DataId {
     }
     return hash;
   }
+
+  String toJson() => jsonEncode(keys);
+
+  @override
+  String toString() => "DataId($keys)";
 }

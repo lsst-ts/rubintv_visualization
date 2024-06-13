@@ -136,9 +136,7 @@ TimeMachine<Workspace> webSocketReceiveMessageReducer(
   WebSocketReceiveMessageAction action,
 ) {
   Map<String, dynamic> message = jsonDecode(action.message);
-  if (message["type"]! == "database schema") {
-    action.dataCenter.addDatabaseSchema(message["content"]);
-  } else if (message["type"] == "table columns") {
+  if (message["type"] == "table columns") {
     developer.log("received ${message["content"]["data"].length} columns for ${message["requestId"]}",
         name: "rubin_chart.workspace");
     action.dataCenter.updateSeriesData(
@@ -151,7 +149,12 @@ TimeMachine<Workspace> webSocketReceiveMessageReducer(
     );
     developer.log("dataCenter data: ${action.dataCenter.seriesIds}", name: "rubin_chart.workspace");
   } else if (message["type"] == "instrument info") {
-    //developer.log("received instrument info: $message", name: "rubin_chart.workspace");
+    // Update the data center to use the new instrument
+    if (message["content"].containsKey("schema")) {
+      action.dataCenter.addDatabaseSchema(message["content"]["schema"]);
+    }
+
+    // Update the workspace to use the new instrument
     Instrument instrument = Instrument.fromJson(message["content"]);
     Workspace newState = state.currentState.copyWith(instrument: instrument);
     if (newState.detector != null) {
@@ -596,6 +599,21 @@ class WorkspaceViewer extends StatefulWidget {
   }
 }
 
+class SelectDataPointsCommand {
+  final Set<DataId> dataPoints;
+
+  SelectDataPointsCommand({
+    required this.dataPoints,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      "type": "select data points",
+      "dataPoints": dataPoints.map((e) => e.toJson()).toList(),
+    };
+  }
+}
+
 class WorkspaceViewerState extends State<WorkspaceViewer> {
   AppTheme get theme => widget.workspace.theme;
   Size get size => widget.size;
@@ -613,6 +631,16 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
     super.initState();
     selectionController = SelectionController();
     drillDownController = SelectionController();
+
+    selectionController.subscribe(_onSelectionUpdate);
+  }
+
+  /// Update the selection data points.
+  void _onSelectionUpdate(Set<Object> dataPoints) {
+    developer.log("Selection updated: $dataPoints", name: "rubin_chart.workspace");
+    /*info.webSocket!.sink.add(SelectDataPointsCommand(
+      dataPoints: dataPoints as Set<DataId>,
+    ).toJson());*/
   }
 
   @override

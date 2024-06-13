@@ -35,16 +35,6 @@ class ServiceCommand {
   }
 }
 
-class LoadSchemaCommand extends ServiceCommand {
-  LoadSchemaCommand()
-      : super(
-          name: "load schema",
-          parameters: {
-            "database": "summitcdb",
-          },
-        );
-}
-
 class LoadInstrumentAction extends ServiceCommand {
   LoadInstrumentAction({required String instrument})
       : super(

@@ -30,6 +30,7 @@ class Detector {
     required String name,
     required List<Offset> corners,
   }) {
+    // Parse the corners, using the bottom-left as the origin
     double left = corners.map((corner) => corner.dx).reduce((a, b) => a < b ? a : b);
     double top = corners.map((corner) => corner.dy).reduce((a, b) => a < b ? a : b);
     double right = corners.map((corner) => corner.dx).reduce((a, b) => a > b ? a : b);
@@ -106,6 +107,7 @@ class FocalPlanePainter extends CustomPainter {
   final Detector? selectedDetector;
 
   FocalPlanePainter(this.detectors, this.selectedDetector, this.onPaintComplete) {
+    // Map the bounding box of the total focal plane at with the origin at the bottom-left
     double left = detectors.map((detector) => detector.bbox.left).reduce((a, b) => a < b ? a : b);
     double top = detectors.map((detector) => detector.bbox.top).reduce((a, b) => a < b ? a : b);
     double right = detectors.map((detector) => detector.bbox.right).reduce((a, b) => a > b ? a : b);
@@ -116,11 +118,11 @@ class FocalPlanePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     double scale = math.min(size.width / focalPlaneRect.width, size.height / focalPlaneRect.height);
-    Offset offset = Offset(-focalPlaneRect.left, -focalPlaneRect.top);
+    Offset offset = Offset(-focalPlaneRect.left, focalPlaneRect.top);
 
     offset += Offset(
       (size.width / scale - focalPlaneRect.width) / 2,
-      (size.height / scale - focalPlaneRect.height) / 2,
+      (-size.height / scale + focalPlaneRect.height) / 2,
     );
     Map<int, Path> detectorPaths = {};
     for (Detector detector in detectors) {
@@ -134,9 +136,9 @@ class FocalPlanePainter extends CustomPainter {
   Path _drawDetector(Canvas canvas, Detector detector, Size size, Offset offset, double scale) {
     Paint paint = Paint()..color = selectedDetector?.id == detector.id ? Colors.red : Colors.blue;
     Path path = Path();
-    List<Offset> corners = detector.corners.map((corner) => (corner + offset) * scale).toList();
-    //developer.log("detector corners: ${detector.corners}", name: "rubinTV.visualization.focal_plane");
-    //developer.log("drawing at $corners", name: "rubinTV.visualization.focal_plane");
+    List<Offset> corners = detector.corners
+        .map((corner) => (Offset(corner.dx, size.height / scale - corner.dy) + offset) * scale)
+        .toList();
 
     path.addPolygon(corners, true);
     canvas.drawPath(path, paint);
@@ -154,11 +156,12 @@ class FocalPlanePainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     );
     textPainter.layout();
-    Offset center = (detector.bbox.center + offset) * scale -
-        Offset(
-          textPainter.width / 2,
-          textPainter.height / 2,
-        );
+    Offset center =
+        (Offset(detector.bbox.center.dx, size.height / scale - detector.bbox.center.dy) + offset) * scale -
+            Offset(
+              textPainter.width / 2,
+              textPainter.height / 2,
+            );
     textPainter.paint(canvas, center);
   }
 

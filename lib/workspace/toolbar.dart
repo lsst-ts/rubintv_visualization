@@ -163,6 +163,10 @@ class ToolbarState extends State<Toolbar> {
                 value: "Latiss",
                 child: Text("Latiss"),
               ),
+              DropdownMenuItem(
+                value: "LsstComCamSim",
+                child: Text("LsstComCamSim"),
+              ),
             ],
             onChanged: (String? value) {
               if (value != null) {
