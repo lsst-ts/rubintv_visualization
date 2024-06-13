@@ -31,6 +31,16 @@ class UpdateMultiSelect extends ToolbarAction {
   UpdateMultiSelect(this.tool, this.chartId);
 }
 
+class UpdateChartBinsAction extends ToolbarAction {
+  final UniqueId chartId;
+  final int nBins;
+
+  UpdateChartBinsAction({
+    required this.chartId,
+    required this.nBins,
+  });
+}
+
 /// The type of chart to display.
 enum InteractiveChartTypes {
   histogram,
@@ -485,6 +495,7 @@ class ScatterChartWindow extends ChartWindow {
 class BinnedChartWindow extends ChartWindow {
   final int nBins;
   final MultiSelectionTool tool;
+  final TextEditingController _binController = TextEditingController();
 
   BinnedChartWindow({
     super.key,
@@ -500,7 +511,9 @@ class BinnedChartWindow extends ChartWindow {
     required super.childKeys,
     required this.nBins,
     required this.tool,
-  });
+  }) {
+    _binController.text = nBins.toString();
+  }
 
   @override
   BinnedChartWindow copyWith({
@@ -561,6 +574,23 @@ class BinnedChartWindow extends ChartWindow {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
 
     List<Widget> tools = [
+      SizedBox(
+          width: 100,
+          child: TextField(
+            controller: _binController,
+            decoration: const InputDecoration(
+              labelText: "bins",
+            ),
+            onSubmitted: (String value) {
+              int? nBins = int.tryParse(value);
+              if (nBins != null && nBins > 0) {
+                workspace.dispatch(UpdateChartBinsAction(
+                  chartId: id,
+                  nBins: nBins,
+                ));
+              }
+            },
+          )),
       SegmentedButton<MultiSelectionTool>(
         selected: {tool},
         segments: [

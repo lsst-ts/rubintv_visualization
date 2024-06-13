@@ -446,6 +446,23 @@ TimeMachine<Workspace> updateMultiSelectReducer(
   ));
 }
 
+TimeMachine<Workspace> updateChartBinsReducer(
+  TimeMachine<Workspace> state,
+  UpdateChartBinsAction action,
+) {
+  Workspace workspace = state.currentState;
+  Map<UniqueId, Window> windows = {...workspace.windows};
+  BinnedChartWindow chart = windows[action.chartId] as BinnedChartWindow;
+  chart = chart.copyWith(nBins: action.nBins);
+  windows[chart.id] = chart;
+  workspace = workspace.copyWith(windows: windows);
+  developer.log("Updating chart bins to ${action.nBins}", name: "rubin_chart.workspace");
+  return state.updated(TimeMachineUpdate(
+    comment: "update chart bins",
+    state: workspace,
+  ));
+}
+
 TimeMachine<Workspace> showFocalPlaneReducer(
   TimeMachine<Workspace> state,
   ShowFocalPlane action,
@@ -545,6 +562,7 @@ Reducer<TimeMachine<Workspace>> workspaceReducer = combineReducers<TimeMachine<W
   TypedReducer<TimeMachine<Workspace>, UpdateMultiSelect>(updateMultiSelectReducer),
   TypedReducer<TimeMachine<Workspace>, ShowFocalPlane>(showFocalPlaneReducer),
   TypedReducer<TimeMachine<Workspace>, SelectDetectorAction>(selectDetectorReducer),
+  TypedReducer<TimeMachine<Workspace>, UpdateChartBinsAction>(updateChartBinsReducer),
   /*TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
   TypedReducer<TimeMachine<Workspace>, RectSelectionAction>(
       rectSelectionReducer),
