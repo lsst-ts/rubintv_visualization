@@ -61,7 +61,7 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
               lastDate: DateTime(2101),
             );
 
-            widget.dispatch(UpdateGlobalObsDateAction(obsDate: pickedDate));
+            widget.dispatch(UpdateGlobalObsDateEvent(obsDate: pickedDate));
           },
           child: Container(
             margin: const EdgeInsets.all(4),
@@ -78,7 +78,7 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
           onPressed: () {
             setState(() {
               selectedDate = null;
-              widget.dispatch(const UpdateGlobalObsDateAction(obsDate: null));
+              widget.dispatch(const UpdateGlobalObsDateEvent(obsDate: null));
             });
           },
           child: const Icon(

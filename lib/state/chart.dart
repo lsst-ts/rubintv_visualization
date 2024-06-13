@@ -354,7 +354,7 @@ abstract class ChartWindow extends Window {
               ? const Icon(Icons.travel_explore, color: Colors.green)
               : const Icon(Icons.public_off, color: Colors.grey),
           onPressed: () {
-            workspace.dispatch(UpdateChartGlobalQueryAction(
+            workspace.dispatch(UpdateChartGlobalQueryEvent(
               useGlobalQuery: !useGlobalQuery,
               dataCenter: workspace.dataCenter,
               chartId: id,

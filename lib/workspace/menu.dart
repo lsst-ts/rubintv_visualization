@@ -4,6 +4,7 @@ import 'package:menu_bar/menu_bar.dart';
 import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/chart.dart';
 import 'package:rubintv_visualization/state/theme.dart';
+import 'package:rubintv_visualization/state/workspace.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 
 /// Notify the user that functionality has not yet been implemented
@@ -33,13 +34,11 @@ VoidCallback showNotImplemented(BuildContext context) {
 }
 
 /// Add a new [CartesianPlot] to the [WorkspaceViewer].
-class CreateNewChartAction extends UiAction {
+class CreateNewChartEvent extends WorkspaceEvent {
   final InteractiveChartTypes chartType;
-  final AppTheme theme;
 
-  CreateNewChartAction({
+  CreateNewChartEvent({
     this.chartType = InteractiveChartTypes.cartesianScatter,
-    required this.theme,
   });
 }
 
@@ -252,36 +251,32 @@ class AppMenu extends StatelessWidget {
                 submenu: SubMenu(menuItems: [
                   MenuButton(
                     onTap: () {
-                      dispatch(CreateNewChartAction(
+                      dispatch(CreateNewChartEvent(
                         chartType: InteractiveChartTypes.cartesianScatter,
-                        theme: theme,
                       ));
                     },
                     text: const Text("Cartesian Scatter Plot"),
                   ),
                   MenuButton(
                     onTap: () {
-                      dispatch(CreateNewChartAction(
+                      dispatch(CreateNewChartEvent(
                         chartType: InteractiveChartTypes.polarScatter,
-                        theme: theme,
                       ));
                     },
                     text: const Text("Polar Scatter Plot"),
                   ),
                   MenuButton(
                     onTap: () {
-                      dispatch(CreateNewChartAction(
+                      dispatch(CreateNewChartEvent(
                         chartType: InteractiveChartTypes.histogram,
-                        theme: theme,
                       ));
                     },
                     text: const Text("Histogram"),
                   ),
                   MenuButton(
                     onTap: () {
-                      dispatch(CreateNewChartAction(
+                      dispatch(CreateNewChartEvent(
                         chartType: InteractiveChartTypes.box,
-                        theme: theme,
                       ));
                     },
                     text: const Text("Box Chart"),

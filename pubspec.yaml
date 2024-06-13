@@ -44,10 +44,6 @@ dependencies:
 
   # The (file) menu bar
   menu_bar: ^0.5.3
-  # The dart redux package
-  redux: ^5.0.0
-  # The flutter_redux package, built on dart redux
-  flutter_redux: ^0.10.0
   # Websocket connections in Flutter
   web_socket_channel: ^2.4.0
   # Display feedback to the user
@@ -57,6 +53,8 @@ dependencies:
   # The rubin_charts plotting library
   rubin_chart:
     path: ../rubin_chart
+  # Use BLoC pattern for state management
+  flutter_bloc: ^8.1.6
 
 dev_dependencies:
   flutter_test:

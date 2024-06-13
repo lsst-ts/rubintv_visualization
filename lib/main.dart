@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:rubintv_visualization/app.dart';
-import 'package:rubintv_visualization/state/app.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 
 Future<AppVersion> getAppVersion() async {

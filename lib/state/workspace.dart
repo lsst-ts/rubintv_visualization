@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
-import 'package:redux/redux.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/image/focal_plane.dart';
 import 'package:rubintv_visualization/state/chart.dart';
@@ -14,20 +15,61 @@ import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/focal_plane.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/state/time_machine.dart';
+import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/menu.dart';
 import 'package:rubintv_visualization/workspace/series.dart';
 import 'package:rubintv_visualization/workspace/toolbar.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// The full working area of the app.
-class Workspace {
-  /// Windows to display in the [Workspace].
-  final Map<UniqueId, Window> _windows;
+abstract class WorkspaceEvent {}
 
-  /// The theme for the app
-  final AppTheme theme;
+/// A message received via the websocket.
+class ReceiveMessageEvent extends WorkspaceEvent {
+  final Map<String, dynamic> message;
+
+  ReceiveMessageEvent(this.message);
+}
+
+/// Update whether or not to use the global query for a given chart.
+class UpdateChartGlobalQueryEvent extends WorkspaceEvent {
+  final UniqueId chartId;
+  final bool useGlobalQuery;
+
+  UpdateChartGlobalQueryEvent({
+    required this.useGlobalQuery,
+    required this.chartId,
+  });
+}
+
+/// Update the global query.
+class UpdateGlobalQueryEvent extends WorkspaceEvent {
+  final Query? globalQuery;
+
+  UpdateGlobalQueryEvent({
+    required this.globalQuery,
+  });
+}
+
+/// Update the global observation date.
+class UpdateGlobalObsDateEvent extends WorkspaceEvent {
+  final DateTime? obsDate;
+
+  UpdateGlobalObsDateEvent({required this.obsDate});
+}
+
+/// State of a [WorkspaceViewer].
+abstract class WorkspaceState {
+  const WorkspaceState();
+}
+
+/// The initial state of the [WorkspaceViewer].
+class WorkspaceStateInitial extends WorkspaceState {}
+
+/// A fully loaded state of the [WorkspaceViewer].
+class WorkspaceStateLoaded extends WorkspaceState {
+  /// Windows to display in the [WorkspaceStateLoaded].
+  final Map<UniqueId, Window> windows;
 
   /// A query that applies to all plots (that opt in to gloabl queries)
   final Query? globalQuery;
@@ -35,88 +77,200 @@ class Workspace {
   /// The observation date for any tables that have an observation date column.
   final DateTime? obsDate;
 
-  // The websocket connection to the analysis service.
-  final WebSocketChannel? webSocket;
+  /// The current instrument being analyzed.
+  final Instrument instrument;
 
-  final Instrument? instrument;
-
+  /// The current detector being analyzed.
+  /// If null, then no detector is selected.
   final Detector? detector;
 
-  const Workspace({
-    required this.theme,
-    Map<UniqueId, Window> windows = const {},
-    this.webSocket,
-    this.globalQuery,
-    this.obsDate,
-    this.instrument,
-    this.detector,
-  }) : _windows = windows;
+  /// Whether or not to show the focal plane.
+  final bool showFocalPlane;
 
-  Workspace copyWith({
-    AppTheme? theme,
+  final AppTheme theme;
+
+  const WorkspaceStateLoaded({
+    required this.windows,
+    required this.instrument,
+    required this.showFocalPlane,
+    required this.globalQuery,
+    required this.obsDate,
+    required this.detector,
+    required this.theme,
+  });
+
+  /// Copy the [WorkspaceStateLoaded] with new values.
+  WorkspaceStateLoaded copyWith({
     Map<UniqueId, Window>? windows,
-    WebSocketChannel? webSocket,
     Instrument? instrument,
+    Detector? detector,
+    bool? showFocalPlane,
+    FocalPlane? focalPlane,
+    AppTheme? theme,
   }) =>
-      Workspace(
-        theme: theme ?? this.theme,
+      WorkspaceStateLoaded(
         windows: windows ?? this.windows,
-        webSocket: webSocket ?? this.webSocket,
         globalQuery: globalQuery,
         obsDate: obsDate,
         instrument: instrument ?? this.instrument,
         detector: detector ?? this.detector,
+        showFocalPlane: showFocalPlane ?? this.showFocalPlane,
+        theme: theme ?? this.theme,
       );
 
   /// Because the global query can be null, we need a special copy method.
-  Workspace updateGlobalQuery(Query? query) => Workspace(
-        theme: theme,
+  WorkspaceStateLoaded updateGlobalQuery(Query? query) => WorkspaceStateLoaded(
         windows: windows,
-        webSocket: webSocket,
+        instrument: instrument,
         globalQuery: query,
         obsDate: obsDate,
-        instrument: instrument,
         detector: detector,
+        showFocalPlane: showFocalPlane,
+        theme: theme,
       );
 
   /// Becayse the obsDate can be null, we need a special copy method.
-  Workspace updateObsDate(DateTime? obsDate) => Workspace(
-        theme: theme,
+  WorkspaceStateLoaded updateObsDate(DateTime? obsDate) => WorkspaceStateLoaded(
         windows: windows,
-        webSocket: webSocket,
+        instrument: instrument,
         globalQuery: globalQuery,
         obsDate: obsDate,
-        instrument: instrument,
         detector: detector,
+        showFocalPlane: showFocalPlane,
+        theme: theme,
       );
 
   // Because the detector can be null, we need a special copy method.
-  Workspace updateSelectedDetector(Detector? detector) => Workspace(
-        theme: theme,
+  WorkspaceStateLoaded updateSelectedDetector(Detector? detector) => WorkspaceStateLoaded(
         windows: windows,
-        webSocket: webSocket,
+        instrument: instrument,
         globalQuery: globalQuery,
         obsDate: obsDate,
-        instrument: instrument,
         detector: detector,
+        showFocalPlane: showFocalPlane,
+        theme: theme,
       );
-
-  /// Protect [_windows] so that it can only be updated through the app.
-  Map<UniqueId, Window> get windows => {..._windows};
 
   /// Add a new [Window] to the [WorkspaceWidgetState].
   /// Normally the [index] is already created, unless
   /// the workspace is being loaded from disk.
-  Workspace addWindow(Window window) {
-    Map<UniqueId, Window> newWindows = {..._windows};
+  WorkspaceStateLoaded addWindow(Window window) {
+    Map<UniqueId, Window> newWindows = {...windows};
     newWindows[window.id] = window;
 
     return copyWith(
       windows: newWindows,
     );
   }
+}
 
-  bool get isShowingFocalPlane => _windows.values.any((element) => element is FocalPlaneWindow);
+/// Get a formatted date string from a [DateTime].
+String? getFormattedDate(DateTime? obsDate) {
+  if (obsDate == null) {
+    return null;
+  }
+  String year = obsDate.year.toString();
+  String month = obsDate.month.toString().padLeft(2, '0');
+  String day = obsDate.day.toString().padLeft(2, '0');
+
+  return '$year-$month-$day';
+}
+
+/// Load data for all series in a given chart
+void getSeriesData(WorkspaceStateLoaded workspace, {ChartWindow? chart}) {
+  String? obsDate = getFormattedDate(workspace.obsDate);
+
+  late final List<ChartWindow> charts;
+  if (chart != null) {
+    charts = [chart];
+  } else {
+    charts = workspace.windows.values.whereType<ChartWindow>().toList();
+  }
+  // Request the data from the server.
+  if (WebSocketManager().isConnected) {
+    for (ChartWindow chart in charts) {
+      for (SeriesInfo series in chart.series.values) {
+        WebSocketManager().sendMessage(LoadColumnsCommand.build(
+          seriesId: series.id,
+          fields: series.fields.values.toList(),
+          query: series.query,
+          useGlobalQuery: chart.useGlobalQuery,
+          globalQuery: workspace.globalQuery,
+          obsDate: obsDate,
+        ).toJson());
+      }
+    }
+  }
+}
+
+class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
+  late StreamSubscription _subscription;
+
+  WorkspaceBloc() : super(WorkspaceStateInitial()) {
+    /// Listen for messages from the websocket.
+    _subscription = WebSocketManager().messages.listen((message) {
+      add(ReceiveMessageEvent(message));
+    });
+
+    /// A message is received from the websocket.
+    on<ReceiveMessageEvent>((event, emit) {
+      if (event.message["type"] == "instrument info") {
+        // Update the workspace to use the new instrument
+        Instrument instrument = Instrument.fromJson(event.message["content"]);
+        emit((state as WorkspaceStateLoaded).copyWith(instrument: instrument));
+      }
+    });
+
+    /// Update whether or not a chart uses the global query.
+    on<UpdateChartGlobalQueryEvent>((event, emit) {
+      WorkspaceStateLoaded state = this.state as WorkspaceStateLoaded;
+      Map<UniqueId, Window> windows = {...state.windows};
+      ChartWindow chart = windows[event.chartId] as ChartWindow;
+      chart = chart.copyWith(useGlobalQuery: event.useGlobalQuery);
+      windows[chart.id] = chart;
+      state = state.copyWith(windows: windows);
+      getSeriesData(state, chart: chart);
+      emit(state);
+    });
+
+    /// Update the global query.
+    on<UpdateGlobalQueryEvent>((event, emit) {
+      WorkspaceStateLoaded state = this.state as WorkspaceStateLoaded;
+      state = state.updateGlobalQuery(event.globalQuery);
+      getSeriesData(state);
+      emit(state);
+    });
+
+    /// Update the global observation date.
+    on<UpdateGlobalObsDateEvent>((event, emit) {
+      developer.log("updating date to ${event.obsDate}!", name: "rubin_chart.workspace");
+      WorkspaceStateLoaded state = this.state as WorkspaceStateLoaded;
+      state = state.updateObsDate(event.obsDate);
+      getSeriesData(state);
+      emit(state);
+    });
+
+    /// Create a new chart
+    on<CreateNewChartEvent>((event, emit) {
+      WorkspaceStateLoaded state = this.state as WorkspaceStateLoaded;
+      Offset offset = state.theme.newWindowOffset;
+
+      if (state.windows.isNotEmpty) {
+        // Shift from last window
+        offset += state.windows.values.last.offset;
+      }
+
+      ChartWindow chart = ChartWindow.fromChartType(
+        id: UniqueId.next(),
+        offset: offset,
+        size: state.theme.newPlotSize,
+        chartType: event.chartType,
+      );
+      Map<UniqueId, Window> windows = {...state.windows};
+      windows[chart.id] = chart;
+      emit(state.copyWith(windows: windows));
+    });
+  }
 }
 
 /// Process a message received from the analysis service.
@@ -131,8 +285,8 @@ class WebSocketReceiveMessageAction extends UiAction {
 }
 
 /// Store the websocket connection to the analysis service.
-TimeMachine<Workspace> webSocketReceiveMessageReducer(
-  TimeMachine<Workspace> state,
+TimeMachine<WorkspaceStateLoaded> webSocketReceiveMessageReducer(
+  TimeMachine<WorkspaceStateLoaded> state,
   WebSocketReceiveMessageAction action,
 ) {
   Map<String, dynamic> message = jsonDecode(action.message);
@@ -148,189 +302,14 @@ TimeMachine<Workspace> webSocketReceiveMessageReducer(
       workspace: state.currentState,
     );
     developer.log("dataCenter data: ${action.dataCenter.seriesIds}", name: "rubin_chart.workspace");
-  } else if (message["type"] == "instrument info") {
-    // Update the data center to use the new instrument
-    if (message["content"].containsKey("schema")) {
-      action.dataCenter.addDatabaseSchema(message["content"]["schema"]);
-    }
-
-    // Update the workspace to use the new instrument
-    Instrument instrument = Instrument.fromJson(message["content"]);
-    Workspace newState = state.currentState.copyWith(instrument: instrument);
-    if (newState.detector != null) {
-      newState = newState.updateSelectedDetector(null);
-    }
-    if (newState.isShowingFocalPlane) {
-      Map<UniqueId, Window> windows = {...newState.windows};
-      for (Window window in newState.windows.values) {
-        if (window is FocalPlaneWindow) {
-          windows[window.id] = window.copyWith(instrument: instrument);
-        }
-      }
-      newState = newState.copyWith(windows: windows);
-    }
-    return state.updated(TimeMachineUpdate(
-      comment: "update instrument info",
-      state: newState,
-    ));
-  }
-  return state;
-}
-
-/// Add a new cartesian plot to the workspace
-TimeMachine<Workspace> updateWindowReducer(
-  TimeMachine<Workspace> state,
-  ApplyWindowUpdate action,
-) {
-  Workspace workspace = state.currentState;
-  Map<UniqueId, Window> windows = {...workspace.windows};
-  Window window = windows[action.windowId]!.copyWith(offset: action.offset, size: action.size);
-  windows[window.id] = window;
-  workspace = workspace.copyWith(windows: windows);
-
-  return state.updated(TimeMachineUpdate(
-    comment: "update a window size and position",
-    state: workspace,
-  ));
-}
-
-class UpdateChartGlobalQueryAction extends UiAction {
-  final UniqueId chartId;
-  final bool useGlobalQuery;
-  final DataCenter dataCenter;
-  UpdateChartGlobalQueryAction({
-    required this.useGlobalQuery,
-    required this.dataCenter,
-    required this.chartId,
-  });
-}
-
-String? getFormattedDate(DateTime? obsDate) {
-  if (obsDate == null) {
-    return null;
-  }
-  String year = obsDate.year.toString();
-  String month = obsDate.month.toString().padLeft(2, '0');
-  String day = obsDate.day.toString().padLeft(2, '0');
-
-  return '$year-$month-$day';
-}
-
-void getSeriesData(Workspace workspace, {ChartWindow? chart}) {
-  String? obsDate = getFormattedDate(workspace.obsDate);
-
-  late final List<ChartWindow> charts;
-  if (chart != null) {
-    charts = [chart];
-  } else {
-    charts = workspace.windows.values.whereType<ChartWindow>().toList();
-  }
-  // Request the data from the server.
-  if (workspace.webSocket != null) {
-    for (ChartWindow chart in charts) {
-      for (SeriesInfo series in chart.series.values) {
-        workspace.webSocket!.sink.add(LoadColumnsCommand.build(
-          seriesId: series.id,
-          fields: series.fields.values.toList(),
-          query: series.query,
-          useGlobalQuery: chart.useGlobalQuery,
-          globalQuery: workspace.globalQuery,
-          obsDate: obsDate,
-        ).toJson());
-      }
-    }
   }
 }
 
-TimeMachine<Workspace> updateChartGlobalQueryReducer(
-  TimeMachine<Workspace> state,
-  UpdateChartGlobalQueryAction action,
-) {
-  Workspace workspace = state.currentState;
-  Map<UniqueId, Window> windows = {...workspace.windows};
-  ChartWindow chart = windows[action.chartId] as ChartWindow;
-  chart = chart.copyWith(useGlobalQuery: action.useGlobalQuery);
-  windows[chart.id] = chart;
-
-  workspace = workspace.copyWith(windows: windows);
-  getSeriesData(workspace, chart: chart);
-
-  return state.updated(TimeMachineUpdate(
-    comment: "update chart global query",
-    state: workspace,
-  ));
-}
-
-class UpdateGlobalQueryAction extends UiAction {
-  final Query? query;
-
-  const UpdateGlobalQueryAction({required this.query});
-}
-
-TimeMachine<Workspace> updateGlobalQueryReducer(
-  TimeMachine<Workspace> state,
-  UpdateGlobalQueryAction action,
-) {
-  Workspace workspace = state.currentState;
-  workspace = workspace.updateGlobalQuery(action.query);
-  getSeriesData(workspace);
-  return state.updated(TimeMachineUpdate(
-    comment: "update global query",
-    state: workspace,
-  ));
-}
-
-class UpdateGlobalObsDateAction extends UiAction {
-  final DateTime? obsDate;
-
-  const UpdateGlobalObsDateAction({required this.obsDate});
-}
-
-TimeMachine<Workspace> updateGlobalObsDateReducer(
-  TimeMachine<Workspace> state,
-  UpdateGlobalObsDateAction action,
-) {
-  developer.log("updating date to ${action.obsDate}!", name: "rubin_chart.workspace");
-  Workspace workspace = state.currentState;
-  workspace = workspace.updateObsDate(action.obsDate);
-  getSeriesData(workspace);
-  return state.updated(TimeMachineUpdate(
-    comment: "update global observation date",
-    state: workspace,
-  ));
-}
-
-/// Add a new cartesian plot to the workspace
-TimeMachine<Workspace> newChartReducer(
-  TimeMachine<Workspace> state,
-  CreateNewChartAction action,
-) {
-  Workspace workspace = state.currentState;
-  Offset offset = workspace.theme.newWindowOffset;
-
-  if (workspace.windows.isNotEmpty) {
-    // Shift from last window
-    offset += workspace.windows.values.last.offset;
-  }
-
-  workspace = workspace.addWindow(ChartWindow.fromChartType(
-    id: UniqueId.next(),
-    offset: offset,
-    size: workspace.theme.newPlotSize,
-    chartType: action.chartType,
-  ));
-
-  return state.updated(TimeMachineUpdate(
-    comment: "add new Cartesian plot",
-    state: workspace,
-  ));
-}
-
-TimeMachine<Workspace> createSeriesReducer(
-  TimeMachine<Workspace> state,
+TimeMachine<WorkspaceStateLoaded> createSeriesReducer(
+  TimeMachine<WorkspaceStateLoaded> state,
   CreateSeriesAction action,
 ) {
-  Workspace workspace = state.currentState;
+  WorkspaceStateLoaded workspace = state.currentState;
   ChartWindow chart = workspace.windows[action.series.id.windowId] as ChartWindow;
   chart = chart.addSeries(series: action.series);
   workspace = workspace.copyWith(windows: {...workspace.windows, chart.id: chart});
@@ -342,8 +321,8 @@ TimeMachine<Workspace> createSeriesReducer(
 }
 
 /// Update [SeriesData] in the [DataCenter].
-TimeMachine<Workspace> updateSeriesReducer(
-  TimeMachine<Workspace> state,
+TimeMachine<WorkspaceStateLoaded> updateSeriesReducer(
+  TimeMachine<WorkspaceStateLoaded> state,
   SeriesUpdateAction action,
 ) {
   ChartWindow chart = state.currentState._windows[action.series.id.windowId] as ChartWindow;
@@ -400,7 +379,7 @@ TimeMachine<Workspace> updateSeriesReducer(
     comment = "add new Series";
   }
 
-  Workspace workspace = state.currentState;
+  WorkspaceStateLoaded workspace = state.currentState;
   Map<UniqueId, Window> windows = {...workspace.windows};
   windows[chart.id] = chart;
 
@@ -424,11 +403,11 @@ TimeMachine<Workspace> updateSeriesReducer(
   ));
 }
 
-TimeMachine<Workspace> updateMultiSelectReducer(
-  TimeMachine<Workspace> state,
+TimeMachine<WorkspaceStateLoaded> updateMultiSelectReducer(
+  TimeMachine<WorkspaceStateLoaded> state,
   UpdateMultiSelect action,
 ) {
-  Workspace workspace = state.currentState;
+  WorkspaceStateLoaded workspace = state.currentState;
   Map<UniqueId, Window> windows = {...workspace.windows};
   ChartWindow chart = windows[action.chartId] as ChartWindow;
   if (chart is ScatterChartWindow) {
@@ -446,11 +425,11 @@ TimeMachine<Workspace> updateMultiSelectReducer(
   ));
 }
 
-TimeMachine<Workspace> updateChartBinsReducer(
-  TimeMachine<Workspace> state,
+TimeMachine<WorkspaceStateLoaded> updateChartBinsReducer(
+  TimeMachine<WorkspaceStateLoaded> state,
   UpdateChartBinsAction action,
 ) {
-  Workspace workspace = state.currentState;
+  WorkspaceStateLoaded workspace = state.currentState;
   Map<UniqueId, Window> windows = {...workspace.windows};
   BinnedChartWindow chart = windows[action.chartId] as BinnedChartWindow;
   chart = chart.copyWith(nBins: action.nBins);
@@ -463,17 +442,17 @@ TimeMachine<Workspace> updateChartBinsReducer(
   ));
 }
 
-TimeMachine<Workspace> showFocalPlaneReducer(
-  TimeMachine<Workspace> state,
+TimeMachine<WorkspaceStateLoaded> showFocalPlaneReducer(
+  TimeMachine<WorkspaceStateLoaded> state,
   ShowFocalPlane action,
 ) {
   for (Window window in state.currentState.windows.values) {
-    if (window is FocalPlaneWindow) {
+    if (window is FocalPlane) {
       return state;
     }
   }
 
-  Workspace workspace = state.currentState;
+  WorkspaceStateLoaded workspace = state.currentState;
   Offset offset = workspace.theme.newWindowOffset;
 
   if (workspace.windows.isNotEmpty) {
@@ -481,7 +460,7 @@ TimeMachine<Workspace> showFocalPlaneReducer(
     offset += workspace.windows.values.last.offset;
   }
 
-  workspace = workspace.addWindow(FocalPlaneWindow(
+  workspace = workspace.addWindow(FocalPlane(
     id: UniqueId.next(),
     offset: offset,
     size: workspace.theme.newPlotSize,
@@ -494,23 +473,23 @@ TimeMachine<Workspace> showFocalPlaneReducer(
   ));
 }
 
-TimeMachine<Workspace> selectDetectorReducer(
-  TimeMachine<Workspace> state,
+TimeMachine<WorkspaceStateLoaded> selectDetectorReducer(
+  TimeMachine<WorkspaceStateLoaded> state,
   SelectDetectorAction action,
 ) {
-  Workspace workspace = state.currentState;
+  WorkspaceStateLoaded workspace = state.currentState;
   Map<UniqueId, Window> windows = {...workspace.windows};
 
   if (workspace.detector == action.detector) {
     // The user unselected the detector.
-    Workspace newState = workspace.updateSelectedDetector(null);
+    WorkspaceStateLoaded newState = workspace.updateSelectedDetector(null);
     return state.updated(TimeMachineUpdate(
       comment: "deselect detector",
       state: newState,
     ));
   }
 
-  Workspace newState = workspace.updateSelectedDetector(action.detector);
+  WorkspaceStateLoaded newState = workspace.updateSelectedDetector(action.detector);
   return state.updated(TimeMachineUpdate(
     comment: "select detector",
     state: newState,
@@ -518,7 +497,8 @@ TimeMachine<Workspace> selectDetectorReducer(
 }
 
 /// Reduce a [TimeMachineAction] and (potentially) update the history and workspace.
-TimeMachine<Workspace> timeMachineReducer(TimeMachine<Workspace> state, TimeMachineAction action) {
+TimeMachine<WorkspaceStateLoaded> timeMachineReducer(
+    TimeMachine<WorkspaceStateLoaded> state, TimeMachineAction action) {
   if (action.action == TimeMachineActions.first) {
     return state.first;
   } else if (action.action == TimeMachineActions.previous) {
@@ -532,11 +512,11 @@ TimeMachine<Workspace> timeMachineReducer(TimeMachine<Workspace> state, TimeMach
 }
 
 /// Add a new cartesian plot to the workspace
-TimeMachine<Workspace> removeWindowReducer(
-  TimeMachine<Workspace> state,
+TimeMachine<WorkspaceStateLoaded> removeWindowReducer(
+  TimeMachine<WorkspaceStateLoaded> state,
   RemoveWindowAction action,
 ) {
-  Workspace workspace = state.currentState;
+  WorkspaceStateLoaded workspace = state.currentState;
   Map<UniqueId, Window> windows = {...workspace.windows};
   windows.remove(action.window.id);
   workspace = workspace.copyWith(windows: windows);
@@ -547,49 +527,17 @@ TimeMachine<Workspace> removeWindowReducer(
   ));
 }
 
-/// Handle a workspace action
-Reducer<TimeMachine<Workspace>> workspaceReducer = combineReducers<TimeMachine<Workspace>>([
-  TypedReducer<TimeMachine<Workspace>, TimeMachineAction>(timeMachineReducer),
-  TypedReducer<TimeMachine<Workspace>, ApplyWindowUpdate>(updateWindowReducer),
-  TypedReducer<TimeMachine<Workspace>, WebSocketReceiveMessageAction>(webSocketReceiveMessageReducer),
-  TypedReducer<TimeMachine<Workspace>, CreateNewChartAction>(newChartReducer),
-  TypedReducer<TimeMachine<Workspace>, UpdateGlobalQueryAction>(updateGlobalQueryReducer),
-  TypedReducer<TimeMachine<Workspace>, UpdateGlobalObsDateAction>(updateGlobalObsDateReducer),
-  TypedReducer<TimeMachine<Workspace>, SeriesUpdateAction>(updateSeriesReducer),
-  TypedReducer<TimeMachine<Workspace>, UpdateChartGlobalQueryAction>(updateChartGlobalQueryReducer),
-  TypedReducer<TimeMachine<Workspace>, RemoveWindowAction>(removeWindowReducer),
-  TypedReducer<TimeMachine<Workspace>, CreateSeriesAction>(createSeriesReducer),
-  TypedReducer<TimeMachine<Workspace>, UpdateMultiSelect>(updateMultiSelectReducer),
-  TypedReducer<TimeMachine<Workspace>, ShowFocalPlane>(showFocalPlaneReducer),
-  TypedReducer<TimeMachine<Workspace>, SelectDetectorAction>(selectDetectorReducer),
-  TypedReducer<TimeMachine<Workspace>, UpdateChartBinsAction>(updateChartBinsReducer),
-  /*TypedReducer<TimeMachine<Workspace>, AxisUpdate>(updateAxisReducer),
-  TypedReducer<TimeMachine<Workspace>, RectSelectionAction>(
-      rectSelectionReducer),
-  TypedReducer<TimeMachine<Workspace>, PointSelectionAction>(
-      pointSelectionReducer),
-  TypedReducer<TimeMachine<Workspace>, RectZoomAction>(rectZoomReducer),*/
-]);
-
 /// A [Widget] used to display a set of re-sizable and translatable [Window] widgets in a container.
 class WorkspaceViewer extends StatefulWidget {
   final Size size;
-  final Workspace workspace;
   final DataCenter dataCenter;
-  final DispatchAction dispatch;
-  final bool isConnected;
-  final bool isFirstFrame;
-  final bool isLastFrame;
+  final AppTheme theme;
 
   const WorkspaceViewer({
     super.key,
     required this.size,
-    required this.workspace,
     required this.dataCenter,
-    required this.dispatch,
-    required this.isConnected,
-    required this.isFirstFrame,
-    required this.isLastFrame,
+    required this.theme,
   });
 
   @override
@@ -635,7 +583,7 @@ class SelectDataPointsCommand {
 class WorkspaceViewerState extends State<WorkspaceViewer> {
   AppTheme get theme => widget.workspace.theme;
   Size get size => widget.size;
-  Workspace get info => widget.workspace;
+  WorkspaceStateLoaded get info => widget.workspace;
   DataCenter get dataCenter => widget.dataCenter;
   DispatchAction get dispatch => widget.dispatch;
 

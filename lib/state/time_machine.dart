@@ -28,7 +28,7 @@ enum TimeMachineActions {
 }
 
 /// An action that updates the history
-class TimeMachineAction extends UiAction {
+class TimeMachineAction extends WorkspaceEvent {
   final TimeMachineActions action;
 
   const TimeMachineAction({

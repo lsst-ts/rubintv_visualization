@@ -3,6 +3,44 @@ import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 
+/// A single, persistable, item displayed in a [Workspace].
+@immutable
+abstract class Window {
+  /// The [id] of this [Window] in [Workspace.windows].
+  final UniqueId id;
+
+  final GlobalKey key;
+
+  /// The location of the window in the entire workspace
+  final Offset offset;
+
+  /// The size of the entry in the entire workspace
+  final Size size;
+
+  /// The title to display in the window bar.
+  final String? title;
+
+  Window({
+    GlobalKey? key,
+    required this.id,
+    required this.offset,
+    required this.size,
+    this.title,
+  }) : key = key ?? GlobalKey();
+
+  Window copyWith({
+    UniqueId? id,
+    Offset? offset,
+    Size? size,
+    String? title,
+  });
+
+  /// Create a new [Widget] to display in a [Workspace].
+  Widget createWidget(BuildContext context);
+
+  Widget? createToolbar(BuildContext context);
+}
+
 /// Different sides that can be resized
 enum WindowResizeDirections {
   left,
@@ -127,19 +165,6 @@ class EndWindowResize extends WindowUpdate {
   });
 }
 
-/// Apply an update to a [Window] to the main [AppState].
-class ApplyWindowUpdate extends UiAction {
-  final UniqueId windowId;
-  final Offset offset;
-  final Size size;
-
-  ApplyWindowUpdate({
-    required this.windowId,
-    required this.offset,
-    required this.size,
-  });
-}
-
 /// Draw the title (drag) bar above the window.
 class WindowTitle extends StatelessWidget {
   /// The text to display in the title
@@ -216,44 +241,6 @@ class WindowTitle extends StatelessWidget {
 class RemoveWindowAction extends UiAction {
   final Window window;
   const RemoveWindowAction(this.window);
-}
-
-/// A single, persistable, item displayed in a [Workspace].
-@immutable
-abstract class Window {
-  /// The [id] of this [Window] in [Workspace.windows].
-  final UniqueId id;
-
-  final GlobalKey key;
-
-  /// The location of the window in the entire workspace
-  final Offset offset;
-
-  /// The size of the entry in the entire workspace
-  final Size size;
-
-  /// The title to display in the window bar.
-  final String? title;
-
-  Window({
-    GlobalKey? key,
-    required this.id,
-    required this.offset,
-    required this.size,
-    this.title,
-  }) : key = key ?? GlobalKey();
-
-  Window copyWith({
-    UniqueId? id,
-    Offset? offset,
-    Size? size,
-    String? title,
-  });
-
-  /// Create a new [Widget] to display in a [Workspace].
-  Widget createWidget(BuildContext context);
-
-  Widget? createToolbar(BuildContext context);
 }
 
 class ResizableWindow extends StatelessWidget {

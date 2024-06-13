@@ -241,7 +241,7 @@ class DataCenter {
     required SeriesId seriesId,
     required List<String> plotColumns,
     required Map<String, List<dynamic>> data,
-    required Workspace workspace,
+    required WorkspaceStateLoaded workspace,
   }) {
     DataSource dataSource = _databaseSchemas[dataSourceName]!;
 

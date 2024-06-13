@@ -29,10 +29,10 @@ class Instrument {
   }
 }
 
-class FocalPlaneWindow extends Window {
+class FocalPlane extends Window {
   final Instrument instrument;
 
-  FocalPlaneWindow({
+  FocalPlane({
     super.key,
     required super.id,
     required super.offset,
@@ -42,14 +42,14 @@ class FocalPlaneWindow extends Window {
   });
 
   @override
-  FocalPlaneWindow copyWith({
+  FocalPlane copyWith({
     UniqueId? id,
     Offset? offset,
     String? title,
     Size? size,
     Instrument? instrument,
   }) {
-    return FocalPlaneWindow(
+    return FocalPlane(
       key: key,
       id: id ?? this.id,
       offset: offset ?? this.offset,
