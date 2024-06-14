@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:menu_bar/menu_bar.dart';
-import 'package:rubintv_visualization/state/action.dart';
-import 'package:rubintv_visualization/state/chart.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
+import 'package:rubintv_visualization/workspace/window.dart';
 
 /// Notify the user that functionality has not yet been implemented
 VoidCallback showNotImplemented(BuildContext context) {
@@ -35,10 +35,10 @@ VoidCallback showNotImplemented(BuildContext context) {
 
 /// Add a new [CartesianPlot] to the [WorkspaceViewer].
 class CreateNewChartEvent extends WorkspaceEvent {
-  final InteractiveChartTypes chartType;
+  final WindowTypes chartType;
 
   CreateNewChartEvent({
-    this.chartType = InteractiveChartTypes.cartesianScatter,
+    this.chartType = WindowTypes.cartesianScatter,
   });
 }
 
@@ -77,14 +77,12 @@ class DataSetSelectorDialog extends StatelessWidget {
 class AppMenu extends StatelessWidget {
   final Widget child;
   final AppTheme theme;
-  final DispatchAction dispatch;
   final DataCenter dataCenter;
 
   const AppMenu({
     super.key,
     required this.theme,
     required this.child,
-    required this.dispatch,
     required this.dataCenter,
   });
 
@@ -251,33 +249,33 @@ class AppMenu extends StatelessWidget {
                 submenu: SubMenu(menuItems: [
                   MenuButton(
                     onTap: () {
-                      dispatch(CreateNewChartEvent(
-                        chartType: InteractiveChartTypes.cartesianScatter,
-                      ));
+                      context.read<WorkspaceBloc>().add(CreateNewChartEvent(
+                            chartType: WindowTypes.cartesianScatter,
+                          ));
                     },
                     text: const Text("Cartesian Scatter Plot"),
                   ),
                   MenuButton(
                     onTap: () {
-                      dispatch(CreateNewChartEvent(
-                        chartType: InteractiveChartTypes.polarScatter,
-                      ));
+                      context.read<WorkspaceBloc>().add(CreateNewChartEvent(
+                            chartType: WindowTypes.polarScatter,
+                          ));
                     },
                     text: const Text("Polar Scatter Plot"),
                   ),
                   MenuButton(
                     onTap: () {
-                      dispatch(CreateNewChartEvent(
-                        chartType: InteractiveChartTypes.histogram,
-                      ));
+                      context.read<WorkspaceBloc>().add(CreateNewChartEvent(
+                            chartType: WindowTypes.histogram,
+                          ));
                     },
                     text: const Text("Histogram"),
                   ),
                   MenuButton(
                     onTap: () {
-                      dispatch(CreateNewChartEvent(
-                        chartType: InteractiveChartTypes.box,
-                      ));
+                      context.read<WorkspaceBloc>().add(CreateNewChartEvent(
+                            chartType: WindowTypes.box,
+                          ));
                     },
                     text: const Text("Box Chart"),
                   ),

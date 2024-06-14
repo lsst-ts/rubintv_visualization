@@ -2,11 +2,11 @@ import 'dart:developer' as developer;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:rubintv_visualization/state/action.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubintv_visualization/state/focal_plane.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
 
-class SelectDetectorAction extends UiAction {
+class SelectDetectorAction extends WorkspaceEvent {
   final Detector? detector;
 
   SelectDetectorAction(this.detector);
@@ -73,7 +73,6 @@ class FocalPlaneViewerState extends State<FocalPlaneViewer> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapUp: (TapUpDetails details) {
-        WorkspaceViewerState workspace = WorkspaceViewer.of(context);
         RenderBox renderBox = context.findRenderObject() as RenderBox;
         Offset localPosition = renderBox.globalToLocal(details.globalPosition);
         // Check which detector was tapped
@@ -81,11 +80,11 @@ class FocalPlaneViewerState extends State<FocalPlaneViewer> {
           if (_detectorPaintInfo != null &&
               _detectorPaintInfo!.detectorPaths[detector.id]!.contains(localPosition)) {
             // Handle tap on the detector
-            workspace.dispatch(SelectDetectorAction(detector));
+            context.read<WorkspaceBloc>().add(SelectDetectorAction(detector));
             return;
           }
         }
-        workspace.dispatch(SelectDetectorAction(null));
+        context.read<WorkspaceBloc>().add(SelectDetectorAction(null));
       },
       child: CustomPaint(
         painter: FocalPlanePainter(
