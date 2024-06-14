@@ -1,11 +1,10 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:rubin_chart/rubin_chart.dart';
-import 'package:rubintv_visualization/state/chart.dart';
-import 'package:rubintv_visualization/state/workspace.dart';
 import 'package:rubintv_visualization/workspace/series.dart';
 
 int _nextDataset = 0;
@@ -221,8 +220,7 @@ class DataCenter {
           DatabaseSchema(name: schemaDict["name"], description: schemaDict["description"], tables: tables);
       _databaseSchemas[database.name] = database;
     } catch (e, s) {
-      print("error: $e");
-      print(s);
+      developer.log("error: $e", name: "rubinTV.workspace.data", error: e, stackTrace: s);
       String msg = "Could not initialize database";
       Fluttertoast.showToast(
           msg: msg,

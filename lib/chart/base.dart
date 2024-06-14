@@ -4,9 +4,11 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/chart/binned.dart';
 import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
+import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/series.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
@@ -67,12 +69,18 @@ class CreateSeriesAction extends ChartEvent {
   });
 }
 
+class UpdateBinsEvent extends ChartEvent {
+  final int nBins;
+
+  UpdateBinsEvent(this.nBins);
+}
+
 abstract class ChartState {}
 
 class ChartStateInitial extends ChartState {}
 
 /// Persistable information to generate a chart
-abstract class ChartStateLoaded extends ChartState {
+class ChartStateLoaded extends ChartState {
   final UniqueId id;
   final GlobalKey key;
   final Map<SeriesId, SeriesInfo> _series;
@@ -123,7 +131,19 @@ abstract class ChartStateLoaded extends ChartState {
     List<GlobalKey>? childKeys,
     WindowTypes? chartType,
     MultiSelectionTool? tool,
-  });
+  }) =>
+      ChartStateLoaded(
+        id: id ?? this.id,
+        series: series ?? _series,
+        axisInfo: axisInfo ?? _axisInfo,
+        legend: legend ?? this.legend,
+        useGlobalQuery: useGlobalQuery ?? this.useGlobalQuery,
+        dataCenter: dataCenter,
+        childKeys: childKeys ?? this.childKeys,
+        chartType: chartType ?? this.chartType,
+        key: key,
+        tool: tool ?? this.tool,
+      );
 
   /// Whether or not at least one [PlotAxis] has been set.
   bool get hasAxes => axisInfo.isNotEmpty;
@@ -143,8 +163,31 @@ abstract class ChartStateLoaded extends ChartState {
   }
 }
 
-abstract class ChartBloc extends Bloc<ChartEvent, ChartState> {
-  ChartBloc() : super(ChartStateInitial());
+class ChartBloc extends Bloc<ChartEvent, ChartState> {
+  late StreamSubscription _subscription;
+
+  ChartBloc() : super(ChartStateInitial()) {
+    /// Listen for messages from the websocket.
+    _subscription = WebSocketManager().messages.listen((message) {
+      add(ChartReceiveMessageEvent(message));
+    });
+
+    /// A message is received from the websocket.
+    on<ChartReceiveMessageEvent>((event, emit) {
+      onReceiveMesssage(event, emit);
+    });
+
+    /// Change the selection tool.
+    on<UpdateMultiSelect>((event, emit) {
+      ChartStateLoaded state = this.state as ChartStateLoaded;
+      emit(state.copyWith(tool: event.tool));
+    });
+
+    on<UpdateBinsEvent>((event, emit) {
+      BinnedState state = this.state as BinnedState;
+      emit(state.copyWith(nBins: event.nBins));
+    });
+  }
 
   onReceiveMesssage(ChartReceiveMessageEvent event, Emitter<ChartState> emit) {
     if (this.state is ChartStateInitial) {
