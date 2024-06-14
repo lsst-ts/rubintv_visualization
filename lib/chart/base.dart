@@ -125,49 +125,13 @@ abstract class ChartStateLoaded extends ChartState {
     MultiSelectionTool? tool,
   });
 
-  ChartInfo _internalBuildChartInfo({required List<Series> allSeries});
-
-  ChartInfo buildChartInfo(WorkspaceViewerState workspace) {
-    List<Series> allSeries = [];
-    for (SeriesInfo seriesInfo in _series.values) {
-      Series? series = seriesInfo.toSeries(workspace.dataCenter);
-      if (series != null) {
-        allSeries.add(series);
-      }
-    }
-
-    return _internalBuildChartInfo(allSeries: allSeries);
-  }
-
-  /// Create a new [Widget] to display in a [WorkspaceViewer].
-  Widget createWidget(BuildContext context) {
-    WorkspaceViewerState workspace = WorkspaceViewer.of(context);
-    SelectionController? selectionController = workspace.selectionController;
-    SelectionController? drillDownController = workspace.drillDownController;
-    if (chartType == WindowTypes.histogram) {
-      if (!useDrillDownController) {
-        drillDownController = null;
-      }
-      if (!useSelectionController) {
-        selectionController = null;
-      }
-    }
-
-    return RubinChart(
-      key: key,
-      info: buildChartInfo(workspace),
-      selectionController: selectionController,
-      drillDownController: drillDownController,
-    );
-  }
-
   /// Whether or not at least one [PlotAxis] has been set.
   bool get hasAxes => axisInfo.isNotEmpty;
 
   /// Whether or not at least one [Series] has been initialized.
   bool get hasSeries => _series.isNotEmpty;
 
-  List<Series> getAllSeries() {
+  List<Series> get allSeries {
     List<Series> allSeries = [];
     for (SeriesInfo seriesInfo in _series.values) {
       Series? series = seriesInfo.toSeries(dataCenter);
@@ -305,7 +269,6 @@ abstract class ChartBloc extends Bloc<ChartEvent, ChartState> {
           series: series,
           isNew: isNew,
           dataCenter: workspace.dataCenter,
-          dispatch: workspace.dispatch,
         ),
       ),
     );

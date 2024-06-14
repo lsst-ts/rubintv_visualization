@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -113,7 +114,8 @@ class HistogramChart extends StatelessWidget {
             return ResizableWindow(
                 info: window,
                 title: "loading...",
-                toolbar: Row(children: [Spacer(), ...context.read<BinnedBloc>().getDefaultTools(context)]),
+                toolbar:
+                    Row(children: [const Spacer(), ...context.read<BinnedBloc>().getDefaultTools(context)]),
                 child: const Center(
                   child: CircularProgressIndicator(),
                 ));
@@ -143,7 +145,7 @@ class HistogramChart extends StatelessWidget {
                   ],
                   onSelectionChanged: (Set<MultiSelectionTool> selection) {
                     MultiSelectionTool tool = selection.first;
-                    print("selected tool: $tool");
+                    developer.log("selected tool: $tool", name: "rubinTV.visualization.chart.binned");
                     context.read<BinnedBloc>().add(UpdateMultiSelect(selection.first));
                   },
                 ),
@@ -154,7 +156,7 @@ class HistogramChart extends StatelessWidget {
                 key: state.key,
                 info: HistogramInfo(
                   id: window.id,
-                  allSeries: state.getAllSeries(),
+                  allSeries: state.allSeries,
                   legend: state.legend,
                   axisInfo: state.axisInfo,
                   key: state.childKeys.first,

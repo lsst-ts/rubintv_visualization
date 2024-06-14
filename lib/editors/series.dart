@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/chart/base.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/editors/query.dart';
-import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/series.dart';
 
 /// Notify the [WorkspaceViewer] that the series has been updated
-class SeriesUpdateAction extends UiAction {
+class SeriesUpdateAction extends ChartEvent {
   final SeriesInfo series;
   final DataCenter dataCenter;
   final SchemaField? groupByColumn;
 
-  const SeriesUpdateAction({
+  SeriesUpdateAction({
     required this.series,
     required this.dataCenter,
     this.groupByColumn,
@@ -27,14 +28,12 @@ class SeriesEditor extends StatefulWidget {
   final SeriesInfo series;
   final bool isNew;
   final DataCenter dataCenter;
-  final DispatchAction dispatch;
 
   const SeriesEditor({
     super.key,
     required this.theme,
     required this.series,
     required this.dataCenter,
-    required this.dispatch,
     this.isNew = false,
   });
 
@@ -167,11 +166,11 @@ class SeriesEditorState extends State<SeriesEditor> {
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
                       _formKey.currentState!.save();
-                      widget.dispatch(SeriesUpdateAction(
-                        series: series,
-                        groupByColumn: groupByColumn,
-                        dataCenter: dataCenter,
-                      ));
+                      context.read<ChartBloc>().add(SeriesUpdateAction(
+                            series: series,
+                            groupByColumn: groupByColumn,
+                            dataCenter: dataCenter,
+                          ));
                       Navigator.pop(context);
                     }
                   },
