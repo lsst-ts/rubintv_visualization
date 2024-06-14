@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubintv_visualization/id.dart';
-import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/theme.dart';
+import 'package:rubintv_visualization/state/workspace.dart';
+
+/// The type of chart to display.
+enum WindowTypes {
+  focalPlane,
+  histogram,
+  box,
+  cartesianScatter,
+  polarScatter,
+  combination,
+}
 
 /// A single, persistable, item displayed in a [Workspace].
 @immutable
-abstract class Window {
+class Window {
   /// The [id] of this [Window] in [Workspace.windows].
   final UniqueId id;
-
-  final GlobalKey key;
 
   /// The location of the window in the entire workspace
   final Offset offset;
@@ -20,25 +29,30 @@ abstract class Window {
   /// The title to display in the window bar.
   final String? title;
 
-  Window({
-    GlobalKey? key,
+  final WindowTypes type;
+
+  const Window({
     required this.id,
     required this.offset,
     required this.size,
+    required this.type,
     this.title,
-  }) : key = key ?? GlobalKey();
+  });
 
+  /// Create a copy of the [Window] with the provided fields updated.
   Window copyWith({
     UniqueId? id,
     Offset? offset,
     Size? size,
     String? title,
-  });
-
-  /// Create a new [Widget] to display in a [Workspace].
-  Widget createWidget(BuildContext context);
-
-  Widget? createToolbar(BuildContext context);
+  }) =>
+      Window(
+        id: id ?? this.id,
+        offset: offset ?? this.offset,
+        size: size ?? this.size,
+        title: title ?? this.title,
+        type: type,
+      );
 }
 
 /// Different sides that can be resized
@@ -49,9 +63,6 @@ enum WindowResizeDirections {
   downLeft,
   downRight,
 }
-
-/// A callback when a window has been updated
-typedef WindowUpdateCallback = void Function(WindowUpdate update);
 
 /// Information about window interactions
 class WindowInteractionInfo {
@@ -92,46 +103,41 @@ class WindowResizeInfo extends WindowInteractionInfo {
   });
 }
 
-/// An update to the window (either a resize or translation).
-class WindowUpdate {
-  const WindowUpdate();
-}
-
 /// Update when a window is first being dragged.
-class StartDragWindowUpdate extends WindowUpdate {
+class StartDragWindowUpdate extends WorkspaceEvent {
   final UniqueId windowId;
   final DragStartDetails details;
 
-  const StartDragWindowUpdate({
+  StartDragWindowUpdate({
     required this.windowId,
     required this.details,
   });
 }
 
 /// Update when a window is being dragged.
-class UpdateDragWindowUpdate extends WindowUpdate {
+class UpdateDragWindowUpdate extends WorkspaceEvent {
   final UniqueId windowId;
   final DragUpdateDetails details;
 
-  const UpdateDragWindowUpdate({
+  UpdateDragWindowUpdate({
     required this.windowId,
     required this.details,
   });
 }
 
 /// Update when the drag pointer has been removed and the window is no longer being dragged.
-class WindowDragEnd extends WindowUpdate {
+class WindowDragEnd extends WorkspaceEvent {
   final UniqueId windowId;
   final DragEndDetails details;
 
-  const WindowDragEnd({
+  WindowDragEnd({
     required this.windowId,
     required this.details,
   });
 }
 
 /// A window has started to be resized
-class StartWindowResize extends WindowUpdate {
+class StartWindowResize extends WorkspaceEvent {
   final UniqueId windowId;
   final DragStartDetails details;
 
@@ -142,12 +148,12 @@ class StartWindowResize extends WindowUpdate {
 }
 
 /// [WindowUpdate] to update the size of a [Window] in the parent [WorkspaceViewer].
-class UpdateWindowResize extends WindowUpdate {
+class UpdateWindowResize extends WorkspaceEvent {
   final UniqueId windowId;
   final DragUpdateDetails details;
   final WindowResizeDirections direction;
 
-  const UpdateWindowResize({
+  UpdateWindowResize({
     required this.windowId,
     required this.details,
     required this.direction,
@@ -155,11 +161,11 @@ class UpdateWindowResize extends WindowUpdate {
 }
 
 /// The window has finished resizing.
-class EndWindowResize extends WindowUpdate {
+class EndWindowResize extends WorkspaceEvent {
   final UniqueId windowId;
   final DragEndDetails details;
 
-  const EndWindowResize({
+  EndWindowResize({
     required this.windowId,
     required this.details,
   });
@@ -170,19 +176,17 @@ class WindowTitle extends StatelessWidget {
   /// The text to display in the title
   final String? text;
 
-  /// The [AppTheme] for the app.
-  final AppTheme theme;
   final Widget? toolbar;
 
   const WindowTitle({
     super.key,
     required this.text,
-    required this.theme,
     this.toolbar,
   });
 
   @override
   Widget build(BuildContext context) {
+    AppTheme theme = WorkspaceViewer.of(context).info.theme;
     if (toolbar != null) {
       return Container(
           constraints: const BoxConstraints(
@@ -238,9 +242,9 @@ class WindowTitle extends StatelessWidget {
 }
 
 /// Remove a [Chart] from the [Workspace].
-class RemoveWindowAction extends UiAction {
-  final Window window;
-  const RemoveWindowAction(this.window);
+class RemoveWindowAction extends WorkspaceEvent {
+  final UniqueId windowId;
+  RemoveWindowAction(this.windowId);
 }
 
 class ResizableWindow extends StatelessWidget {
@@ -250,18 +254,8 @@ class ResizableWindow extends StatelessWidget {
   /// The title to display in the window
   final String? title;
 
-  /// The full size of the window, including the [WindowTitle].
-  /// If [size] is null then the window will layout the child first and expand to the child size.
-  final Size size;
-
-  /// The [AppTheme] for the app.
-  final AppTheme theme;
-
   /// Information about the widget
   final Window info;
-
-  /// Callback to notify the [WorkspaceViewer] that this [Window] has been updated.
-  final WindowUpdateCallback dispatch;
 
   /// Toolbar associated with the window
   final Widget? toolbar;
@@ -270,33 +264,32 @@ class ResizableWindow extends StatelessWidget {
     super.key,
     required this.child,
     required this.title,
-    required this.theme,
     required this.info,
-    required this.size,
-    required this.dispatch,
     required this.toolbar,
   });
 
-  void _onResizeStart(DragStartDetails details) {
-    dispatch(StartWindowResize(windowId: info.id, details: details));
+  void _onResizeStart(DragStartDetails details, BuildContext context) {
+    context.read<WorkspaceBloc>().add(StartWindowResize(windowId: info.id, details: details));
   }
 
-  DragUpdateCallback _onResizeUpdate(WindowResizeDirections direction) {
+  DragUpdateCallback _onResizeUpdate(WindowResizeDirections direction, BuildContext context) {
     return (DragUpdateDetails details) {
-      dispatch(UpdateWindowResize(
-        windowId: info.id,
-        details: details,
-        direction: direction,
-      ));
+      context.read<WorkspaceBloc>().add(UpdateWindowResize(
+            windowId: info.id,
+            details: details,
+            direction: direction,
+          ));
     };
   }
 
-  void _onResizeEnd(DragEndDetails details) {
-    dispatch(EndWindowResize(windowId: info.id, details: details));
+  void _onResizeEnd(DragEndDetails details, BuildContext context) {
+    context.read<WorkspaceBloc>().add(EndWindowResize(windowId: info.id, details: details));
   }
 
   @override
   Widget build(BuildContext context) {
+    AppTheme theme = WorkspaceViewer.of(context).info.theme;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: Container(
@@ -305,23 +298,22 @@ class ResizableWindow extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           GestureDetector(
             onPanStart: (DragStartDetails details) {
-              dispatch(StartDragWindowUpdate(windowId: info.id, details: details));
+              context.read<WorkspaceBloc>().add(StartDragWindowUpdate(windowId: info.id, details: details));
             },
             onPanUpdate: (DragUpdateDetails details) {
-              dispatch(UpdateDragWindowUpdate(windowId: info.id, details: details));
+              context.read<WorkspaceBloc>().add(UpdateDragWindowUpdate(windowId: info.id, details: details));
             },
             onPanEnd: (DragEndDetails details) {
-              dispatch(WindowDragEnd(windowId: info.id, details: details));
+              context.read<WorkspaceBloc>().add(WindowDragEnd(windowId: info.id, details: details));
             },
             child: WindowTitle(
               text: title,
-              theme: theme,
               toolbar: toolbar,
             ),
           ),
           SizedBox(
-            width: size.width,
-            height: size.height,
+            width: info.size.width,
+            height: info.size.height,
             child: Stack(children: [
               Container(
                 margin: const EdgeInsets.all(5),
@@ -333,13 +325,17 @@ class ResizableWindow extends StatelessWidget {
                 left: 0,
                 bottom: 0,
                 child: GestureDetector(
-                  onHorizontalDragStart: _onResizeStart,
-                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.left),
-                  onHorizontalDragEnd: _onResizeEnd,
+                  onHorizontalDragStart: (DragStartDetails details) {
+                    _onResizeStart(details, context);
+                  },
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.left, context),
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    _onResizeEnd(details, context);
+                  },
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeLeftRight,
                     child: SizedBox(
-                      height: size.height,
+                      height: info.size.height,
                       width: theme.resizeInteractionWidth,
                     ),
                   ),
@@ -351,13 +347,17 @@ class ResizableWindow extends StatelessWidget {
                 right: 0,
                 bottom: 0,
                 child: GestureDetector(
-                  onHorizontalDragStart: _onResizeStart,
-                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.right),
-                  onHorizontalDragEnd: _onResizeEnd,
+                  onHorizontalDragStart: (DragStartDetails details) {
+                    _onResizeStart(details, context);
+                  },
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.right, context),
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    _onResizeEnd(details, context);
+                  },
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeLeftRight,
                     child: SizedBox(
-                      height: size.height,
+                      height: info.size.height,
                       width: theme.resizeInteractionWidth,
                     ),
                   ),
@@ -369,14 +369,18 @@ class ResizableWindow extends StatelessWidget {
                 right: 0,
                 bottom: 0,
                 child: GestureDetector(
-                  onHorizontalDragStart: _onResizeStart,
-                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.down),
-                  onHorizontalDragEnd: _onResizeEnd,
+                  onHorizontalDragStart: (DragStartDetails details) {
+                    _onResizeStart(details, context);
+                  },
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.down, context),
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    _onResizeEnd(details, context);
+                  },
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeUpDown,
                     child: SizedBox(
                       height: theme.resizeInteractionWidth,
-                      width: size.width,
+                      width: info.size.width,
                     ),
                   ),
                 ),
@@ -387,9 +391,13 @@ class ResizableWindow extends StatelessWidget {
                 left: 0,
                 bottom: 0,
                 child: GestureDetector(
-                  onHorizontalDragStart: _onResizeStart,
-                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.downLeft),
-                  onHorizontalDragEnd: _onResizeEnd,
+                  onHorizontalDragStart: (DragStartDetails details) {
+                    _onResizeStart(details, context);
+                  },
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.downLeft, context),
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    _onResizeEnd(details, context);
+                  },
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeDownLeft,
                     child: SizedBox(
@@ -405,9 +413,13 @@ class ResizableWindow extends StatelessWidget {
                 right: 0,
                 bottom: 0,
                 child: GestureDetector(
-                  onHorizontalDragStart: _onResizeStart,
-                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.downRight),
-                  onHorizontalDragEnd: _onResizeEnd,
+                  onHorizontalDragStart: (DragStartDetails details) {
+                    _onResizeStart(details, context);
+                  },
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.downRight, context),
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    _onResizeEnd(details, context);
+                  },
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeDownRight,
                     child: SizedBox(

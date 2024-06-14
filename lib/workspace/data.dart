@@ -238,10 +238,9 @@ class DataCenter {
 
   void updateSeriesData({
     required String dataSourceName,
-    required SeriesId seriesId,
+    required SeriesInfo series,
     required List<String> plotColumns,
     required Map<String, List<dynamic>> data,
-    required WorkspaceStateLoaded workspace,
   }) {
     DataSource dataSource = _databaseSchemas[dataSourceName]!;
 
@@ -260,7 +259,6 @@ class DataCenter {
         tables.add(table);
 
         SchemaField field = dataSource.tables[tableName]!.fields[columnName]!;
-        SeriesInfo series = (workspace.windows[seriesId.windowId] as ChartWindow).series[seriesId]!;
         if (series.fields.containsValue(field)) {
           if (field.isString) {
             columns[field] = List<String>.from(data[plotColumn]!.map((e) => e));
@@ -291,7 +289,7 @@ class DataCenter {
         dataIds: dataIds,
       );
 
-      _seriesData[seriesId] = seriesData;
+      _seriesData[series.id] = seriesData;
     } else {
       throw DataAccessException("Unknown data source: $dataSource");
     }

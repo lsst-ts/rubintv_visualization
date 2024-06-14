@@ -11,10 +11,8 @@ import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/io.dart';
 import 'package:rubintv_visualization/query/query.dart';
-import 'package:rubintv_visualization/state/action.dart';
 import 'package:rubintv_visualization/state/focal_plane.dart';
 import 'package:rubintv_visualization/state/theme.dart';
-import 'package:rubintv_visualization/state/time_machine.dart';
 import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/menu.dart';
@@ -29,17 +27,6 @@ class ReceiveMessageEvent extends WorkspaceEvent {
   final Map<String, dynamic> message;
 
   ReceiveMessageEvent(this.message);
-}
-
-/// Update whether or not to use the global query for a given chart.
-class UpdateChartGlobalQueryEvent extends WorkspaceEvent {
-  final UniqueId chartId;
-  final bool useGlobalQuery;
-
-  UpdateChartGlobalQueryEvent({
-    required this.useGlobalQuery,
-    required this.chartId,
-  });
 }
 
 /// Update the global query.
@@ -177,18 +164,18 @@ String? getFormattedDate(DateTime? obsDate) {
 }
 
 /// Load data for all series in a given chart
-void getSeriesData(WorkspaceStateLoaded workspace, {ChartWindow? chart}) {
+void getSeriesData(WorkspaceStateLoaded workspace, {ChartLoadedState? chart}) {
   String? obsDate = getFormattedDate(workspace.obsDate);
 
-  late final List<ChartWindow> charts;
+  late final List<ChartLoadedState> charts;
   if (chart != null) {
     charts = [chart];
   } else {
-    charts = workspace.windows.values.whereType<ChartWindow>().toList();
+    charts = workspace.windows.values.whereType<ChartLoadedState>().toList();
   }
   // Request the data from the server.
   if (WebSocketManager().isConnected) {
-    for (ChartWindow chart in charts) {
+    for (ChartLoadedState chart in charts) {
       for (SeriesInfo series in chart.series.values) {
         WebSocketManager().sendMessage(LoadColumnsCommand.build(
           seriesId: series.id,
@@ -225,7 +212,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     on<UpdateChartGlobalQueryEvent>((event, emit) {
       WorkspaceStateLoaded state = this.state as WorkspaceStateLoaded;
       Map<UniqueId, Window> windows = {...state.windows};
-      ChartWindow chart = windows[event.chartId] as ChartWindow;
+      ChartLoadedState chart = windows[event.chartId] as ChartLoadedState;
       chart = chart.copyWith(useGlobalQuery: event.useGlobalQuery);
       windows[chart.id] = chart;
       state = state.copyWith(windows: windows);
@@ -260,7 +247,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
         offset += state.windows.values.last.offset;
       }
 
-      ChartWindow chart = ChartWindow.fromChartType(
+      ChartLoadedState chart = ChartLoadedState.fromChartType(
         id: UniqueId.next(),
         offset: offset,
         size: state.theme.newPlotSize,
@@ -310,7 +297,7 @@ TimeMachine<WorkspaceStateLoaded> createSeriesReducer(
   CreateSeriesAction action,
 ) {
   WorkspaceStateLoaded workspace = state.currentState;
-  ChartWindow chart = workspace.windows[action.series.id.windowId] as ChartWindow;
+  ChartLoadedState chart = workspace.windows[action.series.id.windowId] as ChartLoadedState;
   chart = chart.addSeries(series: action.series);
   workspace = workspace.copyWith(windows: {...workspace.windows, chart.id: chart});
 
@@ -325,7 +312,7 @@ TimeMachine<WorkspaceStateLoaded> updateSeriesReducer(
   TimeMachine<WorkspaceStateLoaded> state,
   SeriesUpdateAction action,
 ) {
-  ChartWindow chart = state.currentState._windows[action.series.id.windowId] as ChartWindow;
+  ChartLoadedState chart = state.currentState._windows[action.series.id.windowId] as ChartLoadedState;
   late String comment = "update Series";
 
   if (action.groupByColumn != null) {
@@ -409,10 +396,10 @@ TimeMachine<WorkspaceStateLoaded> updateMultiSelectReducer(
 ) {
   WorkspaceStateLoaded workspace = state.currentState;
   Map<UniqueId, Window> windows = {...workspace.windows};
-  ChartWindow chart = windows[action.chartId] as ChartWindow;
-  if (chart is ScatterChartWindow) {
+  ChartLoadedState chart = windows[action.chartId] as ChartLoadedState;
+  if (chart is ScatterChartState) {
     chart = chart.copyWith(tool: action.tool);
-  } else if (chart is BinnedChartWindow) {
+  } else if (chart is BinnedChartState) {
     chart = chart.copyWith(tool: action.tool);
   } else {
     throw UnimplementedError("Unrecognized chart type: $chart");
@@ -431,7 +418,7 @@ TimeMachine<WorkspaceStateLoaded> updateChartBinsReducer(
 ) {
   WorkspaceStateLoaded workspace = state.currentState;
   Map<UniqueId, Window> windows = {...workspace.windows};
-  BinnedChartWindow chart = windows[action.chartId] as BinnedChartWindow;
+  BinnedChartState chart = windows[action.chartId] as BinnedChartState;
   chart = chart.copyWith(nBins: action.nBins);
   windows[chart.id] = chart;
   workspace = workspace.copyWith(windows: windows);
@@ -581,11 +568,10 @@ class SelectDataPointsCommand {
 }
 
 class WorkspaceViewerState extends State<WorkspaceViewer> {
-  AppTheme get theme => widget.workspace.theme;
+  AppTheme get theme => widget.theme;
   Size get size => widget.size;
   WorkspaceStateLoaded get info => widget.workspace;
   DataCenter get dataCenter => widget.dataCenter;
-  DispatchAction get dispatch => widget.dispatch;
 
   WindowInteractionInfo? interactionInfo;
   late SelectionController selectionController;
