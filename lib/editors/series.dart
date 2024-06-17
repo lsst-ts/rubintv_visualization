@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
@@ -5,21 +7,9 @@ import 'package:rubintv_visualization/chart/base.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/editors/query.dart';
 import 'package:rubintv_visualization/state/theme.dart';
+import 'package:rubintv_visualization/state/workspace.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/series.dart';
-
-/// Notify the [WorkspaceViewer] that the series has been updated
-class SeriesUpdateAction extends ChartEvent {
-  final SeriesInfo series;
-  final DataCenter dataCenter;
-  final SchemaField? groupByColumn;
-
-  SeriesUpdateAction({
-    required this.series,
-    required this.dataCenter,
-    this.groupByColumn,
-  });
-}
 
 typedef SeriesQueryCallback = void Function(Query? query);
 
@@ -27,13 +17,15 @@ class SeriesEditor extends StatefulWidget {
   final AppTheme theme;
   final SeriesInfo series;
   final bool isNew;
-  final DataCenter dataCenter;
+  final WorkspaceViewerState workspace;
+  final ChartBloc chartBloc;
 
   const SeriesEditor({
     super.key,
     required this.theme,
     required this.series,
-    required this.dataCenter,
+    required this.workspace,
+    required this.chartBloc,
     this.isNew = false,
   });
 
@@ -73,8 +65,8 @@ class SeriesEditorState extends State<SeriesEditor> {
 
   @override
   Widget build(BuildContext context) {
-    print("Series is $series");
-    DataCenter dataCenter = widget.dataCenter;
+    developer.log("Series is $series", name: "rubinTV.visualization.editors.series");
+    //DataCenter dataCenter = widget.workspace.dataCenter;
 
     return Form(
       key: _formKey,
@@ -103,7 +95,6 @@ class SeriesEditorState extends State<SeriesEditor> {
             const SizedBox(height: 10),
             ColumnEditorFormField(
               theme: theme,
-              dataCenter: dataCenter,
               initialValue: series.fields,
               onSaved: (Map<AxisId, SchemaField?>? fields) {
                 if (fields == null) return;
@@ -147,7 +138,6 @@ class SeriesEditorState extends State<SeriesEditor> {
                                 theme: theme,
                                 expression: QueryExpression(
                                   queries: series.query == null ? [] : [series.query!],
-                                  dataCenter: dataCenter,
                                 ),
                                 onCompleted: updateQuery,
                               ),
@@ -166,11 +156,12 @@ class SeriesEditorState extends State<SeriesEditor> {
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
                       _formKey.currentState!.save();
-                      context.read<ChartBloc>().add(SeriesUpdateAction(
-                            series: series,
-                            groupByColumn: groupByColumn,
-                            dataCenter: dataCenter,
-                          ));
+                      widget.chartBloc.add(UpdateSeriesEvent(
+                        series: series,
+                        groupByColumn: groupByColumn,
+                        obsDate: getFormattedDate(widget.workspace.info!.obsDate),
+                        globalQuery: widget.workspace.info!.globalQuery,
+                      ));
                       Navigator.pop(context);
                     }
                   },
@@ -187,12 +178,10 @@ class SeriesEditorState extends State<SeriesEditor> {
 
 class ColumnEditorFormField extends FormField<Map<AxisId, SchemaField?>> {
   final AppTheme theme;
-  final DataCenter dataCenter;
 
   ColumnEditorFormField({
     super.key,
     required this.theme,
-    required this.dataCenter,
     required FormFieldSetter<Map<AxisId, SchemaField?>> onSaved,
     required FormFieldValidator<Map<AxisId, SchemaField?>> validator,
     required Map<AxisId, SchemaField?> initialValue,
@@ -217,7 +206,6 @@ class ColumnEditorFormField extends FormField<Map<AxisId, SchemaField?>> {
                             ),
                             child: ColumnEditor(
                               theme: theme,
-                              dataCenter: dataCenter,
                               initialValue: initialValue[index],
                               onChanged: (SchemaField? field) {
                                 Map<AxisId, SchemaField?> fields = {...formState.value!};
@@ -233,14 +221,12 @@ class ColumnEditorFormField extends FormField<Map<AxisId, SchemaField?>> {
 
 class ColumnEditor extends StatefulWidget {
   final AppTheme theme;
-  final DataCenter dataCenter;
   final ValueChanged<SchemaField?> onChanged;
   final SchemaField? initialValue;
 
   const ColumnEditor({
     super.key,
     required this.theme,
-    required this.dataCenter,
     required this.onChanged,
     required this.initialValue,
   });
@@ -251,7 +237,6 @@ class ColumnEditor extends StatefulWidget {
 
 class ColumnEditorState extends State<ColumnEditor> {
   AppTheme get theme => widget.theme;
-  DataCenter get dataCenter => widget.dataCenter;
 
   @override
   void initState() {
@@ -278,7 +263,9 @@ class ColumnEditorState extends State<ColumnEditor> {
       _database = _table!.database;
     }
 
-    List<DropdownMenuItem<DatabaseSchema>> databaseEntries = dataCenter.databases.entries
+    List<DropdownMenuItem<DatabaseSchema>> databaseEntries = DataCenter()
+        .databases
+        .entries
         .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
         .toList();
 

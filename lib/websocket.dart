@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:web_socket_channel/io.dart';
 import 'dart:developer' as developer;
 
 class WebSocketManager {
@@ -25,14 +26,14 @@ class WebSocketManager {
   /// The private WebSocketManager constructor.
   WebSocketManager._internal();
 
-  Future<void> connect(String url) async {
+  Future<void> connect(Uri uri) async {
     try {
       if (_channel != null) {
         await _channel!.sink.close();
       }
-      developer.log("Connecting to websocket at $url", name: "rubinTV.visualization.websocket");
+      developer.log("Connecting to websocket at $uri", name: "rubinTV.visualization.websocket");
       _channel =
-          IOWebSocketChannel.connect(url); // Use WebSocketChannel.connect for a platform-agnostic approach
+          WebSocketChannel.connect(uri); // Use WebSocketChannel.connect for a platform-agnostic approach
 
       _channel!.stream.listen((data) {
         if (data is String) {
@@ -50,7 +51,16 @@ class WebSocketManager {
         // Handle the connection being closed
       });
     } catch (e) {
-      developer.log('Failed to connect to $url: $e', name: 'rubinTV.visualization.websocket');
+      developer.log('Failed to connect to $uri: $e', name: 'rubinTV.visualization.websocket');
+      Fluttertoast.showToast(
+          msg: "Failed to connect to $uri",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.CENTER,
+          timeInSecForIosWeb: 5,
+          backgroundColor: Colors.red,
+          webBgColor: "#e74c3c",
+          textColor: Colors.white,
+          fontSize: 16.0);
     }
   }
 
@@ -74,9 +84,9 @@ class WebSocketManager {
   }
 
   /// Automatically attempt to reconnect.
-  void reconnect(String url) {
+  void reconnect(Uri uri) {
     developer.log("Attempting to reconnect to WebSocket...", name: 'rubinTV.visualization.websocket');
-    connect(url);
+    connect(uri);
   }
 
   bool get isConnected => _channel != null;

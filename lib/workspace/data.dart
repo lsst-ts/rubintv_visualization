@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -5,6 +6,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/series.dart';
 
 int _nextDataset = 0;
@@ -168,12 +170,29 @@ class EfdClient extends DataSource {
 class DataCenterUpdate {}
 
 class DataCenter {
+  /// Make the [DataCenter] a singleton.
+  static final DataCenter _singleton = DataCenter._internal();
+
+  /// The [DataCenter] factory constructor.
+  factory DataCenter() => _singleton;
+
+  /// The private [DataCenter] constructor.
+  DataCenter._internal();
+
+  late StreamSubscription _subscription;
   final Map<String, DatabaseSchema> _databaseSchemas = {};
   final Map<String, Butler> butlers = {};
   EfdClient? efdClient;
   final Map<SeriesId, SeriesData> _seriesData = {};
 
-  DataCenter();
+  void initialize() {
+    _subscription = WebSocketManager().messages.listen((Map<String, dynamic> message) {
+      developer.log("DataCenter received message: ${message['type']}", name: "rubinTV.workspace.data");
+      if (message['type'] == 'instrument info' && message['content'].containsKey('schema')) {
+        addDatabaseSchema(message['content']['schema']);
+      }
+    });
+  }
 
   Map<String, DatabaseSchema> get databases => {..._databaseSchemas};
 

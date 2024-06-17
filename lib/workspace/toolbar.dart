@@ -1,28 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubintv_visualization/io.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/editors/query.dart';
-import 'package:rubintv_visualization/state/action.dart';
-import 'package:rubintv_visualization/state/time_machine.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
+import 'package:rubintv_visualization/websocket.dart';
 
-class ToolbarAction extends UiAction {
-  const ToolbarAction();
-}
-
-class ShowFocalPlane extends ToolbarAction {
-  ShowFocalPlane();
+class ToolbarAction extends WorkspaceEvent {
+  ToolbarAction();
 }
 
 class DatePickerWidget extends StatefulWidget {
   final DateTime? obsDate;
   const DatePickerWidget({
     super.key,
-    required this.dispatch,
     required this.obsDate,
   });
-
-  final DispatchAction dispatch;
 
   @override
   DatePickerWidgetState createState() => DatePickerWidgetState();
@@ -61,7 +54,7 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
               lastDate: DateTime(2101),
             );
 
-            widget.dispatch(UpdateGlobalObsDateEvent(obsDate: pickedDate));
+            context.read<WorkspaceBloc>().add(UpdateGlobalObsDateEvent(obsDate: pickedDate));
           },
           child: Container(
             margin: const EdgeInsets.all(4),
@@ -78,7 +71,7 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
           onPressed: () {
             setState(() {
               selectedDate = null;
-              widget.dispatch(const UpdateGlobalObsDateEvent(obsDate: null));
+              context.read<WorkspaceBloc>().add(UpdateGlobalObsDateEvent(obsDate: null));
             });
           },
           child: const Icon(
@@ -92,16 +85,8 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
 }
 
 class Toolbar extends StatefulWidget {
-  final bool isConnected;
-  final bool isFirstFrame;
-  final bool isLastFrame;
-
-  const Toolbar({
-    super.key,
-    required this.isConnected,
-    required this.isFirstFrame,
-    required this.isLastFrame,
-  });
+  final WorkspaceState workspace;
+  const Toolbar({super.key, required this.workspace});
 
   @override
   ToolbarState createState() => ToolbarState();
@@ -119,12 +104,15 @@ Color _getStatusIndicator(bool isConnected, bool hasInstrument) {
 }
 
 class ToolbarState extends State<Toolbar> {
+  WorkspaceState get workspace => widget.workspace;
+
   @override
   Widget build(BuildContext context) {
-    WorkspaceViewerState workspace = WorkspaceViewer.of(context);
+    WebSocketManager webSocketManager = WebSocketManager();
+    WorkspaceViewerState workspaceViewer = WorkspaceViewer.of(context);
 
     return Container(
-      width: workspace.size.width,
+      width: workspaceViewer.size.width,
       height: workspace.theme.toolbarHeight,
       decoration: BoxDecoration(
         color: workspace.theme.themeData.colorScheme.primaryContainer,
@@ -140,12 +128,12 @@ class ToolbarState extends State<Toolbar> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _getStatusIndicator(widget.isConnected, workspace.info.instrument != null),
+              color: _getStatusIndicator(webSocketManager.isConnected, workspace.instrument != null),
             ),
           )),
           const SizedBox(width: 30),
           DropdownButton<String?>(
-            value: workspace.info.instrument?.name,
+            value: workspace.instrument?.name,
             items: const [
               DropdownMenuItem<String?>(
                 value: null,
@@ -170,35 +158,23 @@ class ToolbarState extends State<Toolbar> {
             ],
             onChanged: (String? value) {
               if (value != null) {
-                workspace.info.webSocket!.sink.add(LoadInstrumentAction(instrument: value).toJson());
+                webSocketManager.sendMessage(LoadInstrumentAction(instrument: value).toJson());
               }
             },
           ),
           const SizedBox(width: 10),
           IconButton(
-            onPressed: workspace.info.instrument == null && !workspace.info.isShowingFocalPlane
+            onPressed: workspace.instrument == null && !workspace.isShowingFocalPlane
                 ? null
                 : () {
-                    workspace.dispatch(ShowFocalPlane());
+                    context.read<WorkspaceBloc>().add(ShowFocalPlaneEvent());
                   },
             icon: const Icon(Icons.lens_blur),
           ),
           const Spacer(),
           IconButton(
-            icon: Icon(Icons.undo, color: widget.isFirstFrame ? Colors.grey : Colors.green),
-            onPressed: () {
-              workspace.dispatch(const TimeMachineAction(action: TimeMachineActions.previous));
-            },
-          ),
-          IconButton(
-            icon: Icon(Icons.redo, color: widget.isLastFrame ? Colors.grey : Colors.green),
-            onPressed: () {
-              workspace.dispatch(const TimeMachineAction(action: TimeMachineActions.next));
-            },
-          ),
-          IconButton(
-            icon: Icon(Icons.travel_explore,
-                color: workspace.widget.workspace.globalQuery == null ? Colors.grey : Colors.green),
+            icon:
+                Icon(Icons.travel_explore, color: workspace.globalQuery == null ? Colors.grey : Colors.green),
             onPressed: () {
               showDialog(
                   context: context,
@@ -206,13 +182,10 @@ class ToolbarState extends State<Toolbar> {
                         child: QueryEditor(
                           theme: workspace.theme,
                           expression: QueryExpression(
-                            queries: workspace.widget.workspace.globalQuery == null
-                                ? []
-                                : [workspace.widget.workspace.globalQuery!],
-                            dataCenter: workspace.dataCenter,
+                            queries: workspace.globalQuery == null ? [] : [workspace.globalQuery!],
                           ),
                           onCompleted: (Query? query) {
-                            workspace.dispatch(UpdateGlobalQueryAction(query: query));
+                            context.read<WorkspaceBloc>().add(UpdateGlobalQueryEvent(globalQuery: query));
                           },
                         ),
                       ));
@@ -221,8 +194,7 @@ class ToolbarState extends State<Toolbar> {
           SizedBox(
             height: workspace.theme.toolbarHeight,
             child: DatePickerWidget(
-              dispatch: workspace.widget.dispatch,
-              obsDate: workspace.widget.workspace.obsDate,
+              obsDate: workspace.obsDate,
             ),
           ),
         ],

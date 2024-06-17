@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
 import 'package:rubintv_visualization/websocket.dart';
-import 'package:rubintv_visualization/workspace/data.dart';
 
 class AppVersion {
   final int major;
@@ -36,13 +35,11 @@ class AppVersion {
 }
 
 class MainApp extends StatefulWidget {
-  final DataCenter dataCenter;
-  final String websocketUrl;
+  final Uri websocketUri;
   final AppVersion version;
   const MainApp({
     super.key,
-    required this.dataCenter,
-    required this.websocketUrl,
+    required this.websocketUri,
     required this.version,
   });
 
@@ -54,8 +51,8 @@ class MainAppState extends State<MainApp> {
   @override
   void initState() {
     super.initState();
-    developer.log('Connecting to WebSocket at ${widget.websocketUrl}', name: 'rubinTV.visualization.app');
-    WebSocketManager().connect(widget.websocketUrl);
+    developer.log('Connecting to WebSocket at ${widget.websocketUri}', name: 'rubinTV.visualization.app');
+    WebSocketManager().connect(widget.websocketUri);
   }
 
   @override
@@ -87,7 +84,6 @@ class MainAppState extends State<MainApp> {
         body: WorkspaceViewer(
           size: screenSize,
           theme: theme,
-          dataCenter: widget.dataCenter,
         ),
       ),
     );

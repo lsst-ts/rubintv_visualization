@@ -396,16 +396,12 @@ class NewQueryWidget extends StatefulWidget {
   /// The theme for the app.
   final AppTheme theme;
 
-  /// Available column names to choose from.
-  final DataCenter dataCenter;
-
   /// Dispatcher to pass updates to the full expression.
   final QueryUpdateCallback dispatch;
 
   const NewQueryWidget({
     super.key,
     required this.theme,
-    required this.dataCenter,
     required this.dispatch,
   });
 
@@ -430,12 +426,14 @@ class NewQueryWidgetState extends State<NewQueryWidget> {
       _table = _field!.schema;
       _database = _table!.database;
     } else {
-      _database = widget.dataCenter.databases.values.first;
+      _database = DataCenter().databases.values.first;
       _table = _database!.tables.values.first;
       _field = _table!.fields.values.first;
     }
 
-    List<DropdownMenuItem<DatabaseSchema>> databaseEntries = widget.dataCenter.databases.entries
+    List<DropdownMenuItem<DatabaseSchema>> databaseEntries = DataCenter()
+        .databases
+        .entries
         .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
         .toList();
 
@@ -676,7 +674,6 @@ class QueryEditorState extends State<QueryEditor> {
 
     children.add(NewQueryWidget(
       theme: widget.theme,
-      dataCenter: widget.expression.dataCenter,
       dispatch: dispatcher,
     ));
     children.add(Row(

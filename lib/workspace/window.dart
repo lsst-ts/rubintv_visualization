@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubintv_visualization/id.dart';
@@ -53,6 +54,11 @@ class Window {
         title: title ?? this.title,
         type: type,
       );
+
+  @override
+  String toString() {
+    return "Window(id: $id, offset: $offset, size: $size, title: $title, type: $type)";
+  }
 }
 
 /// Different sides that can be resized
@@ -67,13 +73,9 @@ enum WindowResizeDirections {
 /// Information about window interactions
 class WindowInteractionInfo {
   final UniqueId id;
-  Offset offset;
-  Size size;
 
   WindowInteractionInfo({
     required this.id,
-    required this.offset,
-    required this.size,
   });
 }
 
@@ -83,8 +85,6 @@ class WindowDragInfo extends WindowInteractionInfo {
   WindowDragInfo({
     required super.id,
     required this.pointerOffset,
-    required super.offset,
-    required super.size,
   });
 }
 
@@ -98,28 +98,26 @@ class WindowResizeInfo extends WindowInteractionInfo {
     required this.initialPointerOffset,
     required this.initialSize,
     required this.initialOffset,
-    required super.offset,
-    required super.size,
   });
 }
 
 /// Update when a window is first being dragged.
-class StartDragWindowUpdate extends WorkspaceEvent {
+class StartWindowDragEvent extends WorkspaceEvent {
   final UniqueId windowId;
   final DragStartDetails details;
 
-  StartDragWindowUpdate({
+  StartWindowDragEvent({
     required this.windowId,
     required this.details,
   });
 }
 
 /// Update when a window is being dragged.
-class UpdateDragWindowUpdate extends WorkspaceEvent {
+class WindowDragUpdate extends WorkspaceEvent {
   final UniqueId windowId;
   final DragUpdateDetails details;
 
-  UpdateDragWindowUpdate({
+  WindowDragUpdate({
     required this.windowId,
     required this.details,
   });
@@ -186,7 +184,7 @@ class WindowTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    AppTheme theme = WorkspaceViewer.of(context).info.theme;
+    AppTheme theme = WorkspaceViewer.of(context).info!.theme;
     if (toolbar != null) {
       return Container(
           constraints: const BoxConstraints(
@@ -203,7 +201,7 @@ class WindowTitle extends StatelessWidget {
                   size: kMinInteractiveDimension * .7,
                 ),
                 onPressed: () {
-                  print("Open menu");
+                  developer.log("Open menu", name: "rubinTV.visualization.workspace.window");
                 }),
             Expanded(
               child: Center(
@@ -229,7 +227,7 @@ class WindowTitle extends StatelessWidget {
               size: kMinInteractiveDimension * .7,
             ),
             onPressed: () {
-              print("Open menu");
+              developer.log("Open menu", name: "rubinTV.visualization.workspace.window");
             }),
         Expanded(
           child: Center(
@@ -242,9 +240,9 @@ class WindowTitle extends StatelessWidget {
 }
 
 /// Remove a [Chart] from the [Workspace].
-class RemoveWindowAction extends WorkspaceEvent {
+class RemoveWindowEvent extends WorkspaceEvent {
   final UniqueId windowId;
-  RemoveWindowAction(this.windowId);
+  RemoveWindowEvent(this.windowId);
 }
 
 class ResizableWindow extends StatelessWidget {
@@ -288,7 +286,7 @@ class ResizableWindow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    AppTheme theme = WorkspaceViewer.of(context).info.theme;
+    AppTheme theme = WorkspaceViewer.of(context).info!.theme;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
@@ -298,10 +296,10 @@ class ResizableWindow extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           GestureDetector(
             onPanStart: (DragStartDetails details) {
-              context.read<WorkspaceBloc>().add(StartDragWindowUpdate(windowId: info.id, details: details));
+              context.read<WorkspaceBloc>().add(StartWindowDragEvent(windowId: info.id, details: details));
             },
             onPanUpdate: (DragUpdateDetails details) {
-              context.read<WorkspaceBloc>().add(UpdateDragWindowUpdate(windowId: info.id, details: details));
+              context.read<WorkspaceBloc>().add(WindowDragUpdate(windowId: info.id, details: details));
             },
             onPanEnd: (DragEndDetails details) {
               context.read<WorkspaceBloc>().add(WindowDragEnd(windowId: info.id, details: details));

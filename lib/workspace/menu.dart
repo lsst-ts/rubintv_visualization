@@ -33,28 +33,19 @@ VoidCallback showNotImplemented(BuildContext context) {
   };
 }
 
-/// Add a new [CartesianPlot] to the [WorkspaceViewer].
-class CreateNewChartEvent extends WorkspaceEvent {
-  final WindowTypes chartType;
-
-  CreateNewChartEvent({
-    this.chartType = WindowTypes.cartesianScatter,
-  });
-}
-
 class DataSetSelectorDialog extends StatelessWidget {
   final AppTheme theme;
-  final DataCenter dataCenter;
 
   const DataSetSelectorDialog({
     super.key,
     required this.theme,
-    required this.dataCenter,
   });
 
   @override
   Widget build(BuildContext context) {
-    final List<DropdownMenuItem<String>> dataSetEntries = dataCenter.databases.keys
+    final List<DropdownMenuItem<String>> dataSetEntries = DataCenter()
+        .databases
+        .keys
         .map((String name) => DropdownMenuItem(value: name, child: Text(name)))
         .toList();
 
@@ -77,13 +68,11 @@ class DataSetSelectorDialog extends StatelessWidget {
 class AppMenu extends StatelessWidget {
   final Widget child;
   final AppTheme theme;
-  final DataCenter dataCenter;
 
   const AppMenu({
     super.key,
     required this.theme,
     required this.child,
-    required this.dataCenter,
   });
 
   Future<String?> _selectDataSet(BuildContext context) {
@@ -91,7 +80,6 @@ class AppMenu extends StatelessWidget {
       context: context,
       builder: (BuildContext context) => DataSetSelectorDialog(
         theme: theme,
-        dataCenter: dataCenter,
       ),
     );
   }
@@ -249,32 +237,32 @@ class AppMenu extends StatelessWidget {
                 submenu: SubMenu(menuItems: [
                   MenuButton(
                     onTap: () {
-                      context.read<WorkspaceBloc>().add(CreateNewChartEvent(
-                            chartType: WindowTypes.cartesianScatter,
+                      context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                            windowType: WindowTypes.cartesianScatter,
                           ));
                     },
                     text: const Text("Cartesian Scatter Plot"),
                   ),
                   MenuButton(
                     onTap: () {
-                      context.read<WorkspaceBloc>().add(CreateNewChartEvent(
-                            chartType: WindowTypes.polarScatter,
+                      context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                            windowType: WindowTypes.polarScatter,
                           ));
                     },
                     text: const Text("Polar Scatter Plot"),
                   ),
                   MenuButton(
                     onTap: () {
-                      context.read<WorkspaceBloc>().add(CreateNewChartEvent(
-                            chartType: WindowTypes.histogram,
+                      context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                            windowType: WindowTypes.histogram,
                           ));
                     },
                     text: const Text("Histogram"),
                   ),
                   MenuButton(
                     onTap: () {
-                      context.read<WorkspaceBloc>().add(CreateNewChartEvent(
-                            chartType: WindowTypes.box,
+                      context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                            windowType: WindowTypes.box,
                           ));
                     },
                     text: const Text("Box Chart"),

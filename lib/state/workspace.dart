@@ -1,17 +1,16 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/chart/base.dart';
+import 'package:rubintv_visualization/chart/binned.dart';
+import 'package:rubintv_visualization/chart/scatter.dart';
 import 'package:rubintv_visualization/image/focal_plane.dart';
-import 'package:rubintv_visualization/state/chart.dart';
-import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/io.dart';
 import 'package:rubintv_visualization/query/query.dart';
-import 'package:rubintv_visualization/state/focal_plane.dart';
 import 'package:rubintv_visualization/state/theme.dart';
 import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
@@ -21,6 +20,12 @@ import 'package:rubintv_visualization/workspace/toolbar.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 
 abstract class WorkspaceEvent {}
+
+class InitializeWorkspaceEvent extends WorkspaceEvent {
+  final AppTheme theme;
+
+  InitializeWorkspaceEvent(this.theme);
+}
 
 /// A message received via the websocket.
 class ReceiveMessageEvent extends WorkspaceEvent {
@@ -45,17 +50,30 @@ class UpdateGlobalObsDateEvent extends WorkspaceEvent {
   UpdateGlobalObsDateEvent({required this.obsDate});
 }
 
+/// Add a new [CartesianPlot] to the [WorkspaceViewer].
+class CreateNewWindowEvent extends WorkspaceEvent {
+  final WindowTypes windowType;
+
+  CreateNewWindowEvent({
+    this.windowType = WindowTypes.cartesianScatter,
+  });
+}
+
+class ShowFocalPlaneEvent extends WorkspaceEvent {
+  ShowFocalPlaneEvent();
+}
+
 /// State of a [WorkspaceViewer].
-abstract class WorkspaceState {
-  const WorkspaceState();
+abstract class WorkspaceStateBase {
+  const WorkspaceStateBase();
 }
 
 /// The initial state of the [WorkspaceViewer].
-class WorkspaceStateInitial extends WorkspaceState {}
+class WorkspaceStateInitial extends WorkspaceStateBase {}
 
 /// A fully loaded state of the [WorkspaceViewer].
-class WorkspaceStateLoaded extends WorkspaceState {
-  /// Windows to display in the [WorkspaceStateLoaded].
+class WorkspaceState extends WorkspaceStateBase {
+  /// Windows to display in the [WorkspaceState].
   final Map<UniqueId, Window> windows;
 
   /// A query that applies to all plots (that opt in to gloabl queries)
@@ -65,83 +83,95 @@ class WorkspaceStateLoaded extends WorkspaceState {
   final DateTime? obsDate;
 
   /// The current instrument being analyzed.
-  final Instrument instrument;
+  final Instrument? instrument;
 
   /// The current detector being analyzed.
   /// If null, then no detector is selected.
   final Detector? detector;
 
-  /// Whether or not to show the focal plane.
-  final bool showFocalPlane;
-
+  /// The theme of the app
   final AppTheme theme;
 
-  const WorkspaceStateLoaded({
+  /// The current interaction info.
+  final WindowInteractionInfo? interactionInfo;
+
+  @override
+  String toString() {
+    return "WorkspaceStateLoaded(windows: $windows, instrument: $instrument, globalQuery: $globalQuery, "
+        "obsDate: $obsDate, detector: $detector, theme: $theme, interactionInfo: $interactionInfo)";
+  }
+
+  const WorkspaceState({
     required this.windows,
     required this.instrument,
-    required this.showFocalPlane,
     required this.globalQuery,
     required this.obsDate,
     required this.detector,
     required this.theme,
+    required this.interactionInfo,
   });
 
-  /// Copy the [WorkspaceStateLoaded] with new values.
-  WorkspaceStateLoaded copyWith({
+  /// Copy the [WorkspaceState] with new values.
+  WorkspaceState copyWith({
     Map<UniqueId, Window>? windows,
     Instrument? instrument,
     Detector? detector,
     bool? showFocalPlane,
-    FocalPlane? focalPlane,
     AppTheme? theme,
   }) =>
-      WorkspaceStateLoaded(
-        windows: windows ?? this.windows,
-        globalQuery: globalQuery,
-        obsDate: obsDate,
-        instrument: instrument ?? this.instrument,
-        detector: detector ?? this.detector,
-        showFocalPlane: showFocalPlane ?? this.showFocalPlane,
-        theme: theme ?? this.theme,
-      );
+      WorkspaceState(
+          windows: windows ?? this.windows,
+          globalQuery: globalQuery,
+          obsDate: obsDate,
+          instrument: instrument ?? this.instrument,
+          detector: detector ?? this.detector,
+          theme: theme ?? this.theme,
+          interactionInfo: interactionInfo);
 
   /// Because the global query can be null, we need a special copy method.
-  WorkspaceStateLoaded updateGlobalQuery(Query? query) => WorkspaceStateLoaded(
+  WorkspaceState updateGlobalQuery(Query? query) => WorkspaceState(
         windows: windows,
         instrument: instrument,
         globalQuery: query,
         obsDate: obsDate,
         detector: detector,
-        showFocalPlane: showFocalPlane,
         theme: theme,
+        interactionInfo: interactionInfo,
       );
 
   /// Becayse the obsDate can be null, we need a special copy method.
-  WorkspaceStateLoaded updateObsDate(DateTime? obsDate) => WorkspaceStateLoaded(
-        windows: windows,
-        instrument: instrument,
-        globalQuery: globalQuery,
-        obsDate: obsDate,
-        detector: detector,
-        showFocalPlane: showFocalPlane,
-        theme: theme,
-      );
+  WorkspaceState updateObsDate(DateTime? obsDate) => WorkspaceState(
+      windows: windows,
+      instrument: instrument,
+      globalQuery: globalQuery,
+      obsDate: obsDate,
+      detector: detector,
+      theme: theme,
+      interactionInfo: interactionInfo);
 
   // Because the detector can be null, we need a special copy method.
-  WorkspaceStateLoaded updateSelectedDetector(Detector? detector) => WorkspaceStateLoaded(
-        windows: windows,
-        instrument: instrument,
-        globalQuery: globalQuery,
-        obsDate: obsDate,
-        detector: detector,
-        showFocalPlane: showFocalPlane,
-        theme: theme,
-      );
+  WorkspaceState updateSelectedDetector(Detector? detector) => WorkspaceState(
+      windows: windows,
+      instrument: instrument,
+      globalQuery: globalQuery,
+      obsDate: obsDate,
+      detector: detector,
+      theme: theme,
+      interactionInfo: interactionInfo);
+
+  WorkspaceState updateInteractionInfo(WindowInteractionInfo? interactionInfo) => WorkspaceState(
+      windows: windows,
+      instrument: instrument,
+      globalQuery: globalQuery,
+      obsDate: obsDate,
+      detector: detector,
+      theme: theme,
+      interactionInfo: interactionInfo);
 
   /// Add a new [Window] to the [WorkspaceWidgetState].
   /// Normally the [index] is already created, unless
   /// the workspace is being loaded from disk.
-  WorkspaceStateLoaded addWindow(Window window) {
+  WorkspaceState addWindow(Window window) {
     Map<UniqueId, Window> newWindows = {...windows};
     newWindows[window.id] = window;
 
@@ -149,6 +179,9 @@ class WorkspaceStateLoaded extends WorkspaceState {
       windows: newWindows,
     );
   }
+
+  /// Whether or not the window is showing the focal plane.
+  bool get isShowingFocalPlane => windows.values.any((window) => window.type == WindowTypes.focalPlane);
 }
 
 /// Get a formatted date string from a [DateTime].
@@ -164,18 +197,18 @@ String? getFormattedDate(DateTime? obsDate) {
 }
 
 /// Load data for all series in a given chart
-void getSeriesData(WorkspaceStateLoaded workspace, {ChartLoadedState? chart}) {
+void updateAllSeriesData(WorkspaceState workspace, {ChartStateLoaded? chart}) {
   String? obsDate = getFormattedDate(workspace.obsDate);
 
-  late final List<ChartLoadedState> charts;
+  late final List<ChartStateLoaded> charts;
   if (chart != null) {
     charts = [chart];
   } else {
-    charts = workspace.windows.values.whereType<ChartLoadedState>().toList();
+    charts = workspace.windows.values.whereType<ChartStateLoaded>().toList();
   }
   // Request the data from the server.
   if (WebSocketManager().isConnected) {
-    for (ChartLoadedState chart in charts) {
+    for (ChartStateLoaded chart in charts) {
       for (SeriesInfo series in chart.series.values) {
         WebSocketManager().sendMessage(LoadColumnsCommand.build(
           seriesId: series.id,
@@ -184,13 +217,15 @@ void getSeriesData(WorkspaceStateLoaded workspace, {ChartLoadedState? chart}) {
           useGlobalQuery: chart.useGlobalQuery,
           globalQuery: workspace.globalQuery,
           obsDate: obsDate,
+          windowId: chart.id,
         ).toJson());
       }
     }
   }
 }
 
-class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
+/// A [Bloc] that manages the state of the [WorkspaceViewer].
+class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
   late StreamSubscription _subscription;
 
   WorkspaceBloc() : super(WorkspaceStateInitial()) {
@@ -199,47 +234,48 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       add(ReceiveMessageEvent(message));
     });
 
+    on<InitializeWorkspaceEvent>((event, emit) {
+      emit(WorkspaceState(
+        windows: {},
+        instrument: null,
+        globalQuery: null,
+        obsDate: null,
+        detector: null,
+        theme: event.theme,
+        interactionInfo: null,
+      ));
+    });
+
     /// A message is received from the websocket.
     on<ReceiveMessageEvent>((event, emit) {
+      developer.log("Workspace Received message: ${event.message["type"]}", name: "rubin_chart.workspace");
       if (event.message["type"] == "instrument info") {
         // Update the workspace to use the new instrument
         Instrument instrument = Instrument.fromJson(event.message["content"]);
-        emit((state as WorkspaceStateLoaded).copyWith(instrument: instrument));
+        emit((state as WorkspaceState).copyWith(instrument: instrument));
       }
-    });
-
-    /// Update whether or not a chart uses the global query.
-    on<UpdateChartGlobalQueryEvent>((event, emit) {
-      WorkspaceStateLoaded state = this.state as WorkspaceStateLoaded;
-      Map<UniqueId, Window> windows = {...state.windows};
-      ChartLoadedState chart = windows[event.chartId] as ChartLoadedState;
-      chart = chart.copyWith(useGlobalQuery: event.useGlobalQuery);
-      windows[chart.id] = chart;
-      state = state.copyWith(windows: windows);
-      getSeriesData(state, chart: chart);
-      emit(state);
     });
 
     /// Update the global query.
     on<UpdateGlobalQueryEvent>((event, emit) {
-      WorkspaceStateLoaded state = this.state as WorkspaceStateLoaded;
+      WorkspaceState state = this.state as WorkspaceState;
       state = state.updateGlobalQuery(event.globalQuery);
-      getSeriesData(state);
+      updateAllSeriesData(state);
       emit(state);
     });
 
     /// Update the global observation date.
     on<UpdateGlobalObsDateEvent>((event, emit) {
       developer.log("updating date to ${event.obsDate}!", name: "rubin_chart.workspace");
-      WorkspaceStateLoaded state = this.state as WorkspaceStateLoaded;
+      WorkspaceState state = this.state as WorkspaceState;
       state = state.updateObsDate(event.obsDate);
-      getSeriesData(state);
+      updateAllSeriesData(state);
       emit(state);
     });
 
     /// Create a new chart
-    on<CreateNewChartEvent>((event, emit) {
-      WorkspaceStateLoaded state = this.state as WorkspaceStateLoaded;
+    on<CreateNewWindowEvent>((event, emit) {
+      WorkspaceState state = this.state as WorkspaceState;
       Offset offset = state.theme.newWindowOffset;
 
       if (state.windows.isNotEmpty) {
@@ -247,283 +283,166 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
         offset += state.windows.values.last.offset;
       }
 
-      ChartLoadedState chart = ChartLoadedState.fromChartType(
+      Window newWindow = Window(
         id: UniqueId.next(),
         offset: offset,
         size: state.theme.newPlotSize,
-        chartType: event.chartType,
+        type: event.windowType,
       );
       Map<UniqueId, Window> windows = {...state.windows};
-      windows[chart.id] = chart;
+      windows[newWindow.id] = newWindow;
+      emit(state.copyWith(windows: windows));
+    });
+
+    /// Add a new window with the FocalPlane displayed.
+    on<ShowFocalPlaneEvent>((event, emit) {
+      WorkspaceState state = this.state as WorkspaceState;
+
+      // Make sure that the focal plane isn't already opened
+      for (Window window in state.windows.values) {
+        if (window.type == WindowTypes.focalPlane) {
+          return;
+        }
+      }
+
+      Offset offset = state.theme.newWindowOffset;
+      if (state.windows.isNotEmpty) {
+        // Shift from last window
+        offset += state.windows.values.last.offset;
+      }
+
+      Window newWindow = Window(
+        id: UniqueId.next(),
+        offset: offset,
+        size: state.theme.newPlotSize,
+        type: WindowTypes.focalPlane,
+      );
+      Map<UniqueId, Window> windows = {...state.windows};
+      windows[newWindow.id] = newWindow;
+
+      developer.log("Added new focal plane window: $newWindow", name: "rubin_chart.workspace");
+
+      emit(state.copyWith(windows: windows));
+    });
+
+    /// Select a detector to display in image windows.
+    on<SelectDetectorEvent>((event, emit) {
+      WorkspaceState state = this.state as WorkspaceState;
+      if (state.detector == event.detector) {
+        emit(state.updateSelectedDetector(null));
+        return;
+      }
+      emit(state.updateSelectedDetector(event.detector));
+    });
+
+    /// Remove a window from the workspace.
+    on<RemoveWindowEvent>((event, emit) {
+      WorkspaceState state = this.state as WorkspaceState;
+      Map<UniqueId, Window> windows = {...state.windows};
+      windows.remove(event.windowId);
+      emit(state.copyWith(windows: windows));
+    });
+
+    /// Keep track of the starting drag position
+    on<StartWindowDragEvent>((event, emit) {
+      WorkspaceState state = this.state as WorkspaceState;
+      if (state.interactionInfo != null) {
+        state = state.updateInteractionInfo(null);
+      }
+      Window window = state.windows[event.windowId]!;
+      WindowInteractionInfo interactionInfo = WindowDragInfo(
+        id: event.windowId,
+        pointerOffset: window.offset - event.details.localPosition,
+      );
+      emit(state.updateInteractionInfo(interactionInfo));
+    });
+
+    on<WindowDragUpdate>((event, emit) {
+      WorkspaceState state = this.state as WorkspaceState;
+      if (state.interactionInfo is! WindowDragInfo) {
+        state = state.updateInteractionInfo(null);
+        throw Exception("Mismatched interactionInfo, got ${state.interactionInfo}");
+      }
+      Map<UniqueId, Window> windows = {...state.windows};
+      Window window = windows[event.windowId]!;
+      Offset offset = event.details.localPosition + (state.interactionInfo as WindowDragInfo).pointerOffset;
+      window = window.copyWith(offset: offset);
+      windows[event.windowId] = window;
+      emit(state.copyWith(windows: windows));
+    });
+
+    on<StartWindowResize>((event, emit) {
+      WorkspaceState state = this.state as WorkspaceState;
+      if (state.interactionInfo != null) {
+        state = state.updateInteractionInfo(null);
+      }
+      Window window = state.windows[event.windowId]!;
+      WindowInteractionInfo interactionInfo = WindowResizeInfo(
+        id: event.windowId,
+        initialPointerOffset: event.details.globalPosition,
+        initialSize: window.size,
+        initialOffset: window.offset,
+      );
+      emit(state.updateInteractionInfo(interactionInfo));
+    });
+
+    on<UpdateWindowResize>((event, emit) {
+      WorkspaceState state = this.state as WorkspaceState;
+      if (state.interactionInfo is! WindowResizeInfo) {
+        state = state.updateInteractionInfo(null);
+        throw Exception("Mismatched interactionInfo, got ${state.interactionInfo}");
+      }
+
+      // Get the new offset and size
+      WindowResizeInfo interaction = state.interactionInfo as WindowResizeInfo;
+      Offset deltaPosition = event.details.globalPosition - interaction.initialPointerOffset;
+
+      double left = interaction.initialOffset.dx;
+      double top = interaction.initialOffset.dy;
+      double width = interaction.initialSize.width;
+      double height = interaction.initialSize.height;
+
+      // Update the width and x-offset
+      if (event.direction == WindowResizeDirections.right ||
+          event.direction == WindowResizeDirections.downRight) {
+        width = interaction.initialSize.width + deltaPosition.dx;
+      } else if (event.direction == WindowResizeDirections.left ||
+          event.direction == WindowResizeDirections.downLeft) {
+        left = interaction.initialOffset.dx + deltaPosition.dx;
+        width = interaction.initialSize.width - deltaPosition.dx;
+      }
+
+      // Update the height and y-offset
+      if (event.direction == WindowResizeDirections.down ||
+          event.direction == WindowResizeDirections.downLeft ||
+          event.direction == WindowResizeDirections.downRight) {
+        height = interaction.initialSize.height + deltaPosition.dy;
+      }
+
+      Offset offset = Offset(left, top);
+      Size size = Size(width, height);
+
+      // Update the window
+      Map<UniqueId, Window> windows = {...state.windows};
+      Window window = windows[event.windowId]!;
+      window = window.copyWith(
+        size: size,
+        offset: offset,
+      );
+      windows[event.windowId] = window;
       emit(state.copyWith(windows: windows));
     });
   }
 }
 
-/// Process a message received from the analysis service.
-class WebSocketReceiveMessageAction extends UiAction {
-  final DataCenter dataCenter;
-  final String message;
-
-  const WebSocketReceiveMessageAction({
-    required this.dataCenter,
-    required this.message,
-  });
-}
-
-/// Store the websocket connection to the analysis service.
-TimeMachine<WorkspaceStateLoaded> webSocketReceiveMessageReducer(
-  TimeMachine<WorkspaceStateLoaded> state,
-  WebSocketReceiveMessageAction action,
-) {
-  Map<String, dynamic> message = jsonDecode(action.message);
-  if (message["type"] == "table columns") {
-    developer.log("received ${message["content"]["data"].length} columns for ${message["requestId"]}",
-        name: "rubin_chart.workspace");
-    action.dataCenter.updateSeriesData(
-      seriesId: SeriesId.fromString(message["requestId"] as String),
-      dataSourceName: message["content"]["schema"],
-      plotColumns: List<String>.from(message["content"]["columns"].map((e) => e)),
-      data: Map<String, List<dynamic>>.from(
-          message["content"]["data"].map((key, value) => MapEntry(key, List<dynamic>.from(value)))),
-      workspace: state.currentState,
-    );
-    developer.log("dataCenter data: ${action.dataCenter.seriesIds}", name: "rubin_chart.workspace");
-  }
-}
-
-TimeMachine<WorkspaceStateLoaded> createSeriesReducer(
-  TimeMachine<WorkspaceStateLoaded> state,
-  CreateSeriesAction action,
-) {
-  WorkspaceStateLoaded workspace = state.currentState;
-  ChartLoadedState chart = workspace.windows[action.series.id.windowId] as ChartLoadedState;
-  chart = chart.addSeries(series: action.series);
-  workspace = workspace.copyWith(windows: {...workspace.windows, chart.id: chart});
-
-  return state.updated(TimeMachineUpdate(
-    comment: "add new Series",
-    state: workspace,
-  ));
-}
-
-/// Update [SeriesData] in the [DataCenter].
-TimeMachine<WorkspaceStateLoaded> updateSeriesReducer(
-  TimeMachine<WorkspaceStateLoaded> state,
-  SeriesUpdateAction action,
-) {
-  ChartLoadedState chart = state.currentState._windows[action.series.id.windowId] as ChartLoadedState;
-  late String comment = "update Series";
-
-  if (action.groupByColumn != null) {
-    throw UnimplementedError();
-    // Create a collection of series grouped by the specified column
-    /*SchemaField field = action.groupByColumn!;
-
-    Set unique = {};
-    for(dynamic index in indices){
-      Map<String, dynamic> record = dataSet.data[index]!;
-      unique.add(record[field.name]);
-    }
-
-    developer.log("Creating ${unique.length} new series", name: "rubin_chart.workspace");
-
-    for(dynamic value in unique){
-      Series series = action.series;
-
-      Query groupQuery = EqualityQuery(
-        columnField: field,
-        rightCondition: EqualityCondition(
-          operator: EqualityOperator.eq,
-          value: value,
-        ),
-      );
-
-      Query query = groupQuery;
-
-      if(series.query != null){
-        query = ParentQuery(
-          children: [series.query!, groupQuery],
-          operator: QueryOperator.and,
-        );
-      }
-      series = series.copyWith(name: value, query: query);
-      chart = chart.addSeries(series: series, dataCenter: action.dataCenter);
-    }*/
-  } else if (chart.series.keys.contains(action.series.id)) {
-    Map<SeriesId, SeriesInfo> newSeries = {...chart.series};
-    newSeries[action.series.id] = action.series;
-    List<ChartAxisInfo> axesInfo = [for (var axis in chart.axes) axis!];
-    for (int i = 0; i < axesInfo.length; i++) {
-      ChartAxisInfo axisInfo = axesInfo[i];
-      if (axisInfo.label.startsWith("<") && axisInfo.label.endsWith(">")) {
-        axesInfo[i] = axisInfo.copyWith(label: action.series.fields.values.toList()[i].name);
-      }
-    }
-    chart = chart.copyWith(series: newSeries, axisInfo: axesInfo);
-  } else {
-    chart = chart.addSeries(series: action.series);
-    comment = "add new Series";
-  }
-
-  WorkspaceStateLoaded workspace = state.currentState;
-  Map<UniqueId, Window> windows = {...workspace.windows};
-  windows[chart.id] = chart;
-
-  // Request the data from the server.
-  if (workspace.webSocket != null) {
-    String? obsDate = getFormattedDate(workspace.obsDate);
-    Query? query = action.series.query;
-    workspace.webSocket!.sink.add(LoadColumnsCommand.build(
-            seriesId: action.series.id,
-            fields: action.series.fields.values.toList(),
-            query: query,
-            globalQuery: workspace.globalQuery,
-            useGlobalQuery: chart.useGlobalQuery,
-            obsDate: obsDate)
-        .toJson());
-  }
-
-  return state.updated(TimeMachineUpdate(
-    comment: comment,
-    state: workspace.copyWith(windows: windows),
-  ));
-}
-
-TimeMachine<WorkspaceStateLoaded> updateMultiSelectReducer(
-  TimeMachine<WorkspaceStateLoaded> state,
-  UpdateMultiSelect action,
-) {
-  WorkspaceStateLoaded workspace = state.currentState;
-  Map<UniqueId, Window> windows = {...workspace.windows};
-  ChartLoadedState chart = windows[action.chartId] as ChartLoadedState;
-  if (chart is ScatterChartState) {
-    chart = chart.copyWith(tool: action.tool);
-  } else if (chart is BinnedChartState) {
-    chart = chart.copyWith(tool: action.tool);
-  } else {
-    throw UnimplementedError("Unrecognized chart type: $chart");
-  }
-  windows[chart.id] = chart;
-  workspace = workspace.copyWith(windows: windows);
-  return state.updated(TimeMachineUpdate(
-    comment: "update multi-selection tool",
-    state: workspace,
-  ));
-}
-
-TimeMachine<WorkspaceStateLoaded> updateChartBinsReducer(
-  TimeMachine<WorkspaceStateLoaded> state,
-  UpdateChartBinsAction action,
-) {
-  WorkspaceStateLoaded workspace = state.currentState;
-  Map<UniqueId, Window> windows = {...workspace.windows};
-  BinnedChartState chart = windows[action.chartId] as BinnedChartState;
-  chart = chart.copyWith(nBins: action.nBins);
-  windows[chart.id] = chart;
-  workspace = workspace.copyWith(windows: windows);
-  developer.log("Updating chart bins to ${action.nBins}", name: "rubin_chart.workspace");
-  return state.updated(TimeMachineUpdate(
-    comment: "update chart bins",
-    state: workspace,
-  ));
-}
-
-TimeMachine<WorkspaceStateLoaded> showFocalPlaneReducer(
-  TimeMachine<WorkspaceStateLoaded> state,
-  ShowFocalPlane action,
-) {
-  for (Window window in state.currentState.windows.values) {
-    if (window is FocalPlane) {
-      return state;
-    }
-  }
-
-  WorkspaceStateLoaded workspace = state.currentState;
-  Offset offset = workspace.theme.newWindowOffset;
-
-  if (workspace.windows.isNotEmpty) {
-    // Shift from last window
-    offset += workspace.windows.values.last.offset;
-  }
-
-  workspace = workspace.addWindow(FocalPlane(
-    id: UniqueId.next(),
-    offset: offset,
-    size: workspace.theme.newPlotSize,
-    instrument: workspace.instrument!,
-  ));
-
-  return state.updated(TimeMachineUpdate(
-    comment: "add new Focal Plane",
-    state: workspace,
-  ));
-}
-
-TimeMachine<WorkspaceStateLoaded> selectDetectorReducer(
-  TimeMachine<WorkspaceStateLoaded> state,
-  SelectDetectorAction action,
-) {
-  WorkspaceStateLoaded workspace = state.currentState;
-  Map<UniqueId, Window> windows = {...workspace.windows};
-
-  if (workspace.detector == action.detector) {
-    // The user unselected the detector.
-    WorkspaceStateLoaded newState = workspace.updateSelectedDetector(null);
-    return state.updated(TimeMachineUpdate(
-      comment: "deselect detector",
-      state: newState,
-    ));
-  }
-
-  WorkspaceStateLoaded newState = workspace.updateSelectedDetector(action.detector);
-  return state.updated(TimeMachineUpdate(
-    comment: "select detector",
-    state: newState,
-  ));
-}
-
-/// Reduce a [TimeMachineAction] and (potentially) update the history and workspace.
-TimeMachine<WorkspaceStateLoaded> timeMachineReducer(
-    TimeMachine<WorkspaceStateLoaded> state, TimeMachineAction action) {
-  if (action.action == TimeMachineActions.first) {
-    return state.first;
-  } else if (action.action == TimeMachineActions.previous) {
-    return state.previous;
-  } else if (action.action == TimeMachineActions.next) {
-    return state.next;
-  } else if (action.action == TimeMachineActions.last) {
-    return state.last;
-  }
-  return state;
-}
-
-/// Add a new cartesian plot to the workspace
-TimeMachine<WorkspaceStateLoaded> removeWindowReducer(
-  TimeMachine<WorkspaceStateLoaded> state,
-  RemoveWindowAction action,
-) {
-  WorkspaceStateLoaded workspace = state.currentState;
-  Map<UniqueId, Window> windows = {...workspace.windows};
-  windows.remove(action.window.id);
-  workspace = workspace.copyWith(windows: windows);
-
-  return state.updated(TimeMachineUpdate(
-    comment: "remove chart",
-    state: workspace,
-  ));
-}
-
 /// A [Widget] used to display a set of re-sizable and translatable [Window] widgets in a container.
 class WorkspaceViewer extends StatefulWidget {
   final Size size;
-  final DataCenter dataCenter;
   final AppTheme theme;
 
   const WorkspaceViewer({
     super.key,
     required this.size,
-    required this.dataCenter,
     required this.theme,
   });
 
@@ -570,19 +489,16 @@ class SelectDataPointsCommand {
 class WorkspaceViewerState extends State<WorkspaceViewer> {
   AppTheme get theme => widget.theme;
   Size get size => widget.size;
-  WorkspaceStateLoaded get info => widget.workspace;
-  DataCenter get dataCenter => widget.dataCenter;
 
-  WindowInteractionInfo? interactionInfo;
-  late SelectionController selectionController;
-  late SelectionController drillDownController;
+  final SelectionController selectionController = SelectionController();
+  final SelectionController drillDownController = SelectionController();
+
+  WorkspaceState? info;
 
   @override
   void initState() {
     developer.log("Initializing WorkspaceViewerState", name: "rubin_chart.workspace");
     super.initState();
-    selectionController = SelectionController();
-    drillDownController = SelectionController();
 
     selectionController.subscribe(_onSelectionUpdate);
   }
@@ -597,166 +513,74 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   @override
   Widget build(BuildContext context) {
-    return AppMenu(
-      theme: theme,
-      dispatch: dispatch,
-      dataCenter: dataCenter,
-      child: Column(children: [
-        Toolbar(
-          isConnected: widget.isConnected,
-          isFirstFrame: widget.isFirstFrame,
-          isLastFrame: widget.isLastFrame,
-        ),
-        SizedBox(
-          width: size.width,
-          height: size.height - 2 * kToolbarHeight,
-          child: Builder(
-            builder: (BuildContext context) {
-              List<Widget> children = [];
-              for (Window window in info.windows.values) {
-                Offset offset = window.offset;
-                Size size = window.size;
-                if (interactionInfo != null && window.id == interactionInfo!.id) {
-                  offset = interactionInfo!.offset;
-                  size = interactionInfo!.size;
-                }
+    return BlocProvider(
+      create: (context) => WorkspaceBloc()..add(InitializeWorkspaceEvent(theme)),
+      child: BlocBuilder<WorkspaceBloc, WorkspaceStateBase>(
+        builder: (context, state) {
+          if (state is WorkspaceStateInitial) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-                children.add(Positioned(
-                  left: offset.dx,
-                  top: offset.dy,
-                  child: ResizableWindow(
-                    info: window,
-                    theme: theme,
-                    title: window.title,
-                    dispatch: _updateWindow,
-                    size: size,
-                    toolbar: window.createToolbar(context),
-                    child: window.createWidget(context),
+          if (state is WorkspaceState) {
+            info = state;
+            return AppMenu(
+              theme: theme,
+              child: Column(children: [
+                Toolbar(workspace: state),
+                SizedBox(
+                  width: size.width,
+                  height: size.height - 2 * kToolbarHeight,
+                  child: Builder(
+                    builder: (BuildContext context) {
+                      List<Widget> children = [];
+                      for (Window window in info!.windows.values) {
+                        children.add(Positioned(
+                          left: window.offset.dx,
+                          top: window.offset.dy,
+                          child: buildWindow(window, state),
+                        ));
+                      }
+
+                      return Stack(
+                        children: children,
+                      );
+                    },
                   ),
-                ));
-              }
+                ),
+              ]),
+            );
+          }
 
-              return Stack(
-                children: children,
-              );
-            },
-          ),
-        ),
-      ]),
+          throw ArgumentError("Unrecognized WorkspaceState $state");
+        },
+      ),
     );
   }
 
-  void _updateWindow(WindowUpdate update) {
-    // Translation updates
-    if (update is StartDragWindowUpdate) {
-      return startWindowDrag(update);
+  Widget buildWindow(Window window, WorkspaceState state) {
+    if (window.type == WindowTypes.cartesianScatter || window.type == WindowTypes.polarScatter) {
+      developer.log("Adding scatter plot window", name: "rubin_chart.workspace");
+      return ScatterPlotWidget(window: window);
     }
-    if (update is UpdateDragWindowUpdate) {
-      return updateWindowDrag(update);
+    if (window.type == WindowTypes.histogram) {
+      developer.log("Adding histogram window", name: "rubin_chart.workspace");
+      return HistogramChart(window: window);
     }
-    if (update is WindowDragEnd) {
-      return dragEnd();
+    if (window.type == WindowTypes.box) {
+      developer.log("Adding box chart window", name: "rubin_chart.workspace");
+      throw UnimplementedError("Box charts have not been implmented yet");
     }
-    // Resize updates
-    if (update is StartWindowResize) {
-      return startWindowResize(update);
+    if (window.type == WindowTypes.focalPlane) {
+      developer.log("Adding focal plane window", name: "rubin_chart.workspace");
+      return FocalPlaneViewer(
+        instrument: state.instrument!,
+        selectedDetector: state.detector,
+        window: window,
+        workspace: state,
+      );
     }
-    if (update is UpdateWindowResize) {
-      return updateWindowReSize(update);
-    }
-    if (update is EndWindowResize) {
-      return dragEnd();
-    }
-    throw ArgumentError("Unrecognized WindowUpdate $update");
-  }
-
-  /// Keep track of the starting drag position
-  void startWindowDrag(StartDragWindowUpdate update) {
-    if (interactionInfo != null) {
-      dragEnd();
-    }
-    Window window = info.windows[update.windowId]!;
-    interactionInfo = WindowDragInfo(
-      id: update.windowId,
-      pointerOffset: window.offset - update.details.localPosition,
-      offset: window.offset,
-      size: window.size,
-    );
-    setState(() {});
-  }
-
-  void updateWindowDrag(UpdateDragWindowUpdate update) {
-    if (interactionInfo is! WindowDragInfo) {
-      dragEnd();
-      throw Exception("Mismatched interactionInfo, got $interactionInfo");
-    }
-    setState(() {
-      WindowDragInfo interaction = interactionInfo as WindowDragInfo;
-      interaction.offset = update.details.localPosition + (interactionInfo as WindowDragInfo).pointerOffset;
-    });
-  }
-
-  void dragEnd() {
-    if (interactionInfo != null) {
-      dispatch(ApplyWindowUpdate(
-        windowId: interactionInfo!.id,
-        offset: interactionInfo!.offset,
-        size: interactionInfo!.size,
-      ));
-      interactionInfo = null;
-      setState(() {});
-    }
-  }
-
-  void startWindowResize(StartWindowResize update) {
-    if (interactionInfo != null) {
-      dragEnd();
-    }
-    Window window = info.windows[update.windowId]!;
-
-    interactionInfo = WindowResizeInfo(
-      id: update.windowId,
-      initialPointerOffset: update.details.globalPosition,
-      initialSize: window.size,
-      initialOffset: window.offset,
-      offset: window.offset,
-      size: window.size,
-    );
-    setState(() {});
-  }
-
-  void updateWindowReSize(UpdateWindowResize update) {
-    if (interactionInfo is! WindowResizeInfo) {
-      dragEnd();
-      throw Exception("Mismatched interactionInfo, got $interactionInfo");
-    }
-    WindowResizeInfo interaction = interactionInfo as WindowResizeInfo;
-    Offset deltaPosition = update.details.globalPosition - interaction.initialPointerOffset;
-
-    double left = interaction.initialOffset.dx;
-    double top = interaction.initialOffset.dy;
-    double width = interaction.initialSize.width;
-    double height = interaction.initialSize.height;
-
-    // Update the width and x-offset
-    if (update.direction == WindowResizeDirections.right ||
-        update.direction == WindowResizeDirections.downRight) {
-      width = interaction.initialSize.width + deltaPosition.dx;
-    } else if (update.direction == WindowResizeDirections.left ||
-        update.direction == WindowResizeDirections.downLeft) {
-      left = interaction.initialOffset.dx + deltaPosition.dx;
-      width = interaction.initialSize.width - deltaPosition.dx;
-    }
-
-    // Update the height and y-offset
-    if (update.direction == WindowResizeDirections.down ||
-        update.direction == WindowResizeDirections.downLeft ||
-        update.direction == WindowResizeDirections.downRight) {
-      height = interaction.initialSize.height + deltaPosition.dy;
-    }
-
-    interaction.offset = Offset(left, top);
-    interaction.size = Size(width, height);
-    setState(() {});
+    throw UnimplementedError("WindowType ${window.type} is not implemented yet");
   }
 }

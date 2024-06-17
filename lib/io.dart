@@ -59,11 +59,12 @@ class FutureLoadColumnsCommand extends ServiceCommand {
 class LoadColumnsCommand extends ServiceCommand {
   LoadColumnsCommand({
     required List<SchemaField> fields,
+    required UniqueId windowId,
     required SeriesId seriesId,
     Query? query,
   }) : super(
           name: "load columns",
-          requestId: seriesId.shortString,
+          requestId: "${windowId.id},${seriesId.shortString}",
           parameters: {
             "database": fields.first.database.name,
             "columns": fields.map((e) => "${e.schema.name}.${e.name}").toList(),
@@ -72,6 +73,7 @@ class LoadColumnsCommand extends ServiceCommand {
         );
   static LoadColumnsCommand build({
     required List<SchemaField> fields,
+    required UniqueId windowId,
     required SeriesId seriesId,
     required bool useGlobalQuery,
     required Query? query,
@@ -98,6 +100,11 @@ class LoadColumnsCommand extends ServiceCommand {
         fullQuery = fullQuery & obsQuery;
       }
     }
-    return LoadColumnsCommand(fields: fields, seriesId: seriesId, query: fullQuery);
+    return LoadColumnsCommand(
+      fields: fields,
+      windowId: windowId,
+      seriesId: seriesId,
+      query: fullQuery,
+    );
   }
 }

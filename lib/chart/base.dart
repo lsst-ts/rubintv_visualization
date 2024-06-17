@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/chart/binned.dart';
+import 'package:rubintv_visualization/chart/scatter.dart';
 import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
+import 'package:rubintv_visualization/io.dart';
+import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
 import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
@@ -42,15 +45,6 @@ class UpdateMultiSelect extends ChartEvent {
   UpdateMultiSelect(this.tool);
 }
 
-/// Update the number of bins for a chart.
-class UpdateChartBinsAction extends ChartEvent {
-  final int nBins;
-
-  UpdateChartBinsAction({
-    required this.nBins,
-  });
-}
-
 /// Update whether or not to use the global query for a chart.
 class UpdateChartGlobalQueryEvent extends ChartEvent {
   final bool useGlobalQuery;
@@ -69,20 +63,39 @@ class CreateSeriesAction extends ChartEvent {
   });
 }
 
+/// Update a [Series] in a chart.
+class UpdateSeriesEvent extends ChartEvent {
+  final SeriesInfo series;
+  final String? obsDate;
+  final Query? globalQuery;
+  final SchemaField? groupByColumn;
+
+  UpdateSeriesEvent({
+    required this.series,
+    required this.obsDate,
+    required this.globalQuery,
+    this.groupByColumn,
+  });
+}
+
 class UpdateBinsEvent extends ChartEvent {
   final int nBins;
 
   UpdateBinsEvent(this.nBins);
 }
 
-abstract class ChartState {}
+abstract class ChartState {
+  UniqueId id;
 
-class ChartStateInitial extends ChartState {}
+  ChartState(this.id);
+}
+
+class ChartStateInitial extends ChartState {
+  ChartStateInitial(super.id);
+}
 
 /// Persistable information to generate a chart
 class ChartStateLoaded extends ChartState {
-  final UniqueId id;
-  final GlobalKey key;
   final Map<SeriesId, SeriesInfo> _series;
   final Legend? legend;
   final List<ChartAxisInfo> _axisInfo;
@@ -90,27 +103,23 @@ class ChartStateLoaded extends ChartState {
   /// Whether or not to use the global query for all series in this [ChartLoadedState].
   final bool useGlobalQuery;
 
-  final List<GlobalKey> childKeys;
-
-  final DataCenter dataCenter;
+  //final DataCenter dataCenter;
 
   final WindowTypes chartType;
 
   final MultiSelectionTool tool;
 
   ChartStateLoaded({
-    required this.key,
-    required this.id,
+    required UniqueId id,
     required Map<SeriesId, SeriesInfo> series,
     required List<ChartAxisInfo> axisInfo,
     required this.legend,
     required this.useGlobalQuery,
-    required this.childKeys,
-    required this.dataCenter,
     required this.chartType,
     required this.tool,
   })  : _series = Map<SeriesId, SeriesInfo>.unmodifiable(series),
-        _axisInfo = List<ChartAxisInfo>.unmodifiable(axisInfo);
+        _axisInfo = List<ChartAxisInfo>.unmodifiable(axisInfo),
+        super(id);
 
   bool get useSelectionController => tool == MultiSelectionTool.select;
 
@@ -128,7 +137,6 @@ class ChartStateLoaded extends ChartState {
     List<ChartAxisInfo>? axisInfo,
     Legend? legend,
     bool? useGlobalQuery,
-    List<GlobalKey>? childKeys,
     WindowTypes? chartType,
     MultiSelectionTool? tool,
   }) =>
@@ -138,10 +146,7 @@ class ChartStateLoaded extends ChartState {
         axisInfo: axisInfo ?? _axisInfo,
         legend: legend ?? this.legend,
         useGlobalQuery: useGlobalQuery ?? this.useGlobalQuery,
-        dataCenter: dataCenter,
-        childKeys: childKeys ?? this.childKeys,
         chartType: chartType ?? this.chartType,
-        key: key,
         tool: tool ?? this.tool,
       );
 
@@ -154,7 +159,7 @@ class ChartStateLoaded extends ChartState {
   List<Series> get allSeries {
     List<Series> allSeries = [];
     for (SeriesInfo seriesInfo in _series.values) {
-      Series? series = seriesInfo.toSeries(dataCenter);
+      Series? series = seriesInfo.toSeries();
       if (series != null) {
         allSeries.add(series);
       }
@@ -166,7 +171,7 @@ class ChartStateLoaded extends ChartState {
 class ChartBloc extends Bloc<ChartEvent, ChartState> {
   late StreamSubscription _subscription;
 
-  ChartBloc() : super(ChartStateInitial()) {
+  ChartBloc(UniqueId id) : super(ChartStateInitial(id)) {
     /// Listen for messages from the websocket.
     _subscription = WebSocketManager().messages.listen((message) {
       add(ChartReceiveMessageEvent(message));
@@ -174,7 +179,46 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
     /// A message is received from the websocket.
     on<ChartReceiveMessageEvent>((event, emit) {
-      onReceiveMesssage(event, emit);
+      if (this.state is ChartStateInitial) {
+        return;
+      }
+      ChartStateLoaded state = this.state as ChartStateLoaded;
+      DataCenter dataCenter = DataCenter();
+      developer.log("received message: ${event.message.keys}, requestId: ${event.message['requestId']}",
+          name: "rubin_chart.workspace");
+      List<String>? splitId = event.message["requestId"]?.split(",");
+      if (splitId == null || splitId.length != 2) {
+        return;
+      }
+      UniqueId windowId = UniqueId.fromString(splitId[0]);
+      SeriesId seriesId = SeriesId.fromString(splitId[1]);
+
+      if (event.message["type"] == "table columns" && windowId == state.id) {
+        developer.log(
+            "received ${event.message["content"]["data"].length} columns for ${event.message["requestId"]}",
+            name: "rubin_chart.workspace");
+        dataCenter.updateSeriesData(
+          series: state.series[seriesId]!,
+          dataSourceName: event.message["content"]["schema"],
+          plotColumns: List<String>.from(event.message["content"]["columns"].map((e) => e)),
+          data: Map<String, List<dynamic>>.from(
+              event.message["content"]["data"].map((key, value) => MapEntry(key, List<dynamic>.from(value)))),
+        );
+        developer.log("dataCenter data: ${dataCenter.seriesIds}", name: "rubin_chart.workspace");
+      }
+      emit(state.copyWith());
+    });
+
+    on<InitializeScatterPlotEvent>((event, emit) {
+      emit(ChartStateLoaded(
+        id: event.id,
+        series: {},
+        axisInfo: event.axisInfo,
+        legend: Legend(),
+        useGlobalQuery: true,
+        chartType: event.chartType,
+        tool: MultiSelectionTool.select,
+      ));
     });
 
     /// Change the selection tool.
@@ -183,30 +227,73 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       emit(state.copyWith(tool: event.tool));
     });
 
+    /// Toggle the use of the global query in this Chart.
+    on<UpdateChartGlobalQueryEvent>((event, emit) {
+      ChartStateLoaded state = this.state as ChartStateLoaded;
+      emit(state.copyWith(useGlobalQuery: event.useGlobalQuery));
+    });
+
+    /// Add a new series to the chart.
+    on<CreateSeriesAction>((event, emit) {
+      ChartStateLoaded state = this.state as ChartStateLoaded;
+
+      Map<SeriesId, SeriesInfo> newSeries = {...state._series};
+      newSeries[event.series.id] = event.series;
+      emit(state.copyWith(series: newSeries));
+    });
+
+    on<UpdateSeriesEvent>((event, emit) {
+      ChartStateLoaded state = this.state as ChartStateLoaded;
+
+      if (event.groupByColumn != null) {
+        throw UnimplementedError("Group by column not yet implemented");
+      } else {
+        // Update the series
+        Map<SeriesId, SeriesInfo> newSeries = {...state._series};
+        newSeries[event.series.id] = event.series;
+
+        // Update the axis labels, if necessary
+        List<ChartAxisInfo> axesInfo = state.axisInfo;
+        for (int i = 0; i < axesInfo.length; i++) {
+          ChartAxisInfo axisInfo = axesInfo[i];
+          // Axis labels are surrounded by <> to indicate that they have not been set yet.
+          if (axisInfo.label.startsWith("<") && axisInfo.label.endsWith(">")) {
+            axesInfo[i] = axisInfo.copyWith(label: event.series.fields.values.toList()[i].name);
+          }
+        }
+        emit(state.copyWith(series: newSeries, axisInfo: axesInfo));
+      }
+      updateSeriesData(
+        series: event.series,
+        globalQuery: event.globalQuery,
+        obsDate: event.obsDate,
+      );
+    });
+
+    /// Update the number of bins for a binned chart.
     on<UpdateBinsEvent>((event, emit) {
       BinnedState state = this.state as BinnedState;
       emit(state.copyWith(nBins: event.nBins));
     });
   }
 
-  onReceiveMesssage(ChartReceiveMessageEvent event, Emitter<ChartState> emit) {
-    if (this.state is ChartStateInitial) {
-      return;
-    }
-    ChartStateLoaded state = this.state as ChartStateLoaded;
-    if (event.message["type"] == "table columns" && event.message["to"] == state.id) {
-      developer.log(
-          "received ${event.message["content"]["data"].length} columns for ${event.message["requestId"]}",
-          name: "rubin_chart.workspace");
-      SeriesId seriesId = SeriesId.fromString(event.message["requestId"] as String);
-      state.dataCenter.updateSeriesData(
-        series: state.series[seriesId]!,
-        dataSourceName: event.message["content"]["schema"],
-        plotColumns: List<String>.from(event.message["content"]["columns"].map((e) => e)),
-        data: Map<String, List<dynamic>>.from(
-            event.message["content"]["data"].map((key, value) => MapEntry(key, List<dynamic>.from(value)))),
-      );
-      developer.log("dataCenter data: ${state.dataCenter.seriesIds}", name: "rubin_chart.workspace");
+  void updateSeriesData({
+    required SeriesInfo series,
+    required String? obsDate,
+    required Query? globalQuery,
+  }) {
+    WebSocketManager websocket = WebSocketManager();
+    if (websocket.isConnected) {
+      ChartStateLoaded state = this.state as ChartStateLoaded;
+      websocket.sendMessage(LoadColumnsCommand.build(
+        seriesId: series.id,
+        fields: series.fields.values.toList(),
+        query: series.query,
+        globalQuery: globalQuery,
+        useGlobalQuery: state.useGlobalQuery,
+        obsDate: obsDate,
+        windowId: state.id,
+      ).toJson());
     }
   }
 
@@ -246,17 +333,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     return mismatched;
   }
 
-  /// Update [ChartLoadedState] when [Series] is updated.
-  ChartStateLoaded addSeries({
-    required SeriesInfo series,
-  }) {
-    ChartStateLoaded state = this.state as ChartStateLoaded;
-
-    Map<SeriesId, SeriesInfo> newSeries = {...state._series};
-    newSeries[series.id] = series;
-    return state.copyWith(series: newSeries);
-  }
-
   BigInt get nextSeriesId {
     ChartStateLoaded state = this.state as ChartStateLoaded;
 
@@ -270,11 +346,11 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
   }
 
   /// Create a new empty Series for this [ChartLoadedState].
-  SeriesInfo nextSeries({required DataCenter dataCenter}) {
+  SeriesInfo nextSeries() {
     ChartStateLoaded state = this.state as ChartStateLoaded;
 
     SeriesId sid = SeriesId(windowId: state.id, id: nextSeriesId);
-    DatabaseSchema database = dataCenter.databases.values.first;
+    DatabaseSchema database = DataCenter().databases.values.first;
     TableSchema table = database.tables.values.first;
     Map<AxisId, SchemaField> fields = {};
     for (int i = 0; i < state.axisInfo.length; i++) {
@@ -311,7 +387,8 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
           theme: workspace.theme,
           series: series,
           isNew: isNew,
-          dataCenter: workspace.dataCenter,
+          workspace: workspace,
+          chartBloc: this,
         ),
       ),
     );
@@ -319,14 +396,17 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
   List<Widget> getDefaultTools(BuildContext context) {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
-    ChartStateLoaded state = this.state as ChartStateLoaded;
+    bool useGlobalQuery = false;
+    if (state is ChartStateLoaded) {
+      useGlobalQuery = (state as ChartStateLoaded).useGlobalQuery;
+    }
     return [
       Tooltip(
         message: "Add a new series to the chart",
         child: IconButton(
           icon: const Icon(Icons.format_list_bulleted_add, color: Colors.green),
           onPressed: () {
-            SeriesInfo newSeries = nextSeries(dataCenter: workspace.dataCenter);
+            SeriesInfo newSeries = nextSeries();
             context.read<ChartBloc>().add(CreateSeriesAction(series: newSeries));
             _editSeries(context, newSeries, true);
           },
@@ -335,12 +415,12 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       Tooltip(
         message: "Use the global query",
         child: IconButton(
-          icon: state.useGlobalQuery
+          icon: useGlobalQuery
               ? const Icon(Icons.travel_explore, color: Colors.green)
               : const Icon(Icons.public_off, color: Colors.grey),
           onPressed: () {
             context.read<ChartBloc>().add(UpdateChartGlobalQueryEvent(
-                  useGlobalQuery: !state.useGlobalQuery,
+                  useGlobalQuery: !useGlobalQuery,
                 ));
           },
         ),
@@ -356,7 +436,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
           child: IconButton(
             icon: const Icon(Icons.close, color: Colors.white),
             onPressed: () {
-              context.read<WorkspaceBloc>().add(RemoveWindowAction(state.id));
+              context.read<WorkspaceBloc>().add(RemoveWindowEvent(state.id));
             },
           ),
         ),

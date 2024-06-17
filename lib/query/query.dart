@@ -256,11 +256,9 @@ class QueryOperation extends Query {
 
 class QueryExpression {
   List<Query> _queries;
-  DataCenter dataCenter;
 
   QueryExpression({
     required List<Query> queries,
-    required this.dataCenter,
   }) : _queries = queries;
 
   List<Query> get queries => [..._queries];

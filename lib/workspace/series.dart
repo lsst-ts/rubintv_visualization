@@ -85,8 +85,8 @@ class SeriesInfo {
   @override
   String toString() => "Series<$id:$name>";
 
-  Series? toSeries(DataCenter dataCenter) {
-    SeriesData? seriesData = dataCenter.getSeriesData(id);
+  Series? toSeries() {
+    SeriesData? seriesData = DataCenter().getSeriesData(id);
     if (seriesData == null) {
       return null;
     }

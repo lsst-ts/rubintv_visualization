@@ -22,6 +22,7 @@ Future<AppVersion> getAppVersion() async {
 
 Future main() async {
   DataCenter dataCenter = DataCenter();
+  dataCenter.initialize();
   await dotenv.load(fileName: ".env");
 
   String host = web.window.location.hostname;
@@ -35,10 +36,9 @@ Future main() async {
     name: 'rubinTV.visualization.main',
   );
 
-  String websocketUrl = Uri.decodeFull(
-      Uri(scheme: protocol, host: host, pathSegments: [address, 'client'], port: port).toString());
+  Uri websocketUrl = Uri(scheme: protocol, host: host, pathSegments: [address, 'client'], port: port);
 
   AppVersion version = await getAppVersion();
 
-  runApp(MainApp(dataCenter: dataCenter, websocketUrl: websocketUrl, version: version));
+  runApp(MainApp(websocketUri: websocketUrl, version: version));
 }

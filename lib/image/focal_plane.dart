@@ -3,13 +3,38 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rubintv_visualization/state/focal_plane.dart';
 import 'package:rubintv_visualization/state/workspace.dart';
+import 'package:rubintv_visualization/workspace/window.dart';
 
-class SelectDetectorAction extends WorkspaceEvent {
+class Instrument {
+  final String name;
+  final List<Detector> detectors;
+
+  Instrument({
+    required this.name,
+    required this.detectors,
+  });
+
+  static Instrument fromJson(Map<String, dynamic> json) {
+    return Instrument(
+      name: json["instrument"],
+      detectors: (json["detectors"] as List).map((detector) {
+        return Detector.fromCorners(
+          id: detector["id"],
+          name: detector["name"],
+          corners: (detector["corners"] as List).map((corner) {
+            return Offset(corner[0], corner[1]);
+          }).toList(),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class SelectDetectorEvent extends WorkspaceEvent {
   final Detector? detector;
 
-  SelectDetectorAction(this.detector);
+  SelectDetectorEvent(this.detector);
 }
 
 class Detector {
@@ -53,14 +78,18 @@ class DetectorPaintInfo {
 typedef FocalPlanePainterCallback = void Function(DetectorPaintInfo info);
 
 class FocalPlaneViewer extends StatefulWidget {
+  final Window window;
   final Instrument instrument;
   final Detector? selectedDetector;
+  final WorkspaceState workspace;
 
   const FocalPlaneViewer({
-    Key? key,
+    super.key,
+    required this.window,
     required this.instrument,
     required this.selectedDetector,
-  }) : super(key: key);
+    required this.workspace,
+  });
 
   @override
   FocalPlaneViewerState createState() => FocalPlaneViewerState();
@@ -71,28 +100,54 @@ class FocalPlaneViewerState extends State<FocalPlaneViewer> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapUp: (TapUpDetails details) {
-        RenderBox renderBox = context.findRenderObject() as RenderBox;
-        Offset localPosition = renderBox.globalToLocal(details.globalPosition);
-        // Check which detector was tapped
-        for (Detector detector in widget.instrument.detectors) {
-          if (_detectorPaintInfo != null &&
-              _detectorPaintInfo!.detectorPaths[detector.id]!.contains(localPosition)) {
-            // Handle tap on the detector
-            context.read<WorkspaceBloc>().add(SelectDetectorAction(detector));
-            return;
-          }
-        }
-        context.read<WorkspaceBloc>().add(SelectDetectorAction(null));
-      },
-      child: CustomPaint(
-        painter: FocalPlanePainter(
-          widget.instrument.detectors,
-          widget.selectedDetector,
-          (info) {
-            _detectorPaintInfo = info;
+    Window focalPlaneWindow =
+        widget.workspace.windows.values.firstWhere((window) => window.type == WindowTypes.focalPlane);
+
+    return ResizableWindow(
+      info: widget.window,
+      toolbar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.redAccent,
+          shape: BoxShape.circle,
+        ),
+        child: Tooltip(
+          message: "Remove chart",
+          child: IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () {
+              context.read<WorkspaceBloc>().add(RemoveWindowEvent(focalPlaneWindow.id));
+            },
+          ),
+        ),
+      ),
+      title: widget.instrument.name,
+      child: SizedBox(
+        width: widget.window.size.width,
+        height: widget.window.size.height,
+        child: GestureDetector(
+          onTapUp: (TapUpDetails details) {
+            RenderBox renderBox = context.findRenderObject() as RenderBox;
+            Offset localPosition = renderBox.globalToLocal(details.globalPosition);
+            // Check which detector was tapped
+            for (Detector detector in widget.instrument.detectors) {
+              if (_detectorPaintInfo != null &&
+                  _detectorPaintInfo!.detectorPaths[detector.id]!.contains(localPosition)) {
+                // Handle tap on the detector
+                context.read<WorkspaceBloc>().add(SelectDetectorEvent(detector));
+                return;
+              }
+            }
+            context.read<WorkspaceBloc>().add(SelectDetectorEvent(null));
           },
+          child: CustomPaint(
+            painter: FocalPlanePainter(
+              widget.instrument.detectors,
+              widget.selectedDetector,
+              (info) {
+                _detectorPaintInfo = info;
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -123,6 +178,7 @@ class FocalPlanePainter extends CustomPainter {
       (size.width / scale - focalPlaneRect.width) / 2,
       (-size.height / scale + focalPlaneRect.height) / 2,
     );
+
     Map<int, Path> detectorPaths = {};
     for (Detector detector in detectors) {
       detectorPaths[detector.id] = _drawDetector(canvas, detector, size, offset, scale);
