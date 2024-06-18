@@ -344,7 +344,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
     });
 
     /// Keep track of the starting drag position
-    on<StartWindowDragEvent>((event, emit) {
+    on<WindowDragStartEvent>((event, emit) {
       WorkspaceState state = this.state as WorkspaceState;
       if (state.interactionInfo != null) {
         state = state.updateInteractionInfo(null);
@@ -369,6 +369,10 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       window = window.copyWith(offset: offset);
       windows[event.windowId] = window;
       emit(state.copyWith(windows: windows));
+    });
+    on<WindowDragEndEvent>((event, emit) {
+      WorkspaceState state = this.state as WorkspaceState;
+      emit(state.updateInteractionInfo(null));
     });
 
     on<StartWindowResize>((event, emit) {
@@ -431,6 +435,11 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       );
       windows[event.windowId] = window;
       emit(state.copyWith(windows: windows));
+    });
+
+    on<EndWindowResize>((event, emit) {
+      WorkspaceState state = this.state as WorkspaceState;
+      emit(state.updateInteractionInfo(null));
     });
   }
 }
@@ -505,7 +514,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   /// Update the selection data points.
   void _onSelectionUpdate(Set<Object> dataPoints) {
-    developer.log("Selection updated: $dataPoints", name: "rubin_chart.workspace");
+    developer.log("Selection updated: ${dataPoints.length}", name: "rubin_chart.workspace");
     /*info.webSocket!.sink.add(SelectDataPointsCommand(
       dataPoints: dataPoints as Set<DataId>,
     ).toJson());*/
@@ -561,19 +570,12 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   Widget buildWindow(Window window, WorkspaceState state) {
     if (window.type == WindowTypes.cartesianScatter || window.type == WindowTypes.polarScatter) {
-      developer.log("Adding scatter plot window", name: "rubin_chart.workspace");
       return ScatterPlotWidget(window: window);
     }
-    if (window.type == WindowTypes.histogram) {
-      developer.log("Adding histogram window", name: "rubin_chart.workspace");
-      return HistogramChart(window: window);
-    }
-    if (window.type == WindowTypes.box) {
-      developer.log("Adding box chart window", name: "rubin_chart.workspace");
-      throw UnimplementedError("Box charts have not been implmented yet");
+    if (window.type == WindowTypes.histogram || window.type == WindowTypes.box) {
+      return BinnedChartWidget(window: window);
     }
     if (window.type == WindowTypes.focalPlane) {
-      developer.log("Adding focal plane window", name: "rubin_chart.workspace");
       return FocalPlaneViewer(
         instrument: state.instrument!,
         selectedDetector: state.detector,

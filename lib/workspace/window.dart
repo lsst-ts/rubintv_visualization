@@ -102,11 +102,11 @@ class WindowResizeInfo extends WindowInteractionInfo {
 }
 
 /// Update when a window is first being dragged.
-class StartWindowDragEvent extends WorkspaceEvent {
+class WindowDragStartEvent extends WorkspaceEvent {
   final UniqueId windowId;
   final DragStartDetails details;
 
-  StartWindowDragEvent({
+  WindowDragStartEvent({
     required this.windowId,
     required this.details,
   });
@@ -124,11 +124,11 @@ class WindowDragUpdate extends WorkspaceEvent {
 }
 
 /// Update when the drag pointer has been removed and the window is no longer being dragged.
-class WindowDragEnd extends WorkspaceEvent {
+class WindowDragEndEvent extends WorkspaceEvent {
   final UniqueId windowId;
   final DragEndDetails details;
 
-  WindowDragEnd({
+  WindowDragEndEvent({
     required this.windowId,
     required this.details,
   });
@@ -296,13 +296,13 @@ class ResizableWindow extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           GestureDetector(
             onPanStart: (DragStartDetails details) {
-              context.read<WorkspaceBloc>().add(StartWindowDragEvent(windowId: info.id, details: details));
+              context.read<WorkspaceBloc>().add(WindowDragStartEvent(windowId: info.id, details: details));
             },
             onPanUpdate: (DragUpdateDetails details) {
               context.read<WorkspaceBloc>().add(WindowDragUpdate(windowId: info.id, details: details));
             },
             onPanEnd: (DragEndDetails details) {
-              context.read<WorkspaceBloc>().add(WindowDragEnd(windowId: info.id, details: details));
+              context.read<WorkspaceBloc>().add(WindowDragEndEvent(windowId: info.id, details: details));
             },
             child: WindowTitle(
               text: title,

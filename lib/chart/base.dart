@@ -221,6 +221,19 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       ));
     });
 
+    on<InitializeBinnedEvent>((event, emit) {
+      emit(BinnedState(
+        id: event.id,
+        series: {},
+        axisInfo: event.axisInfo,
+        legend: Legend(),
+        useGlobalQuery: true,
+        chartType: event.chartType,
+        tool: MultiSelectionTool.select,
+        nBins: 20,
+      ));
+    });
+
     /// Change the selection tool.
     on<UpdateMultiSelect>((event, emit) {
       ChartStateLoaded state = this.state as ChartStateLoaded;

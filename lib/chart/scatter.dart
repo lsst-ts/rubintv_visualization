@@ -30,8 +30,6 @@ class ScatterPlotWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    WorkspaceViewerState workspace = WorkspaceViewer.of(context);
-
     return BlocProvider(
       create: (context) {
         List<ChartAxisInfo> axisInfo = [
@@ -65,14 +63,8 @@ class ScatterPlotWidget extends StatelessWidget {
           }
 
           WorkspaceViewerState workspace = WorkspaceViewer.of(context);
-          SelectionController? selectionController;
-          SelectionController? drillDownController;
-          if (state.useDrillDownController) {
-            drillDownController = workspace.drillDownController;
-          }
-          if (state.useSelectionController) {
-            selectionController = workspace.selectionController;
-          }
+          SelectionController selectionController = workspace.selectionController;
+          SelectionController drillDownController = workspace.drillDownController;
 
           return ResizableWindow(
             info: window,

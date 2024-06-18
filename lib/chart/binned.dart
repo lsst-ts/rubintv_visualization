@@ -10,6 +10,18 @@ import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/series.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 
+class InitializeBinnedEvent extends ChartEvent {
+  final UniqueId id;
+  final List<ChartAxisInfo> axisInfo;
+  final WindowTypes chartType;
+
+  InitializeBinnedEvent({
+    required this.id,
+    required this.axisInfo,
+    required this.chartType,
+  });
+}
+
 class BinnedState extends ChartStateLoaded {
   int nBins;
 
@@ -48,10 +60,10 @@ class BinnedState extends ChartStateLoaded {
       );
 }
 
-class HistogramChart extends StatelessWidget {
+class BinnedChartWidget extends StatelessWidget {
   final Window window;
 
-  const HistogramChart({
+  const BinnedChartWidget({
     super.key,
     required this.window,
   });
@@ -59,7 +71,26 @@ class HistogramChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => ChartBloc(window.id),
+      create: (context) {
+        List<ChartAxisInfo> axisInfo = [
+          ChartAxisInfo(
+            label: "<x>",
+            axisId: AxisId(AxisLocation.bottom),
+          ),
+        ];
+        if (window.type == WindowTypes.box) {
+          axisInfo.add(ChartAxisInfo(
+            label: "<y>",
+            axisId: AxisId(AxisLocation.left),
+          ));
+        }
+        return ChartBloc(window.id)
+          ..add(InitializeBinnedEvent(
+            id: window.id,
+            axisInfo: axisInfo,
+            chartType: window.type,
+          ));
+      },
       child: BlocBuilder<ChartBloc, ChartState>(
         builder: (context, state) {
           if (state is! BinnedState) {
@@ -67,8 +98,7 @@ class HistogramChart extends StatelessWidget {
             return ResizableWindow(
                 info: window,
                 title: "loading...",
-                toolbar:
-                    Row(children: [const Spacer(), ...context.read<ChartBloc>().getDefaultTools(context)]),
+                toolbar: Row(children: [...context.read<ChartBloc>().getDefaultTools(context)]),
                 child: const Center(
                   child: CircularProgressIndicator(),
                 ));
@@ -115,13 +145,21 @@ class HistogramChart extends StatelessWidget {
             ]),
             title: null,
             child: RubinChart(
-              info: HistogramInfo(
-                id: window.id,
-                allSeries: state.allSeries,
-                legend: state.legend,
-                axisInfo: state.axisInfo,
-                nBins: state.nBins,
-              ),
+              info: window.type == WindowTypes.histogram
+                  ? HistogramInfo(
+                      id: window.id,
+                      allSeries: state.allSeries,
+                      legend: state.legend,
+                      axisInfo: state.axisInfo,
+                      nBins: state.nBins,
+                    )
+                  : BoxChartInfo(
+                      id: window.id,
+                      allSeries: state.allSeries,
+                      legend: state.legend,
+                      axisInfo: state.axisInfo,
+                      nBins: state.nBins,
+                    ),
               selectionController: selectionController,
               drillDownController: drillDownController,
             ),
