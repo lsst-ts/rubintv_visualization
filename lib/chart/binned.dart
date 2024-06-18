@@ -63,10 +63,12 @@ class BinnedState extends ChartStateLoaded {
 class BinnedChartWidget extends StatelessWidget {
   final Window window;
 
-  const BinnedChartWidget({
+  BinnedChartWidget({
     super.key,
     required this.window,
   });
+
+  final TextEditingController _binController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -113,10 +115,25 @@ class BinnedChartWidget extends StatelessWidget {
           if (state.useSelectionController) {
             selectionController = workspace.selectionController;
           }
+          _binController.text = state.nBins.toString();
 
           return ResizableWindow(
             info: window,
             toolbar: Row(children: [
+              SizedBox(
+                  width: 50,
+                  child: TextField(
+                    controller: _binController,
+                    decoration: const InputDecoration(
+                      labelText: "bins",
+                    ),
+                    onSubmitted: (String value) {
+                      int? nBins = int.tryParse(value);
+                      if (nBins != null && nBins > 0) {
+                        context.read<ChartBloc>().add(UpdateBinsEvent(nBins));
+                      }
+                    },
+                  )),
               SegmentedButton<MultiSelectionTool>(
                 selected: {state.tool},
                 segments: [
@@ -127,11 +144,6 @@ class BinnedChartWidget extends StatelessWidget {
                   ButtonSegment(
                     value: MultiSelectionTool.drillDown,
                     icon: Icon(MultiSelectionTool.drillDown.icon,
-                        color: workspace.theme.themeData.primaryColor),
-                  ),
-                  ButtonSegment(
-                    value: MultiSelectionTool.dateTimeSelect,
-                    icon: Icon(MultiSelectionTool.dateTimeSelect.icon,
                         color: workspace.theme.themeData.primaryColor),
                   ),
                 ],

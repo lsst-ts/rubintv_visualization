@@ -32,17 +32,34 @@ class ScatterPlotWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) {
-        List<ChartAxisInfo> axisInfo = [
-          ChartAxisInfo(
-            label: "<x>",
-            axisId: AxisId(AxisLocation.bottom),
-          ),
-          ChartAxisInfo(
-            label: "<y>",
-            axisId: AxisId(AxisLocation.left),
-            isInverted: true,
-          ),
-        ];
+        List<ChartAxisInfo> axisInfo = [];
+        if (window.type == WindowTypes.cartesianScatter) {
+          axisInfo = [
+            ChartAxisInfo(
+              label: "<x>",
+              axisId: AxisId(AxisLocation.bottom),
+            ),
+            ChartAxisInfo(
+              label: "<y>",
+              axisId: AxisId(AxisLocation.left),
+              isInverted: true,
+            ),
+          ];
+        } else if (window.type == WindowTypes.polarScatter) {
+          axisInfo = [
+            ChartAxisInfo(
+              label: "<r>",
+              axisId: AxisId(AxisLocation.radial),
+            ),
+            ChartAxisInfo(
+              label: "<θ>",
+              axisId: AxisId(AxisLocation.angular),
+              isInverted: true,
+            ),
+          ];
+        } else {
+          throw Exception("Invalid window type: ${window.type}");
+        }
         return ChartBloc(window.id)
           ..add(InitializeScatterPlotEvent(
             id: window.id,
@@ -83,11 +100,11 @@ class ScatterPlotWidget extends StatelessWidget {
                       icon: Icon(MultiSelectionTool.drillDown.icon,
                           color: workspace.theme.themeData.primaryColor),
                     ),
-                    ButtonSegment(
+                    /*ButtonSegment(
                       value: MultiSelectionTool.dateTimeSelect,
                       icon: Icon(MultiSelectionTool.dateTimeSelect.icon,
                           color: workspace.theme.themeData.primaryColor),
-                    ),
+                    ),*/
                   ],
                   onSelectionChanged: (Set<MultiSelectionTool> selection) {
                     MultiSelectionTool tool = selection.first;
