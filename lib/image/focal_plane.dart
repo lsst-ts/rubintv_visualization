@@ -9,24 +9,29 @@ import 'package:rubintv_visualization/workspace/window.dart';
 class Instrument {
   final String name;
   final List<Detector> detectors;
+  final String? schema;
 
   Instrument({
     required this.name,
     required this.detectors,
+    this.schema,
   });
 
   static Instrument fromJson(Map<String, dynamic> json) {
     return Instrument(
       name: json["instrument"],
-      detectors: (json["detectors"] as List).map((detector) {
-        return Detector.fromCorners(
-          id: detector["id"],
-          name: detector["name"],
-          corners: (detector["corners"] as List).map((corner) {
-            return Offset(corner[0], corner[1]);
-          }).toList(),
-        );
-      }).toList(),
+      detectors: (json["detectors"] as List).map(
+        (detector) {
+          return Detector.fromCorners(
+            id: detector["id"],
+            name: detector["name"],
+            corners: (detector["corners"] as List).map((corner) {
+              return Offset(corner[0], corner[1]);
+            }).toList(),
+          );
+        },
+      ).toList(),
+      schema: json.containsKey("schema") ? json["schema"]["name"] : null,
     );
   }
 }

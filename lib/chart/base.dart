@@ -393,6 +393,8 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
   Future<void> _editSeries(BuildContext context, SeriesInfo series, isNew) async {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
+    developer.log(
+        "DataCenter keys: ${DataCenter().databases.keys}, instrument: ${workspace.info?.instrument?.name}");
     return showDialog(
       context: context,
       builder: (BuildContext context) => Dialog(
@@ -402,6 +404,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
           isNew: isNew,
           workspace: workspace,
           chartBloc: this,
+          databaseSchema: DataCenter().databases[workspace.info!.instrument!.schema]!,
         ),
       ),
     );

@@ -1,7 +1,6 @@
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/chart/base.dart';
 import 'package:rubintv_visualization/query/query.dart';
@@ -19,6 +18,7 @@ class SeriesEditor extends StatefulWidget {
   final bool isNew;
   final WorkspaceViewerState workspace;
   final ChartBloc chartBloc;
+  final DatabaseSchema databaseSchema;
 
   const SeriesEditor({
     super.key,
@@ -26,6 +26,7 @@ class SeriesEditor extends StatefulWidget {
     required this.series,
     required this.workspace,
     required this.chartBloc,
+    required this.databaseSchema,
     this.isNew = false,
   });
 
@@ -113,6 +114,7 @@ class SeriesEditorState extends State<SeriesEditor> {
                 }
                 return null;
               },
+              databaseSchema: widget.databaseSchema,
             ),
             const SizedBox(height: 10),
             /*DropdownButtonFormField<String>(
@@ -178,6 +180,7 @@ class SeriesEditorState extends State<SeriesEditor> {
 
 class ColumnEditorFormField extends FormField<Map<AxisId, SchemaField?>> {
   final AppTheme theme;
+  final DatabaseSchema databaseSchema;
 
   ColumnEditorFormField({
     super.key,
@@ -185,6 +188,7 @@ class ColumnEditorFormField extends FormField<Map<AxisId, SchemaField?>> {
     required FormFieldSetter<Map<AxisId, SchemaField?>> onSaved,
     required FormFieldValidator<Map<AxisId, SchemaField?>> validator,
     required Map<AxisId, SchemaField?> initialValue,
+    required this.databaseSchema,
     bool autovalidate = false,
   }) : super(
             onSaved: onSaved,
@@ -212,6 +216,7 @@ class ColumnEditorFormField extends FormField<Map<AxisId, SchemaField?>> {
                                 fields[axisId] = field;
                                 formState.didChange(fields);
                               },
+                              databaseSchema: databaseSchema,
                             )));
                   },
                 ),
@@ -223,12 +228,14 @@ class ColumnEditor extends StatefulWidget {
   final AppTheme theme;
   final ValueChanged<SchemaField?> onChanged;
   final SchemaField? initialValue;
+  final DatabaseSchema databaseSchema;
 
   const ColumnEditor({
     super.key,
     required this.theme,
     required this.onChanged,
     required this.initialValue,
+    required this.databaseSchema,
   });
 
   @override
@@ -252,7 +259,6 @@ class ColumnEditorState extends State<ColumnEditor> {
     }
   }
 
-  DatabaseSchema? _database;
   TableSchema? _table;
   SchemaField? _field;
 
@@ -260,7 +266,6 @@ class ColumnEditorState extends State<ColumnEditor> {
   Widget build(BuildContext context) {
     if (_field != null) {
       _table = _field!.schema;
-      _database = _table!.database;
     }
 
     List<DropdownMenuItem<DatabaseSchema>> databaseEntries = DataCenter()
@@ -272,10 +277,9 @@ class ColumnEditorState extends State<ColumnEditor> {
     List<DropdownMenuItem<TableSchema>> tableEntries = [];
     List<DropdownMenuItem<SchemaField>> columnEntries = [];
 
-    if (_database != null) {
-      tableEntries =
-          _database!.tables.entries.map((e) => DropdownMenuItem(value: e.value, child: Text(e.key))).toList();
-    }
+    tableEntries = widget.databaseSchema.tables.entries
+        .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
+        .toList();
 
     if (_table != null) {
       columnEntries =
@@ -286,23 +290,6 @@ class ColumnEditorState extends State<ColumnEditor> {
       mainAxisAlignment: MainAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        DropdownButtonFormField<DatabaseSchema>(
-          decoration: const InputDecoration(
-            labelText: "Database",
-            border: OutlineInputBorder(),
-          ),
-          value: _database,
-          items: databaseEntries,
-          onChanged: (DatabaseSchema? newDatabase) {
-            setState(() {
-              _database = newDatabase;
-              _table = _database!.tables.values.first;
-              _field = _table!.fields.values.first;
-            });
-            widget.onChanged(_field);
-          },
-        ),
-        const SizedBox(height: 10),
         DropdownButtonFormField<TableSchema>(
           decoration: const InputDecoration(
             labelText: "Table",
