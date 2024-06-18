@@ -407,7 +407,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     );
   }
 
-  List<Widget> getDefaultTools(BuildContext context) {
+  List<Widget> getDefaultTools(BuildContext context, StreamController<ResetChartAction> resetController) {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
     bool useGlobalQuery = false;
     if (state is ChartStateLoaded) {
@@ -435,6 +435,16 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
             context.read<ChartBloc>().add(UpdateChartGlobalQueryEvent(
                   useGlobalQuery: !useGlobalQuery,
                 ));
+          },
+        ),
+      ),
+      const SizedBox(width: 10),
+      Tooltip(
+        message: "Reset the chart",
+        child: IconButton(
+          icon: const Icon(Icons.refresh, color: Colors.green),
+          onPressed: () {
+            resetController.add(ResetChartAction());
           },
         ),
       ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
@@ -23,10 +24,12 @@ class InitializeScatterPlotEvent extends ChartEvent {
 class ScatterPlotWidget extends StatelessWidget {
   final Window window;
 
-  const ScatterPlotWidget({
+  ScatterPlotWidget({
     super.key,
     required this.window,
   });
+
+  final StreamController<ResetChartAction> resetController = StreamController<ResetChartAction>.broadcast();
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +77,8 @@ class ScatterPlotWidget extends StatelessWidget {
             return ResizableWindow(
               info: window,
               title: "loading...",
-              toolbar: Row(children: [...context.read<ChartBloc>().getDefaultTools(context)]),
+              toolbar:
+                  Row(children: [...context.read<ChartBloc>().getDefaultTools(context, resetController)]),
               child: const Center(child: CircularProgressIndicator()),
             );
           }
@@ -112,7 +116,7 @@ class ScatterPlotWidget extends StatelessWidget {
                     context.read<ChartBloc>().add(UpdateMultiSelect(selection.first));
                   },
                 ),
-                ...context.read<ChartBloc>().getDefaultTools(context)
+                ...context.read<ChartBloc>().getDefaultTools(context, resetController),
               ],
             ),
             title: null,
@@ -134,6 +138,7 @@ class ScatterPlotWidget extends StatelessWidget {
                     ),
               selectionController: selectionController,
               drillDownController: drillDownController,
+              resetController: resetController,
             ),
           );
         },

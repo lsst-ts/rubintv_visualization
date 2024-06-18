@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
@@ -69,6 +70,7 @@ class BinnedChartWidget extends StatelessWidget {
   });
 
   final TextEditingController _binController = TextEditingController();
+  final StreamController<ResetChartAction> resetController = StreamController<ResetChartAction>.broadcast();
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +102,8 @@ class BinnedChartWidget extends StatelessWidget {
             return ResizableWindow(
                 info: window,
                 title: "loading...",
-                toolbar: Row(children: [...context.read<ChartBloc>().getDefaultTools(context)]),
+                toolbar:
+                    Row(children: [...context.read<ChartBloc>().getDefaultTools(context, resetController)]),
                 child: const Center(
                   child: CircularProgressIndicator(),
                 ));
@@ -153,7 +156,7 @@ class BinnedChartWidget extends StatelessWidget {
                   context.read<ChartBloc>().add(UpdateMultiSelect(selection.first));
                 },
               ),
-              ...context.read<ChartBloc>().getDefaultTools(context)
+              ...context.read<ChartBloc>().getDefaultTools(context, resetController)
             ]),
             title: null,
             child: RubinChart(
@@ -174,6 +177,7 @@ class BinnedChartWidget extends StatelessWidget {
                     ),
               selectionController: selectionController,
               drillDownController: drillDownController,
+              resetController: resetController,
             ),
           );
         },
