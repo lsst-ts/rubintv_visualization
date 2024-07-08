@@ -1,3 +1,24 @@
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'dart:async';
 import 'dart:developer' as developer;
 
@@ -11,14 +32,21 @@ import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/theme.dart';
 import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/controller.dart';
-import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/chart/series.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 
+/// The global query parameters
 class GlobalQuery {
+  /// The global query.
   final Query? query;
+
+  /// The global observation date.
   final String? dayObs;
+
+  /// The current instrument being analyzed.
   final Instrument? instrument;
+
+  /// The current detector that is selected.
   final Detector? detector;
 
   GlobalQuery({
@@ -29,9 +57,12 @@ class GlobalQuery {
   });
 }
 
+/// An event to update the workspace state.
 abstract class WorkspaceEvent {}
 
+/// Initialize the workspace.
 class InitializeWorkspaceEvent extends WorkspaceEvent {
+  /// The theme of the app.
   final AppTheme theme;
 
   InitializeWorkspaceEvent(this.theme);
@@ -39,6 +70,7 @@ class InitializeWorkspaceEvent extends WorkspaceEvent {
 
 /// A message received via the websocket.
 class ReceiveMessageEvent extends WorkspaceEvent {
+  /// The message received.
   final Map<String, dynamic> message;
 
   ReceiveMessageEvent(this.message);
@@ -46,6 +78,7 @@ class ReceiveMessageEvent extends WorkspaceEvent {
 
 /// Update the global query.
 class UpdateGlobalQueryEvent extends WorkspaceEvent {
+  /// The new global query.
   final Query? globalQuery;
 
   UpdateGlobalQueryEvent({
@@ -55,6 +88,7 @@ class UpdateGlobalQueryEvent extends WorkspaceEvent {
 
 /// Update the global observation date.
 class UpdateGlobalObsDateEvent extends WorkspaceEvent {
+  /// The new observation date.
   final DateTime? dayObs;
 
   UpdateGlobalObsDateEvent({required this.dayObs});
@@ -62,6 +96,7 @@ class UpdateGlobalObsDateEvent extends WorkspaceEvent {
 
 /// Add a new [CartesianPlot] to the [WorkspaceViewer].
 class CreateNewWindowEvent extends WorkspaceEvent {
+  /// The type of window to create.
   final WindowTypes windowType;
 
   CreateNewWindowEvent({
@@ -69,6 +104,7 @@ class CreateNewWindowEvent extends WorkspaceEvent {
   });
 }
 
+/// Notify the [WorkspaceViewer] to show the full focal plane.
 class ShowFocalPlaneEvent extends WorkspaceEvent {
   ShowFocalPlaneEvent();
 }
@@ -169,6 +205,7 @@ class WorkspaceState extends WorkspaceStateBase {
       theme: theme,
       interactionInfo: interactionInfo);
 
+  /// Update the interaction info.
   WorkspaceState updateInteractionInfo(WindowInteractionInfo? interactionInfo) => WorkspaceState(
       windows: windows,
       instrument: instrument,
@@ -255,6 +292,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       add(ReceiveMessageEvent(message));
     });
 
+    /// Initialize the workspace.
     on<InitializeWorkspaceEvent>((event, emit) {
       emit(WorkspaceState(
         windows: {},
@@ -378,6 +416,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       emit(state.updateInteractionInfo(interactionInfo));
     });
 
+    /// Update the position of a window.
     on<WindowDragUpdate>((event, emit) {
       WorkspaceState state = this.state as WorkspaceState;
       if (state.interactionInfo is! WindowDragInfo) {
@@ -391,11 +430,14 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       windows[event.windowId] = window;
       emit(state.copyWith(windows: windows));
     });
+
+    /// End the drag interaction.
     on<WindowDragEndEvent>((event, emit) {
       WorkspaceState state = this.state as WorkspaceState;
       emit(state.updateInteractionInfo(null));
     });
 
+    /// Start a window resize interaction.
     on<StartWindowResize>((event, emit) {
       WorkspaceState state = this.state as WorkspaceState;
       if (state.interactionInfo != null) {
@@ -411,6 +453,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       emit(state.updateInteractionInfo(interactionInfo));
     });
 
+    /// Update the window size during a resize interaction.
     on<UpdateWindowResize>((event, emit) {
       WorkspaceState state = this.state as WorkspaceState;
       if (state.interactionInfo is! WindowResizeInfo) {
@@ -458,30 +501,17 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       emit(state.copyWith(windows: windows));
     });
 
+    /// End the window resize interaction.
     on<EndWindowResize>((event, emit) {
       WorkspaceState state = this.state as WorkspaceState;
       emit(state.updateInteractionInfo(null));
     });
   }
 
+  /// Cancel the subscription to the websocket.
   @override
   Future<void> close() async {
     await _subscription.cancel();
     return super.close();
-  }
-}
-
-class SelectDataPointsCommand {
-  final Set<DataId> dataPoints;
-
-  SelectDataPointsCommand({
-    required this.dataPoints,
-  });
-
-  Map<String, dynamic> toJson() {
-    return {
-      "type": "select data points",
-      "dataPoints": dataPoints.map((e) => e.toJson()).toList(),
-    };
   }
 }

@@ -1,4 +1,24 @@
-import 'dart:developer' as developer;
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -7,19 +27,33 @@ import 'package:rubintv_visualization/focal_plane/instrument.dart';
 import 'package:rubintv_visualization/workspace/state.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 
+/// Information about the paths of the detectors on the focal plane.
 class DetectorPaintInfo {
+  /// The paths of the detectors on the focal plane.
   final Map<int, Path> detectorPaths;
 
   DetectorPaintInfo(this.detectorPaths);
 }
 
+/// A callback function that is called when the painting of the focal plane is complete.
 typedef FocalPlanePainterCallback = void Function(DetectorPaintInfo info);
 
+/// A [StatefulWidget] that displays the focal plane of an instrument.
 class FocalPlaneViewer extends StatefulWidget {
+  /// The window that contains the viewer.
   final Window window;
+
+  /// The instrument to display.
   final Instrument instrument;
+
+  /// The selected detector.
   final Detector? selectedDetector;
+
+  /// The workspace state.
   final WorkspaceState workspace;
+
+  /// The colors of the detectors.
+  /// If not specified, the detectors will be blue, and the selected detector will be red.
   final Map<int, Color>? detectorColors;
 
   const FocalPlaneViewer({
@@ -35,7 +69,9 @@ class FocalPlaneViewer extends StatefulWidget {
   FocalPlaneViewerState createState() => FocalPlaneViewerState();
 }
 
+/// The state of the [FocalPlaneViewer].
 class FocalPlaneViewerState extends State<FocalPlaneViewer> {
+  /// The information about the detectors on the focal plane.
   DetectorPaintInfo? _detectorPaintInfo;
 
   @override
@@ -71,11 +107,21 @@ class FocalPlaneViewerState extends State<FocalPlaneViewer> {
   }
 }
 
+/// A [CustomPainter] that paints the focal plane of an instrument.
 class FocalPlanePainter extends CustomPainter {
+  /// The detectors on the focal plane.
   final List<Detector> detectors;
+
+  /// Callback for when the painting is complete.
   final FocalPlanePainterCallback onPaintComplete;
+
+  /// The bounding box of the focal plane.
   late final Rect focalPlaneRect;
+
+  /// The selected detector.
   final Detector? selectedDetector;
+
+  /// The colors of the detectors.
   final Map<int, Color>? detectorColors;
 
   FocalPlanePainter(this.detectors, this.selectedDetector, this.onPaintComplete, this.detectorColors) {
@@ -87,6 +133,7 @@ class FocalPlanePainter extends CustomPainter {
     focalPlaneRect = Rect.fromLTRB(left, top, right, bottom);
   }
 
+  /// Paint the detectors on the focal plane.
   @override
   void paint(Canvas canvas, Size size) {
     double scale = math.min(size.width / focalPlaneRect.width, size.height / focalPlaneRect.height);
@@ -106,6 +153,7 @@ class FocalPlanePainter extends CustomPainter {
     onPaintComplete(DetectorPaintInfo(detectorPaths));
   }
 
+  /// Draw a detector on the focal plane.
   Path _drawDetector(Canvas canvas, Detector detector, Size size, Offset offset, double scale) {
     Color detectorColor = selectedDetector?.id == detector.id ? Colors.red : Colors.blue;
     if (detectorColors != null) {
@@ -122,6 +170,7 @@ class FocalPlanePainter extends CustomPainter {
     return path;
   }
 
+  /// Draw the information about a detector on the focal plane.
   void _drawDetectorInfo(Canvas canvas, Detector detector, Size size, Offset offset, double scale) {
     TextPainter textPainter = TextPainter(
       maxLines: 2,

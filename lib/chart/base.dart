@@ -1,3 +1,24 @@
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'dart:async';
 import 'dart:developer' as developer;
 
@@ -72,50 +93,66 @@ class UpdateSeriesEvent extends ChartEvent {
   });
 }
 
+/// Update the number of bins in a binned chart.
 class UpdateBinsEvent extends ChartEvent {
   final int nBins;
 
   UpdateBinsEvent(this.nBins);
 }
 
+/// Update the [ChartAxisInfo] for a chart.
 class UpdateAxisInfoEvent extends ChartEvent {
   final ChartAxisInfo axisInfo;
 
   UpdateAxisInfoEvent(this.axisInfo);
 }
 
+/// Reset the chart.
 class ResetChartEvent extends ChartEvent {
   final ChartResetTypes type;
   ResetChartEvent(this.type);
 }
 
+/// State of a chart.
 abstract class ChartState {
+  /// All charts have a [UniqueId].
   UniqueId id;
 
   ChartState(this.id);
 }
 
+/// Initial state of a chart.
 class ChartStateInitial extends ChartState {
   ChartStateInitial(super.id);
 }
 
 /// Persistable information to generate a chart
 class ChartStateLoaded extends ChartState {
+  /// The series that are plotted on the chart.
   final Map<SeriesId, SeriesInfo> _series;
+
+  /// The legend displayed on the chart.
   final Legend? legend;
+
+  /// Information about the chart axes.
   final List<ChartAxisInfo> _axisInfo;
 
   /// Whether or not to use the global query for all series in this [ChartLoadedState].
   final bool useGlobalQuery;
 
-  //final DataCenter dataCenter;
-
+  /// The type of chart to display.
   final WindowTypes chartType;
 
+  /// The selection tool to use for this chart.
   final MultiSelectionTool tool;
 
+  /// A controller for resetting the chart.
+  /// This is required since rubin_chart keeps parameters like the axis bounds
+  /// and the data plots plotted hidden in the state and it doesn't always
+  /// know when to reset them.
   final StreamController<ResetChartAction> resetController;
 
+  /// Whether or not this chart needs a reset.
   bool needsReset;
 
   ChartStateLoaded({
@@ -132,8 +169,10 @@ class ChartStateLoaded extends ChartState {
         _axisInfo = List<ChartAxisInfo>.unmodifiable(axisInfo),
         super(id);
 
+  /// Whether or not to use a selection controller.
   bool get useSelectionController => tool == MultiSelectionTool.select;
 
+  /// Whether or not to use a drill down controller.
   bool get useDrillDownController => tool == MultiSelectionTool.drillDown;
 
   /// Return a copy of the internal [Map] of [SeriesInfo], to prevent updates.
@@ -142,6 +181,7 @@ class ChartStateLoaded extends ChartState {
   /// Return a copy of the internal [List] of [ChartAxisInfo], to prevent updates.
   List<ChartAxisInfo> get axisInfo => [..._axisInfo];
 
+  /// Make a copy of this [ChartStateLoaded] with the given parameters updated.
   ChartStateLoaded copyWith({
     UniqueId? id,
     Map<SeriesId, SeriesInfo>? series,
@@ -171,6 +211,7 @@ class ChartStateLoaded extends ChartState {
   /// Whether or not at least one [Series] has been initialized.
   bool get hasSeries => _series.isNotEmpty;
 
+  /// Get a list of all of the [Series] in the chart.
   List<Series> get allSeries {
     List<Series> allSeries = [];
     for (SeriesInfo seriesInfo in _series.values) {
@@ -183,8 +224,12 @@ class ChartStateLoaded extends ChartState {
   }
 }
 
+/// The base class for all chart blocs.
 class ChartBloc extends Bloc<ChartEvent, ChartState> {
+  /// Subscription to the websocket.
   late StreamSubscription _subscription;
+
+  /// Subscription to changes in the global query or global dayObs values.
   late StreamSubscription _globalQuerySubscription;
 
   ChartBloc(UniqueId id) : super(ChartStateInitial(id)) {
@@ -193,6 +238,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       add(ChartReceiveMessageEvent(message));
     });
 
+    /// Reload the data if the global query or global dayObs changes.
     _globalQuerySubscription = ControlCenter().globalQueryStream.listen((GlobalQuery? query) {
       if (state is ChartStateLoaded) {
         ChartStateLoaded state = this.state as ChartStateLoaded;
@@ -212,8 +258,8 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         return;
       }
       ChartStateLoaded state = this.state as ChartStateLoaded;
-      /*developer.log("received message: ${event.message.keys}, requestId: ${event.message['requestId']}",
-          name: "rubin_chart.workspace");*/
+      //developer.log("received message: ${event.message.keys}, requestId: ${event.message['requestId']}",
+      //    name: "rubin_chart.workspace");
       List<String>? splitId = event.message["requestId"]?.split(",");
       if (splitId == null || splitId.length != 2) {
         return;
@@ -222,6 +268,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       SeriesId seriesId = SeriesId.fromString(splitId[1]);
 
       if (event.message["type"] == "table columns" && windowId == state.id) {
+        // Process the results of a LoadColumnsCommand.
         int rows = event.message["content"]["data"].values.first.length;
         int columns = event.message["content"]["data"].length;
         developer.log("received $columns columns and $rows rows for ${event.message["requestId"]}",
@@ -237,6 +284,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       emit(state.copyWith());
     });
 
+    /// Initialize a scatter plot.
     on<InitializeScatterPlotEvent>((event, emit) {
       emit(ChartStateLoaded(
         id: event.id,
@@ -250,6 +298,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       ));
     });
 
+    /// Initialize a binned chart.
     on<InitializeBinnedEvent>((event, emit) {
       emit(BinnedState(
         id: event.id,
@@ -276,6 +325,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       emit(state.copyWith(useGlobalQuery: event.useGlobalQuery));
     });
 
+    /// A Series in the chart is updated. This will trigger a reload of the data from the remote server.
     on<UpdateSeriesEvent>((event, emit) {
       ChartStateLoaded state = this.state as ChartStateLoaded;
 
@@ -297,6 +347,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         }
         emit(state.copyWith(series: newSeries, axisInfo: axesInfo));
       }
+      // Load the data from the server.
       _fetchSeriesData(
         series: event.series,
         globalQuery: event.globalQuery,
@@ -310,6 +361,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       emit(state.copyWith(nBins: event.nBins));
     });
 
+    /// Update the axis information for a chart.
     on<UpdateAxisInfoEvent>((event, emit) {
       ChartStateLoaded state = this.state as ChartStateLoaded;
       List<ChartAxisInfo> newAxisInfo = state.axisInfo.map((ChartAxisInfo info) {
@@ -321,6 +373,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       emit(state.copyWith(axisInfo: newAxisInfo, needsReset: true));
     });
 
+    /// Reset the chart.
     on<ResetChartEvent>((event, emit) {
       if (state is ChartStateLoaded) {
         ChartStateLoaded state = this.state as ChartStateLoaded;
@@ -330,6 +383,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     });
   }
 
+  /// Request data from the server for a series.
   void _fetchSeriesData({
     required SeriesInfo series,
     required String? dayObs,
@@ -386,6 +440,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     return mismatched;
   }
 
+  /// Get the next series ID for this [ChartLoadedState].
   BigInt get nextSeriesId {
     ChartStateLoaded state = this.state as ChartStateLoaded;
 
@@ -417,6 +472,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     );
   }
 
+  /// Get the maximum number of axes for this chart.
   int get nMaxAxes {
     ChartStateLoaded state = this.state as ChartStateLoaded;
     if (state.chartType == WindowTypes.histogram) {
@@ -431,7 +487,8 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     throw UnimplementedError("Unknown chart type: ${state.chartType}");
   }
 
-  Future<void> _editSeries(BuildContext context, SeriesInfo series, isNew) async {
+  /// Open the [SeriesEditor] dialog to edit a series.
+  Future<void> _editSeries(BuildContext context, SeriesInfo series) async {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
     developer.log("New series fields: ${series.fields}", name: "rubin_chart.core.chart.dart");
     return showDialog(
@@ -440,7 +497,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         child: SeriesEditor(
           theme: workspace.theme,
           series: series,
-          isNew: isNew,
           workspace: workspace,
           chartBloc: this,
           databaseSchema: DataCenter().databases[workspace.info!.instrument!.schema]!,
@@ -449,16 +505,20 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     );
   }
 
+  /// The action to perform when a [Series] entry in a chart [Legend] is selected.
+  /// This will open the [SeriesEditor] dialog to edit the series.
   void onLegendSelect({required Series series, required BuildContext context}) {
     ChartStateLoaded state = this.state as ChartStateLoaded;
     for (SeriesId seriesId in state.series.keys) {
       if (seriesId == series.id) {
-        _editSeries(context, state.series[seriesId]!, false);
+        _editSeries(context, state.series[seriesId]!);
       }
     }
     throw ArgumentError("Series not found in chart");
   }
 
+  /// The action to perform when an [Axis] entry in a chart [Legend] is selected.
+  /// This will open the [AxisEditor] dialog to edit the axis properties.
   void onAxisTap({required AxisId axisId, required BuildContext context}) {
     ChartStateLoaded state = this.state as ChartStateLoaded;
     for (ChartAxisInfo axisInfo in state.axisInfo) {
@@ -479,6 +539,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     throw ArgumentError("Axis not found in chart");
   }
 
+  /// Get the default widgets for the toolbar of all charts.
   List<Widget> getDefaultTools(BuildContext context) {
     bool useGlobalQuery = false;
     if (state is ChartStateLoaded) {
@@ -491,7 +552,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
           icon: const Icon(Icons.format_list_bulleted_add, color: Colors.green),
           onPressed: () {
             SeriesInfo newSeries = nextSeries();
-            _editSeries(context, newSeries, true);
+            _editSeries(context, newSeries);
           },
         ),
       ),

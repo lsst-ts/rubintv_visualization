@@ -1,3 +1,24 @@
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
@@ -9,14 +30,17 @@ import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/chart/series.dart';
 
+/// Unique ID of the next dataset
 int _nextDataset = 0;
 
+/// Names of tables with exposure data
 const List<String> kExposureTables = [
   "exposure",
   "ccdexposure",
   "ccdexposure_camera",
 ];
 
+/// Names of tables with single visit exposure data
 const List<String> kVisit1Tables = [
   "visit1",
   "visit1_quicklook",
@@ -24,6 +48,7 @@ const List<String> kVisit1Tables = [
   "ccdvisit1_quicklook",
 ];
 
+/// Names of tables with CCD data
 const List<String> kCcdTables = [
   "ccdexposure",
   "ccdexposure_camera",
@@ -31,15 +56,18 @@ const List<String> kCcdTables = [
   "ccdvisit1_quicklook",
 ];
 
+/// An exception thrown when there is an issue with data access.
 class DataAccessException implements IOException {
   DataAccessException(this.message);
 
+  /// The message associated with the exception.
   String? message;
 
   @override
   String toString() => "$runtimeType:\n\t$message";
 }
 
+/// Convert a string into a [ColumnDataType].
 ColumnDataType? dataTypeFromString(String dataType) {
   switch (dataType) {
     case "char":
@@ -74,25 +102,31 @@ DateTime convertRubinDate(String date) {
   return dateFromString(date);
 }
 
-const Map<Type, ColumnDataType> _typeToDataType = {
-  String: ColumnDataType.string,
-  int: ColumnDataType.number,
-  double: ColumnDataType.number,
-  DateTime: ColumnDataType.dateTime,
-};
-
+/// Convert a [ColumnDataType] into a [Type].
 const Map<ColumnDataType, Type> _dataTypeToType = {
   ColumnDataType.string: String,
   ColumnDataType.number: double,
   ColumnDataType.dateTime: DateTime,
 };
 
+/// A field in a database table.
 class SchemaField {
+  /// The name of the field.
   final String name;
+
+  /// The data type of the field.
   final ColumnDataType dataType;
+
+  /// The unit of the field.
   final String? unit;
+
+  /// The description of the field.
   final String? description;
+
+  /// The schema that contains the [SchemaField].
   late final TableSchema schema;
+
+  /// The bounds of the field.
   final Bounds? bounds;
 
   SchemaField({
@@ -121,15 +155,22 @@ class SchemaField {
   /// Whether or not the field is a date/time.
   bool get isDateTime => dataType == ColumnDataType.dateTime;
 
+  /// The [Type] of the field.
   Type get type => _dataTypeToType[dataType]!;
 }
 
-typedef ExtremaCallback<T> = bool Function(T lhs, T rhs);
-
+/// A table schema.
 class TableSchema {
+  /// The name of the table.
   final String name;
+
+  /// The name of the primary key of the table.
   final String indexKey;
+
+  /// The fields in the table.
   final Map<String, SchemaField> fields;
+
+  /// The database that contains the [TableSchema].
   late final DatabaseSchema database;
 
   TableSchema({required this.name, required this.indexKey, required this.fields}) {
@@ -139,9 +180,16 @@ class TableSchema {
   }
 }
 
+/// A data source.
+/// For example this could be a database, a Butler instance, or an EFD client.
 abstract class DataSource {
+  /// The unique ID of the [DataSource].
   final int id;
+
+  /// The name of the [DataSource].
   final String name;
+
+  /// The description of the [DataSource].
   final String description;
 
   DataSource({
@@ -151,6 +199,7 @@ abstract class DataSource {
   }) : id = id ?? _nextDataset++;
 }
 
+/// A database schema.
 class DatabaseSchema extends DataSource {
   final Map<String, TableSchema> tables;
 
@@ -169,8 +218,12 @@ class DatabaseSchema extends DataSource {
   String toString() => "Database<$name>";
 }
 
+/// A Butler instance.
 class Butler extends DataSource {
+  /// Repo of the Butler
   final String repo;
+
+  /// Collections to load data from
   final List<String> collections;
 
   Butler({
@@ -182,7 +235,9 @@ class Butler extends DataSource {
   });
 }
 
+/// An EFD client.
 class EfdClient extends DataSource {
+  /// Connection string of the EFD client
   final String connectionString;
 
   EfdClient({
@@ -193,8 +248,8 @@ class EfdClient extends DataSource {
   });
 }
 
-class DataCenterUpdate {}
-
+/// A data center that contains all of the data for the workspace,
+/// allowing the individual widgets to have immutable states with low memory usage.
 class DataCenter {
   /// Make the [DataCenter] a singleton.
   static final DataCenter _singleton = DataCenter._internal();
@@ -205,12 +260,22 @@ class DataCenter {
   /// The private [DataCenter] constructor.
   DataCenter._internal();
 
+  /// The [StreamSubscription] to listen for messages from the [WebSocketManager].
   late StreamSubscription _subscription;
+
+  /// The databases in the [DataCenter].
   final Map<String, DatabaseSchema> _databaseSchemas = {};
+
+  /// The butlers in the [DataCenter].
   final Map<String, Butler> butlers = {};
+
+  /// The EFD client.
   EfdClient? efdClient;
+
+  /// Data for all of the series in the [DataCenter].
   final Map<SeriesId, SeriesData> _seriesData = {};
 
+  /// Subscribe to the [WebSocketManager] messages.
   void initialize() {
     _subscription = WebSocketManager().messages.listen((Map<String, dynamic> message) {
       developer.log("DataCenter received message: ${message['type']}", name: "rubinTV.workspace.data");
@@ -220,12 +285,16 @@ class DataCenter {
     });
   }
 
+  /// Get the map of databases.
   Map<String, DatabaseSchema> get databases => {..._databaseSchemas};
 
+  /// Get data for a series with the given [SeriesId].
   SeriesData? getSeriesData(SeriesId id) => _seriesData[id];
 
+  /// Get the set of series IDs.
   Set<SeriesId> get seriesIds => _seriesData.keys.toSet();
 
+  /// Add a new database schema to the [DataCenter].
   void addDatabaseSchema(Map<String, dynamic> schemaDict) {
     if (!schemaDict.containsKey("name")) {
       String msg = "Schema does not contain a name";
@@ -242,6 +311,7 @@ class DataCenter {
     }
 
     try {
+      // Add the tables to the database schema
       Map<String, TableSchema> tables = {};
       for (Map<String, dynamic> tableDict in schemaDict["tables"]) {
         List<SchemaField> fields = [];
@@ -276,6 +346,7 @@ class DataCenter {
         tables[tableDict["name"]!] = schema;
       }
 
+      // Create the DatabaseSchema
       DatabaseSchema database =
           DatabaseSchema(name: schemaDict["name"], description: schemaDict["description"], tables: tables);
       _databaseSchemas[database.name] = database;
@@ -294,6 +365,7 @@ class DataCenter {
     }
   }
 
+  /// Update the data for a series.
   void updateSeriesData({
     required String dataSourceName,
     required SeriesInfo series,
@@ -369,8 +441,12 @@ class DataCenter {
   }
 }
 
+/// DataId for an entry in the exposure or visit table
 class DataId {
+  /// The sequence number of the data point.
   final int seqNum;
+
+  /// The observation day of the data point.
   final int dayObs;
 
   const DataId({required this.seqNum, required this.dayObs});
@@ -381,8 +457,10 @@ class DataId {
   @override
   int get hashCode => seqNum.hashCode ^ dayObs.hashCode;
 
+  /// Convert the [DataId] to a JSON string.
   String toJson() => jsonEncode({"seq_num": seqNum, "day_obs": dayObs});
 
+  /// Create a [DataId] from a JSON string.
   @override
   String toString() => "DataId($seqNum, $dayObs)";
 }

@@ -1,13 +1,41 @@
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'package:rubintv_visualization/focal_plane/color_picker.dart';
 
+/// The orientation of the colorbar.
 enum ColorbarOrientation { horizontal, vertical }
 
+/// A stop on the colorbar.
 class ColorbarStop {
+  /// The unique identifier of the stop.
   final int id;
+
+  /// The value of the stop.
   double value;
+
+  /// The color of the stop.
   Color color;
 
   ColorbarStop({required this.id, required this.value, required this.color});
@@ -18,9 +46,15 @@ class ColorbarStop {
   }
 }
 
+/// The state of the colorbar.
 class ColorbarState {
+  /// The minimum value of the colorbar.
   final double min;
+
+  /// The maximum value of the colorbar.
   final double max;
+
+  /// The stops on the colorbar.
   final Map<int, ColorbarStop> stops;
 
   ColorbarState({
@@ -30,14 +64,25 @@ class ColorbarState {
   });
 }
 
+/// A callback function that is called when the state of the colorbar changes.
 typedef ColorbarStateCallback = void Function(ColorbarState state);
 
+/// A controller for the colorbar.
 class ColorbarController {
+  /// The minimum value of the colorbar.
   double _min;
+
+  /// The maximum value of the colorbar.
   double _max;
+
+  /// The stops on the colorbar.
   final Map<int, ColorbarStop> _stops;
+
+  /// The next unique identifier for a stop.
   int _nextId = 0;
-  List<ColorbarStateCallback> _observers = [];
+
+  /// The observers of the colorbar.
+  final List<ColorbarStateCallback> _observers = [];
 
   ColorbarController({
     required double min,
@@ -47,6 +92,7 @@ class ColorbarController {
         _min = min,
         _max = max {
     assert(stops.length >= 2, 'At least 2 stops are required');
+    // Add stops in order
     stops.forEach((key, value) {
       addStop(key, value);
     });
@@ -55,6 +101,7 @@ class ColorbarController {
     }
   }
 
+  /// Get the color for a given value.
   Color getColor(double value) {
     List<ColorbarStop> sortedStops = _getSortedStops();
     if (value <= sortedStops.first.value) return sortedStops.first.color;
@@ -72,6 +119,7 @@ class ColorbarController {
     return sortedStops.last.color;
   }
 
+  /// Add a stop to the colorbar.
   int addStop(double value, Color color) {
     if (value < min) {
       value = min;
@@ -85,6 +133,7 @@ class ColorbarController {
     return id;
   }
 
+  /// Update a stop on the colorbar.
   void updateStop(int id, double newValue, Color newColor) {
     if (_stops.containsKey(id)) {
       ColorbarStop stop = _stops[id]!;
@@ -94,10 +143,12 @@ class ColorbarController {
     }
   }
 
+  /// Remove a stop from the colorbar.
   void removeStop(int id) {
     _stops.remove(id);
   }
 
+  /// Update the bounds of the colorbar.
   void updateBounds({required double min, required double max, bool adjustStops = true}) {
     if (adjustStops) {
       double oldRange = _max - _min;
@@ -113,28 +164,37 @@ class ColorbarController {
     notifyObservers();
   }
 
+  /// Get the number of stops on the colorbar.
   int get stopCount => _stops.length;
 
+  /// Get the stops on the colorbar.
   LinkedHashMap<int, ColorbarStop> get stops {
     return LinkedHashMap.fromEntries(
         _stops.entries.toList()..sort((a, b) => a.value.value.compareTo(b.value.value)));
   }
 
+  /// Get the stops on the colorbar sorted by value.
   List<ColorbarStop> _getSortedStops() {
     return _stops.values.toList()..sort((a, b) => a.value.compareTo(b.value));
   }
 
+  /// Get the minimum and maximum values of the colorbar.
   double get min => _min;
+
+  /// Get the minimum and maximum values of the colorbar.
   double get max => _max;
 
+  /// Subscribe to changes in the colorbar.
   void subscribe(ColorbarStateCallback observer) {
     _observers.add(observer);
   }
 
+  /// Unsubscribe from changes in the colorbar.
   void unsubscribe(ColorbarStateCallback observer) {
     _observers.remove(observer);
   }
 
+  /// Notify observers of changes in the colorbar.
   void notifyObservers() {
     final state = ColorbarState(min: _min, max: _max, stops: _stops);
     for (ColorbarStateCallback observer in _observers) {
@@ -143,13 +203,27 @@ class ColorbarController {
   }
 }
 
+/// A slider for selecting colors on a colorbar.
 class ColorbarSlider extends StatefulWidget {
+  /// The controller for the colorbar.
   final ColorbarController controller;
+
+  /// Callback for when the colorbar changes.
   final ValueChanged<Map<int, ColorbarStop>>? onChanged;
+
+  /// Callback for when the colorbar change starts.
   final ValueChanged<Map<int, ColorbarStop>>? onChangeStart;
+
+  /// Callback for when the colorbar change ends.
   final ValueChanged<Map<int, ColorbarStop>>? onChangeEnd;
+
+  /// Whether to show labels on the colorbar.
   final bool showLabels;
+
+  /// The orientation of the colorbar.
   final ColorbarOrientation orientation;
+
+  /// Whether to flip the minimum and maximum values of the colorbar.
   final bool flipMinMax;
 
   const ColorbarSlider({
@@ -167,8 +241,12 @@ class ColorbarSlider extends StatefulWidget {
   ColorbarSliderState createState() => ColorbarSliderState();
 }
 
+/// The state of the colorbar slider.
 class ColorbarSliderState extends State<ColorbarSlider> {
+  /// The size of the stop handles.
   final double _handleSize = 20;
+
+  /// The radius of the stop handles.
   double get _handleRadius => _handleSize / 2;
 
   @override
@@ -228,7 +306,9 @@ class ColorbarSliderState extends State<ColorbarSlider> {
     );
   }
 
+  /// Build a handle for a stop on the colorbar.
   Widget _buildHandle(ColorbarStop stop, Size size) {
+    /// The position of the handle.
     final Offset position = _getPositionForValue(stop.value, size);
 
     return Positioned(
@@ -273,6 +353,7 @@ class ColorbarSliderState extends State<ColorbarSlider> {
     );
   }
 
+  /// Get the position of a handle for a given value.
   Offset _getPositionForValue(double value, Size size) {
     final percent = (value - widget.controller.min) / (widget.controller.max - widget.controller.min);
     final adjustedPercent = widget.flipMinMax ? 1 - percent : percent;
@@ -282,12 +363,14 @@ class ColorbarSliderState extends State<ColorbarSlider> {
         : Offset(size.width / 2, size.height * (1 - adjustedPercent) + _handleRadius);
   }
 
+  /// Call the onChangeState callback when a pan gesture on a handle starts.
   void _handlePanStart(ColorbarStop stop) {
     if (widget.onChangeStart != null) {
       widget.onChangeStart!(widget.controller.stops);
     }
   }
 
+  /// Update the colorbar when a pan gesture on a handle updates.
   void _handlePanUpdate(ColorbarStop stop, DragUpdateDetails details, Size size) {
     final RenderBox renderBox = context.findRenderObject() as RenderBox;
     final position = renderBox.globalToLocal(details.globalPosition);
@@ -307,6 +390,7 @@ class ColorbarSliderState extends State<ColorbarSlider> {
     }
   }
 
+  /// Update the colorbar when a pan gesture on a handle ends.
   void _handlePanEnd(ColorbarStop stop) {
     if (widget.onChangeEnd != null) {
       widget.onChangeEnd!(widget.controller.stops);
@@ -314,10 +398,18 @@ class ColorbarSliderState extends State<ColorbarSlider> {
   }
 }
 
+/// Draw the colorbar on a [Canvas].
 class ColorbarPainter extends CustomPainter {
+  /// The controller for the colorbar.
   final ColorbarController controller;
+
+  /// Whether to show labels on the colorbar.
   final bool showLabels;
+
+  /// The orientation of the colorbar.
   final ColorbarOrientation orientation;
+
+  /// Whether to flip the minimum and maximum values of the colorbar.
   final bool flipMinMax;
 
   ColorbarPainter({
@@ -327,6 +419,7 @@ class ColorbarPainter extends CustomPainter {
     required this.flipMinMax,
   });
 
+  /// Paint the colorbar on the canvas.
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
@@ -357,6 +450,7 @@ class ColorbarPainter extends CustomPainter {
     }
   }
 
+  /// Draw a label for the stop.
   void _drawLabel(Canvas canvas, Size size, double value) {
     final textSpan = TextSpan(
       text: value.toStringAsFixed(2),
@@ -376,6 +470,7 @@ class ColorbarPainter extends CustomPainter {
     textPainter.paint(canvas, offset);
   }
 
+  /// Get the position of a handle for a given value.
   Offset _getPositionForValue(double value, Size size) {
     final percent = (value - controller.min) / (controller.max - controller.min);
     final adjustedPercent = flipMinMax ? 1 - percent : percent;
@@ -385,6 +480,7 @@ class ColorbarPainter extends CustomPainter {
         : Offset(size.width / 2, size.height * (1 - adjustedPercent));
   }
 
+  /// Determine if the colorbar needs to be repainted.
   @override
   bool shouldRepaint(ColorbarPainter oldDelegate) {
     return oldDelegate.controller != controller ||

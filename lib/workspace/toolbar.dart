@@ -1,3 +1,24 @@
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,12 +33,11 @@ import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/viewer.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 
-class ToolbarAction extends WorkspaceEvent {
-  ToolbarAction();
-}
-
+/// A [Widget] used to display a toolbar at the top of the workspace.
 class DatePickerWidget extends StatefulWidget {
+  /// The date to display in the date picker.
   final DateTime? dayObs;
+
   const DatePickerWidget({
     super.key,
     required this.dayObs,
@@ -27,7 +47,9 @@ class DatePickerWidget extends StatefulWidget {
   DatePickerWidgetState createState() => DatePickerWidgetState();
 }
 
+/// A [State] object for the [DatePickerWidget].
 class DatePickerWidgetState extends State<DatePickerWidget> {
+  /// The currently selected date.
   DateTime? selectedDate;
 
   @override
@@ -91,8 +113,11 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
   }
 }
 
+/// A [Widget] used to display the toolbar at the top of the workspace.
 class Toolbar extends StatefulWidget {
+  /// The [WorkspaceState] object to use for the toolbar.
   final WorkspaceState workspace;
+
   const Toolbar({super.key, required this.workspace});
 
   @override
@@ -110,6 +135,7 @@ Color _getStatusIndicator(bool isConnected, bool hasInstrument) {
   }
 }
 
+/// The [State] of the [Toolbar] widget.
 class ToolbarState extends State<Toolbar> {
   WorkspaceState get workspace => widget.workspace;
 

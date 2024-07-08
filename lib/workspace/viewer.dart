@@ -1,3 +1,24 @@
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
@@ -14,7 +35,10 @@ import 'package:rubintv_visualization/workspace/window.dart';
 
 /// A [Widget] used to display a set of re-sizable and translatable [Window] widgets in a container.
 class WorkspaceViewer extends StatefulWidget {
+  /// The size of the widget.
   final Size size;
+
+  /// The theme to use for the workspace.
   final AppTheme theme;
 
   const WorkspaceViewer({
@@ -48,10 +72,12 @@ class WorkspaceViewer extends StatefulWidget {
   }
 }
 
+/// The state of the [WorkspaceViewer] widget.
 class WorkspaceViewerState extends State<WorkspaceViewer> {
   AppTheme get theme => widget.theme;
   Size get size => widget.size;
 
+  /// The current state of the workspace.
   WorkspaceState? info;
 
   @override
@@ -67,9 +93,6 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
   /// matched to obs_date,seq_num data IDs.
   void _onSelectionUpdate(Set<Object> dataPoints) {
     developer.log("Selection updated: ${dataPoints.length}", name: "rubin_chart.workspace");
-    /*info.webSocket!.sink.add(SelectDataPointsCommand(
-      dataPoints: dataPoints as Set<DataId>,
-    ).toJson());*/
   }
 
   @override
@@ -117,6 +140,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
     );
   }
 
+  /// Build a window widget based on the type of the window.
   Widget buildWindow(Window window, WorkspaceState state) {
     if (window.type == WindowTypes.cartesianScatter || window.type == WindowTypes.polarScatter) {
       return ScatterPlotWidget(window: window);

@@ -1,3 +1,24 @@
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
@@ -11,14 +32,24 @@ import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/chart/series.dart';
 import 'package:rubintv_visualization/workspace/viewer.dart';
 
+/// A callback function that is called when the series query is updated.
 typedef SeriesQueryCallback = void Function(Query? query);
 
+/// A [Widget] used to edit a [SeriesInfo] object.
 class SeriesEditor extends StatefulWidget {
+  /// The [AppTheme] used to style the editor.
   final AppTheme theme;
+
+  /// The [SeriesInfo] object to edit.
   final SeriesInfo series;
-  final bool isNew;
+
+  /// The [WorkspaceViewerState] object that contains the series.
   final WorkspaceViewerState workspace;
+
+  /// The [ChartBloc] used to update the series.
   final ChartBloc chartBloc;
+
+  /// The [DatabaseSchema] used to populate the editor.
   final DatabaseSchema databaseSchema;
 
   const SeriesEditor({
@@ -28,13 +59,13 @@ class SeriesEditor extends StatefulWidget {
     required this.workspace,
     required this.chartBloc,
     required this.databaseSchema,
-    this.isNew = false,
   });
 
   @override
   SeriesEditorState createState() => SeriesEditorState();
 }
 
+/// The [State] object for the [SeriesEditor] widget.
 class SeriesEditorState extends State<SeriesEditor> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
@@ -54,10 +85,12 @@ class SeriesEditorState extends State<SeriesEditor> {
     nameController.text = series.name;
   }
 
+  /// Update the series query.
   void updateQuery(Query? query) {
     series = series.copyWith(query: query);
   }
 
+  /// Update a column in the series.
   void updateColumn(SchemaField? column, int index) {
     Map<AxisId, SchemaField> fields = {...series.fields};
     AxisId key = fields.keys.toList()[fields.values.toList().indexOf(column!)];
@@ -178,8 +211,12 @@ class SeriesEditorState extends State<SeriesEditor> {
   }
 }
 
+/// A [FormField] used to edit a collection columns in a series.
 class ColumnEditorFormField extends FormField<Map<AxisId, SchemaField?>> {
+  /// The [AppTheme] used to style the editor.
   final AppTheme theme;
+
+  /// The [DatabaseSchema] used to populate the editor.
   final DatabaseSchema databaseSchema;
 
   ColumnEditorFormField({
@@ -224,10 +261,18 @@ class ColumnEditorFormField extends FormField<Map<AxisId, SchemaField?>> {
             });
 }
 
+/// A [StatefulWidget] used to edit a column in a series.
 class ColumnEditor extends StatefulWidget {
+  /// The [AppTheme] used to style the editor.
   final AppTheme theme;
+
+  /// A callback function that is called when the column is updated.
   final ValueChanged<SchemaField?> onChanged;
+
+  /// The initial value of the column.
   final SchemaField initialValue;
+
+  /// The [DatabaseSchema] used to populate the editor.
   final DatabaseSchema databaseSchema;
 
   const ColumnEditor({
@@ -242,6 +287,7 @@ class ColumnEditor extends StatefulWidget {
   ColumnEditorState createState() => ColumnEditorState();
 }
 
+/// The [State] object for the [ColumnEditor] widget.
 class ColumnEditorState extends State<ColumnEditor> {
   AppTheme get theme => widget.theme;
 
@@ -259,7 +305,10 @@ class ColumnEditorState extends State<ColumnEditor> {
     }
   }
 
+  /// The current table schema.
   TableSchema? _table;
+
+  /// The current column field.
   SchemaField? _field;
 
   @override
@@ -271,8 +320,11 @@ class ColumnEditorState extends State<ColumnEditor> {
     List<DropdownMenuItem<TableSchema>> tableEntries = [];
     List<DropdownMenuItem<SchemaField>> columnEntries = [];
 
+    // We don't allow the user to select from the CCD tables because the DataIds of visits/exposures
+    // are the same for all detectors, which means they cannot be properly searched.
     tableEntries = widget.databaseSchema.tables.entries
         .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
+        .where((e) => (!kCcdTables.contains(e.value!.name)))
         .toList();
 
     if (_table != null) {

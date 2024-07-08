@@ -1,3 +1,24 @@
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 
@@ -81,6 +102,7 @@ class QueryError implements Exception {
   String toString() => "$runtimeType:\n\t$message";
 }
 
+/// A query that can be used to filter data.
 abstract class Query {
   UniqueId id;
   QueryOperation? parent;
@@ -182,17 +204,14 @@ class EqualityQuery extends Query {
       throw QueryError("EqualityQuery has no left or right value!");
     }
   }
-
-  /*static EqualityQuery fromDict(Map<String, dynamic> dict) {
-    return EqualityQuery(
-      id: UniqueId.fromString(dict["id"]),
-      leftValue: Query.fromDict()
-    );
-  }*/
 }
 
+/// A query that combines two or more queries with a boolean operator.
 class QueryOperation extends Query {
+  /// The queries to combine.
   final List<Query> _children;
+
+  /// The operator to combine the queries.
   QueryOperator operator;
 
   QueryOperation({
@@ -206,18 +225,22 @@ class QueryOperation extends Query {
     }
   }
 
+  /// The children of this query.
   List<Query> get children => [..._children];
 
+  /// Remove a child from this query.
   void removeChild(Query child) {
     _children.remove(child);
     child.parent = null;
   }
 
+  /// Add a child to this query.
   void addChild(Query child) {
     _children.add(child);
     child.parent = this;
   }
 
+  /// Add multiple children to this query.
   void addAllChildren(List<Query> children) {
     _children.addAll(children);
     for (Query child in children) {
@@ -241,6 +264,7 @@ class QueryOperation extends Query {
     return result;
   }
 
+  /// Create a [QueryOperation] from a dictionary.
   static QueryOperation fromDict(Map<String, dynamic> dict) {
     List<Query> children = [];
     for (Map<String, dynamic> child in dict["content"]["children"]) {
@@ -254,24 +278,30 @@ class QueryOperation extends Query {
   }
 }
 
+/// A query that combines two or more queries with a boolean operator.
 class QueryExpression {
-  List<Query> _queries;
+  /// The queries in the expression.
+  final List<Query> _queries;
 
   QueryExpression({
     required List<Query> queries,
   }) : _queries = queries;
 
+  /// The queries in the expression.
   List<Query> get queries => [..._queries];
 
+  /// Remove a query from the expression.
   void removeQuery(Query query) {
     _queries.remove(query);
   }
 
+  /// Add a query to the expression.
   void addQuery(Query query) {
     _queries.add(query);
     query.parent = null;
   }
 
+  /// Add multiple queries to the expression.
   void addAllQueries(List<Query> queries) {
     _queries.addAll(queries);
     for (Query query in queries) {

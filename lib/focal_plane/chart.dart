@@ -1,3 +1,24 @@
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
@@ -17,9 +38,14 @@ import 'package:rubintv_visualization/workspace/state.dart';
 import 'package:rubintv_visualization/workspace/viewer.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 
+/// Playback speed in milliseconds.
 const int kDefaultPlaybackSpeed = 500;
+
+/// factor to multiply the playback speed by.
 const double kPlaybackSpeedStep = 1.25;
 
+/// Create an empty [ChartAxis].
+/// This is required for the color map slider, and is just a dummy axis.
 ChartAxis _createEmptyAxis(ChartAxisInfo axisInfo, ChartTheme theme) {
   return NumericalChartAxis(
     info: axisInfo,
@@ -35,18 +61,33 @@ ChartAxis _createEmptyAxis(ChartAxisInfo axisInfo, ChartTheme theme) {
   );
 }
 
-String formatDate(int dateNumber) {
+/// Format the obsDate (an integer of the form YYYYMMDD) as a string.
+String formatObsDate(int dateNumber) {
   String dateString = dateNumber.toString().padLeft(8, '0');
   return '${dateString.substring(0, 4)}-${dateString.substring(4, 6)}-${dateString.substring(6)}';
 }
 
+/// An event in a [FocalPlaneChartBloc].
 abstract class FocalPlaneChartEvent {}
 
+/// An event to initialize the focal plane chart.
 class InitializeFocalPlaneChartEvent extends FocalPlaneChartEvent {
+  /// The unique identifier of the chart.
   final UniqueId id;
+
+  /// The series information.
   final SeriesInfo series;
+
+  /// The axis of the column being displayed.
+  /// (required for bounds and to map the value of the column to a double).
   final ChartAxis dataAxis;
+
+  /// The colorbar controller.
   final ColorbarController colorbarController;
+
+  /// The global dayObs.
+  /// If this is null no global dayObs is used and the chart can only be updated
+  /// when points are selected in other charts.
   final String? dayObs;
 
   InitializeFocalPlaneChartEvent({
@@ -58,15 +99,23 @@ class InitializeFocalPlaneChartEvent extends FocalPlaneChartEvent {
   });
 }
 
+/// An event when a message has been received from the websocket.
 class FocalPlaneReceiveMessageEvent extends FocalPlaneChartEvent {
+  /// The message received.
   final Map<String, dynamic> message;
 
   FocalPlaneReceiveMessageEvent(this.message);
 }
 
+/// An event to update the column being displayed.
 class FocalPlaneUpdateColumnEvent extends FocalPlaneChartEvent {
+  /// The field to plot.
   final SchemaField field;
+
+  /// The global dayObs.
   final String? dayObs;
+
+  /// The selected data points.
   final Set<DataId> selected;
 
   FocalPlaneUpdateColumnEvent({
@@ -76,44 +125,80 @@ class FocalPlaneUpdateColumnEvent extends FocalPlaneChartEvent {
   });
 }
 
+/// An event to update the data index.
 class FocalPlaneUpdateDataIndexEvent extends FocalPlaneChartEvent {
+  /// The new index.
   final int index;
 
   FocalPlaneUpdateDataIndexEvent(this.index);
 }
 
+/// An event to increase the data index.
 class FocalPlaneIncreaseDataIndexEvent extends FocalPlaneChartEvent {}
 
+/// An event to update the playback speed.
 class FocalPlaneUpdatePlaybackSpeedEvent extends FocalPlaneChartEvent {
   final double speed;
 
   FocalPlaneUpdatePlaybackSpeedEvent(this.speed);
 }
 
+/// An event to start the timer.
 class FocalPlaneStartTimerEvent extends FocalPlaneChartEvent {}
 
+/// An event to stop the timer.
 class FocalPlaneStopTimerEvent extends FocalPlaneChartEvent {}
 
+/// An event when a new tick is received.
 class FocalPlaneTickEvent extends FocalPlaneChartEvent {}
 
+/// An event to toggle the loop playback.
 class FocalPlaneToggleLoopEvent extends FocalPlaneChartEvent {}
 
+/// The state of a [FocalPlaneChartBloc].
 abstract class FocalPlaneChartState {}
 
+/// The initial state of a [FocalPlaneChartBloc].
 class FocalPlaneChartStateInitial extends FocalPlaneChartState {}
 
+/// The loaded state of a [FocalPlaneChartBloc].
 class FocalPlaneChartStateLoaded extends FocalPlaneChartState {
+  /// The unique identifier of the chart.
   UniqueId id;
+
+  /// The series information.
   SeriesInfo series;
+
+  /// The axis of the selected column.
   ChartAxis dataAxis;
+
+  /// The axis of the "detector" value.
+  /// We use the color axis, but really it isn't a color at all, it's the index of the detector
+  /// in the focal plane.
   ChartAxisInfo detectorAxisInfo = ChartAxisInfo(label: "Detector", axisId: AxisId(AxisLocation.color));
+
+  /// The data for each detector
   Map<DataId, Map<int, dynamic>> data;
+
+  /// The list of data ids that can be cycled through.
   List<DataId> dataIds;
+
+  /// The index of the current data point.
   int dataIndex;
+
+  /// The colorbar controller.
   ColorbarController colorbarController;
+
+  /// The playback speed.
   double playbackSpeed;
+
+  /// Whether the playback is currently playing.
   bool isPlaying;
+
+  /// Whether the playback should loop.
   bool loopPlayback;
+
+  /// The global dayObs.
   String? dayObs;
 
   FocalPlaneChartStateLoaded({
@@ -130,6 +215,7 @@ class FocalPlaneChartStateLoaded extends FocalPlaneChartState {
     required this.dayObs,
   });
 
+  /// Copy the state with new values.
   FocalPlaneChartStateLoaded copyWith({
     UniqueId? id,
     SeriesInfo? series,
@@ -157,13 +243,22 @@ class FocalPlaneChartStateLoaded extends FocalPlaneChartState {
         dayObs: dayObs ?? this.dayObs,
       );
 
+  /// Get the data axis id.
   AxisId get dataAxisId => dataAxis.info.axisId;
 }
 
+/// A bloc to manage the state of a focal plane chart.
 class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartState> {
+  /// The subscription to the websocket.
   late StreamSubscription _websocketSubscription;
+
+  /// The subscription to the global query stream.
   late StreamSubscription _globalQuerySubscription;
+
+  /// The play timer.
   Timer? _playTimer;
+
+  /// The selection timer.
   Timer? _selectionTimer;
 
   FocalPlaneChartBloc() : super(FocalPlaneChartStateInitial()) {
@@ -171,6 +266,8 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       add(FocalPlaneReceiveMessageEvent(message));
     });
 
+    /// Subscribe to the selection controller to update the chart when points are selected.
+    /// We use a timer so that we don't load data until the selection has stopped
     ControlCenter().selectionController.subscribe((Set<Object> dataPoints) {
       if (this.state is! FocalPlaneChartStateLoaded) {
         return;
@@ -186,6 +283,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       });
     });
 
+    /// Subscribe to the global query stream to update the chart when the query changes.
     _globalQuerySubscription = ControlCenter().globalQueryStream.listen((GlobalQuery? query) {
       if (state is FocalPlaneChartStateLoaded) {
         FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
@@ -202,6 +300,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       }
     });
 
+    /// Initialize the chart.
     on<InitializeFocalPlaneChartEvent>((event, emit) {
       ColorbarController colorbarController = event.colorbarController;
       emit(FocalPlaneChartStateLoaded(
@@ -219,6 +318,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       ));
     });
 
+    /// Process data received from the websocket.
     on<FocalPlaneReceiveMessageEvent>((event, emit) {
       if (this.state is FocalPlaneChartStateInitial) {
         return;
@@ -239,6 +339,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       }
     });
 
+    /// Update the Series and fetch the data.
     on<FocalPlaneUpdateColumnEvent>((event, emit) {
       FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       final String tableName = event.field.schema.name;
@@ -272,11 +373,13 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       emit(state.copyWith(series: newSeries));
     });
 
+    /// Update the data index.
     on<FocalPlaneUpdateDataIndexEvent>((event, emit) {
       FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       emit(state.copyWith(dataIndex: event.index));
     });
 
+    /// Increase the data index.
     on<FocalPlaneIncreaseDataIndexEvent>((event, emit) {
       FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       if (state.dataIndex < state.dataIds.length - 1) {
@@ -284,6 +387,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       }
     });
 
+    /// Update the playback speed.
     on<FocalPlaneUpdatePlaybackSpeedEvent>((event, emit) {
       FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       emit(state.copyWith(playbackSpeed: event.speed));
@@ -292,6 +396,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       }
     });
 
+    /// Start the playback timer, which increases the [dataIndex] periodically.
     on<FocalPlaneStartTimerEvent>((event, emit) {
       _createTimer();
       FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
@@ -302,6 +407,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       emit(state.copyWith(isPlaying: true, dataIndex: dataIndex));
     });
 
+    /// Stop the playback timer.
     on<FocalPlaneStopTimerEvent>((event, emit) {
       FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       _playTimer?.cancel();
@@ -309,6 +415,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       emit(state.copyWith(isPlaying: false));
     });
 
+    /// Update the data index when a tick is received.
     on<FocalPlaneTickEvent>((event, emit) {
       FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       if (state.dataIndex < state.dataIds.length - 1) {
@@ -321,12 +428,14 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       }
     });
 
+    /// Toggle the loop playback.
     on<FocalPlaneToggleLoopEvent>((event, emit) {
       FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       emit(state.copyWith(loopPlayback: !state.loopPlayback));
     });
   }
 
+  /// Create the playback timer.
   void _createTimer() {
     FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
     _playTimer?.cancel();
@@ -336,6 +445,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
     });
   }
 
+  /// Update the series data.
   FocalPlaneChartStateLoaded? _updateSeriesData(FocalPlaneReceiveMessageEvent event) {
     // Extract result
     FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
@@ -343,10 +453,13 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
     int columns = event.message["content"]["data"].length;
     developer.log("received $columns columns and $rows rows for ${event.message["requestId"]}",
         name: "rubin_chart.workspace");
+
     if (rows > 0) {
+      // Extract the data from the message
       Map<String, List<dynamic>> allData = Map<String, List<dynamic>>.from(
           event.message["content"]["data"].map((key, value) => MapEntry(key, List<dynamic>.from(value))));
 
+      // Extract the dataID and the data
       Map<DataId, Map<int, dynamic>> data = {};
       List<dynamic> dynamicData = [];
       for (int i = 0; i < rows; i++) {
@@ -403,6 +516,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
     return null;
   }
 
+  /// Request the data for the series from the server.
   void _fetchSeriesData({
     required SeriesInfo series,
     Set<DataId>? selected,
@@ -424,15 +538,22 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
     }
   }
 
+  /// Close the bloc.
   @override
   Future<void> close() {
     _websocketSubscription.cancel();
+    _globalQuerySubscription.cancel();
     return super.close();
   }
 }
 
+/// A viewer for the focal plane chart.
 class FocalPlaneChartViewer extends StatefulWidget {
+  /// The window to display the chart in.
   final Window window;
+
+  /// The state of the entire workspace.
+  /// (used to get the detector and global dayObs)
   final WorkspaceState workspace;
 
   const FocalPlaneChartViewer({
@@ -445,10 +566,12 @@ class FocalPlaneChartViewer extends StatefulWidget {
   FocalPlaneChartViewerState createState() => FocalPlaneChartViewerState();
 }
 
+/// The state of the [FocalPlaneChartViewer].
 class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
   Window get window => widget.window;
   WorkspaceState get workspace => widget.workspace;
 
+  /// We use a special editor for the series in a focal plane chart.
   Future<void> _editSeries(BuildContext context, SeriesInfo series) async {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
     developer.log("New series fields: ${series.fields}", name: "rubin_chart.core.chart.dart");
@@ -480,6 +603,7 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (BuildContext context) {
+        // Initialize the Bloc
         SeriesId sid = SeriesId(windowId: window.id, id: BigInt.zero);
         AxisId valueAxisId = AxisId(AxisLocation.right);
         AxisId detectorAxisId = AxisId(AxisLocation.color);
@@ -524,23 +648,25 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
       child: BlocBuilder<FocalPlaneChartBloc, FocalPlaneChartState>(
         builder: (BuildContext context, FocalPlaneChartState state) {
           if (state is FocalPlaneChartStateInitial) {
+            // The chart is still initializing
             return const Center(
               child: CircularProgressIndicator(),
             );
           }
-          FocalPlaneChartStateLoaded fullState = state as FocalPlaneChartStateLoaded;
 
+          FocalPlaneChartStateLoaded fullState = state as FocalPlaneChartStateLoaded;
           String columnName = "chart column";
           if (fullState.series.fields.isNotEmpty) {
             columnName = fullState.series.fields.values.first.name;
           }
 
+          // Extract the data ID and the data
           String dayObsStr = "dayObs";
           String seqNumStr = "seqNum";
           Map<int, Color>? colors;
           if (fullState.dataIds.isNotEmpty) {
             DataId dataId = fullState.dataIds[fullState.dataIndex];
-            dayObsStr = formatDate(dataId.dayObs);
+            dayObsStr = formatObsDate(dataId.dayObs);
             seqNumStr = dataId.seqNum.toString();
             colors = {};
             for (int detector in fullState.data[dataId]!.keys) {

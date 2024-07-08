@@ -1,3 +1,24 @@
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -141,17 +162,6 @@ class EqualityQueryWidgetState extends State<EqualityQueryWidget> {
     }
     widget.dispatch(const QueryUpdate());
     setState(() {});
-  }
-
-  dynamic textToValue(dynamic value) {
-    SchemaField field = query.field;
-    if (field.isString) {
-      return value;
-    }
-    if (field.isDateTime) {
-      throw UnimplementedError("Dates have not yet been implemented");
-    }
-    return num.parse(value);
   }
 
   @override
@@ -627,6 +637,7 @@ class QueryEditorState extends State<QueryEditor> {
     setState(() {});
   }
 
+  /// Validate the query expression before closing the editor.
   bool validate(Query? query) {
     if (query is QueryOperation) {
       if (query.children.length <= 1) {
@@ -724,10 +735,18 @@ class QueryEditorState extends State<QueryEditor> {
   }
 }
 
+/// Widget to display a [Query] instance.
 class QueryWidget extends StatefulWidget {
+  /// The [Query] instance to display.
   final Query query;
+
+  /// The theme for the app.
   final AppTheme theme;
+
+  /// Dispatcher to pass updates to the full expression.
   final QueryUpdateCallback dispatch;
+
+  /// The depth of this query in the tree
   final int depth;
 
   const QueryWidget({
@@ -742,12 +761,21 @@ class QueryWidget extends StatefulWidget {
   QueryWidgetState createState() => QueryWidgetState();
 }
 
+/// [State] for a [QueryWidget].
 class QueryWidgetState extends State<QueryWidget> {
+  /// Shortcut to the [QueryWidget.query].
   AppTheme get theme => widget.theme;
+
+  /// [Widget] to display if a query field is being dragged.
   OverlayEntry? wireWidget;
+
+  /// The initial position of the drag.
   late Offset initialPosition;
+
+  /// The current position of the drag.
   late Offset currentPosition;
 
+  /// The color to use for this query (which depends on the operator)
   Color get color => widget.query is EqualityQuery
       ? theme.themeData.colorScheme.primaryContainer
       : theme.operatorQueryColor(widget.depth);
@@ -838,9 +866,15 @@ class QueryWidgetState extends State<QueryWidget> {
   }
 }
 
+/// [CustomPainter] to draw a wire between two [Query] instances.
 class WirePainter extends CustomPainter {
+  /// The theme for the app.
   final AppTheme theme;
+
+  /// The initial position of the wire.
   final Offset initialPosition;
+
+  /// The final position of the wire.
   final Offset currentPosition;
 
   WirePainter({
@@ -849,6 +883,7 @@ class WirePainter extends CustomPainter {
     required this.currentPosition,
   });
 
+  /// Paint the wire between the two positions.
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
@@ -859,6 +894,7 @@ class WirePainter extends CustomPainter {
     canvas.drawLine(initialPosition, currentPosition, paint);
   }
 
+  /// Check if the wire should be repainted.
   @override
   bool shouldRepaint(WirePainter oldDelegate) =>
       initialPosition != oldDelegate.initialPosition ||
@@ -866,9 +902,15 @@ class WirePainter extends CustomPainter {
       theme != oldDelegate.theme;
 }
 
+/// [Widget] to display a wire between two [Query] instances.
 class WireWidget extends StatelessWidget {
+  /// The theme for the app.
   final AppTheme theme;
+
+  /// The initial position where the wire starts.
   final Offset initialPosition;
+
+  /// The current position of the end of the wire (the cursor).
   final Offset currentPosition;
 
   const WireWidget({

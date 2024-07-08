@@ -1,3 +1,24 @@
+/// This file is part of the rubintv_visualization package.
+///
+/// Developed for the LSST Data Management System.
+/// This product includes software developed by the LSST Project
+/// (https://www.lsst.org).
+/// See the COPYRIGHT file at the top-level directory of this distribution
+/// for details of code ownership.
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// (at your option) any later version.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU General Public License for more details.
+///
+/// You should have received a copy of the GNU General Public License
+/// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -81,7 +102,9 @@ class WindowInteractionInfo {
   });
 }
 
+/// Information about a window being dragged.
 class WindowDragInfo extends WindowInteractionInfo {
+  /// The offset of the pointer from the top-left corner of the window.
   final Offset pointerOffset;
 
   WindowDragInfo({
@@ -90,9 +113,15 @@ class WindowDragInfo extends WindowInteractionInfo {
   });
 }
 
+/// Information about a window being resized.
 class WindowResizeInfo extends WindowInteractionInfo {
+  /// The offset of the pointer from the top-left corner of the window when it first contacted the window.
   final Offset initialPointerOffset;
+
+  /// The initial size of the window.
   final Size initialSize;
+
+  /// The initial offset of the window in the workspace.
   final Offset initialOffset;
 
   WindowResizeInfo({
@@ -105,7 +134,10 @@ class WindowResizeInfo extends WindowInteractionInfo {
 
 /// Update when a window is first being dragged.
 class WindowDragStartEvent extends WorkspaceEvent {
+  /// The [UniqueId] of the window being dragged.
   final UniqueId windowId;
+
+  /// The details of the drag start.
   final DragStartDetails details;
 
   WindowDragStartEvent({
@@ -116,7 +148,10 @@ class WindowDragStartEvent extends WorkspaceEvent {
 
 /// Update when a window is being dragged.
 class WindowDragUpdate extends WorkspaceEvent {
+  /// The [UniqueId] of the window being dragged.
   final UniqueId windowId;
+
+  /// The details of the drag update.
   final DragUpdateDetails details;
 
   WindowDragUpdate({
@@ -127,7 +162,10 @@ class WindowDragUpdate extends WorkspaceEvent {
 
 /// Update when the drag pointer has been removed and the window is no longer being dragged.
 class WindowDragEndEvent extends WorkspaceEvent {
+  /// The [UniqueId] of the window being dragged.
   final UniqueId windowId;
+
+  /// The details of the drag end.
   final DragEndDetails details;
 
   WindowDragEndEvent({
@@ -138,7 +176,10 @@ class WindowDragEndEvent extends WorkspaceEvent {
 
 /// A window has started to be resized
 class StartWindowResize extends WorkspaceEvent {
+  /// The [UniqueId] of the window being resized.
   final UniqueId windowId;
+
+  /// The details of the drag start.
   final DragStartDetails details;
 
   StartWindowResize({
@@ -149,8 +190,13 @@ class StartWindowResize extends WorkspaceEvent {
 
 /// [WindowUpdate] to update the size of a [Window] in the parent [WorkspaceViewer].
 class UpdateWindowResize extends WorkspaceEvent {
+  /// The [UniqueId] of the window being resized.
   final UniqueId windowId;
+
+  /// The details of the drag update.
   final DragUpdateDetails details;
+
+  //// The direction of the resize
   final WindowResizeDirections direction;
 
   UpdateWindowResize({
@@ -162,7 +208,10 @@ class UpdateWindowResize extends WorkspaceEvent {
 
 /// The window has finished resizing.
 class EndWindowResize extends WorkspaceEvent {
+  /// The [UniqueId] of the window being resized.
   final UniqueId windowId;
+
+  /// The details of the drag end.
   final DragEndDetails details;
 
   EndWindowResize({
@@ -176,6 +225,7 @@ class WindowTitle extends StatelessWidget {
   /// The text to display in the title
   final String? text;
 
+  /// The toolbar to display in the title
   final Widget? toolbar;
 
   const WindowTitle({
@@ -243,10 +293,13 @@ class WindowTitle extends StatelessWidget {
 
 /// Remove a [Chart] from the [Workspace].
 class RemoveWindowEvent extends WorkspaceEvent {
+  /// The [UniqueId] of the window to remove.
   final UniqueId windowId;
+
   RemoveWindowEvent(this.windowId);
 }
 
+/// A [Widget] that can be resized and dragged around a workspace.
 class ResizableWindow extends StatelessWidget {
   /// The child [Widget] to display in the window.
   final Widget child;
@@ -268,10 +321,12 @@ class ResizableWindow extends StatelessWidget {
     required this.toolbar,
   });
 
+  /// Notify the [WorkspaceBloc] that the window is being dragged.
   void _onResizeStart(DragStartDetails details, BuildContext context) {
     context.read<WorkspaceBloc>().add(StartWindowResize(windowId: info.id, details: details));
   }
 
+  /// Notify the [WorkspaceBloc] that the window is being resized.
   DragUpdateCallback _onResizeUpdate(WindowResizeDirections direction, BuildContext context) {
     return (DragUpdateDetails details) {
       context.read<WorkspaceBloc>().add(UpdateWindowResize(
@@ -282,6 +337,7 @@ class ResizableWindow extends StatelessWidget {
     };
   }
 
+  /// Notify the [WorkspaceBloc] that the window is no longer being resized.
   void _onResizeEnd(DragEndDetails details, BuildContext context) {
     context.read<WorkspaceBloc>().add(EndWindowResize(windowId: info.id, details: details));
   }
