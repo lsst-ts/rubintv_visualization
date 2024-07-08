@@ -454,7 +454,7 @@ class ColorbarPainter extends CustomPainter {
   void _drawLabel(Canvas canvas, Size size, double value) {
     final textSpan = TextSpan(
       text: value.toStringAsFixed(2),
-      style: TextStyle(color: Colors.black, fontSize: 12),
+      style: const TextStyle(color: Colors.black, fontSize: 12),
     );
     final textPainter = TextPainter(
       text: textSpan,

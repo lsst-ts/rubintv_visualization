@@ -439,6 +439,10 @@ class DataCenter {
   void removeSeriesData(SeriesId id) {
     _seriesData.remove(id);
   }
+
+  void dispose() {
+    _subscription.cancel();
+  }
 }
 
 /// DataId for an entry in the exposure or visit table

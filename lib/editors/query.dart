@@ -367,12 +367,6 @@ class QueryOperationWidgetState extends State<QueryOperationWidget> {
     }
   }
 
-  /// To be used when the [Column] is changed changed to an [AnimatedList].
-  Widget _buildItem(BuildContext context, int index, Animation<double> animation) {
-    return QueryWidget(
-        theme: theme, dispatch: dispatch, depth: widget.depth + 1, query: query.children[index]);
-  }
-
   @override
   Widget build(BuildContext context) {
     List<Widget> children = query.children
@@ -464,7 +458,7 @@ class NewQueryWidgetState extends State<NewQueryWidget> {
       borderRadius: BorderRadius.circular(5),
       child: Container(
           decoration: BoxDecoration(
-            color: widget.theme.themeData.colorScheme.background,
+            color: widget.theme.themeData.colorScheme.surface,
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             DropdownButton<DatabaseSchema>(
@@ -801,8 +795,10 @@ class QueryWidgetState extends State<QueryWidget> {
       throw UnimplementedError("Unrecognized query type ${widget.query}");
     }
     return DragTarget<Query>(
-      onWillAccept: (Query? query) => query != null && query != widget.query,
-      onAccept: (Query? query) {
+      onWillAcceptWithDetails: (DragTargetDetails<Query?> details) =>
+          details.data != null && details.data != widget.query,
+      onAcceptWithDetails: (DragTargetDetails<Query?> details) {
+        Query? query = details.data;
         if (query != null) {
           widget.dispatch(ConnectQueries(
             target: widget.query,

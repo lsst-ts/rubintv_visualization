@@ -349,7 +349,7 @@ class ResizableWindow extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        color: theme.themeData.colorScheme.background,
+        color: theme.themeData.colorScheme.surface,
         child: IntrinsicWidth(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           GestureDetector(
