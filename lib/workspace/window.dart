@@ -1,10 +1,67 @@
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
-import 'package:rubintv_visualization/state/action.dart';
-import 'package:rubintv_visualization/state/theme.dart';
-import 'package:rubintv_visualization/state/workspace.dart';
-import 'package:rubintv_visualization/workspace/data.dart';
-import 'package:rubintv_visualization/workspace/menu.dart';
-import 'package:rubintv_visualization/workspace/toolbar.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rubintv_visualization/id.dart';
+import 'package:rubintv_visualization/theme.dart';
+import 'package:rubintv_visualization/workspace/state.dart';
+import 'package:rubintv_visualization/workspace/viewer.dart';
+
+/// The type of chart to display.
+enum WindowTypes {
+  detectorSelector,
+  focalPlane,
+  histogram,
+  box,
+  cartesianScatter,
+  polarScatter,
+  combination,
+}
+
+/// A single, persistable, item displayed in a [Workspace].
+@immutable
+class Window {
+  /// The [id] of this [Window] in [Workspace.windows].
+  final UniqueId id;
+
+  /// The location of the window in the entire workspace
+  final Offset offset;
+
+  /// The size of the entry in the entire workspace
+  final Size size;
+
+  /// The title to display in the window bar.
+  final String? title;
+
+  final WindowTypes type;
+
+  const Window({
+    required this.id,
+    required this.offset,
+    required this.size,
+    required this.type,
+    this.title,
+  });
+
+  /// Create a copy of the [Window] with the provided fields updated.
+  Window copyWith({
+    UniqueId? id,
+    Offset? offset,
+    Size? size,
+    String? title,
+  }) =>
+      Window(
+        id: id ?? this.id,
+        offset: offset ?? this.offset,
+        size: size ?? this.size,
+        title: title ?? this.title,
+        type: type,
+      );
+
+  @override
+  String toString() {
+    return "Window(id: $id, offset: $offset, size: $size, title: $title, type: $type)";
+  }
+}
 
 /// Different sides that can be resized
 enum WindowResizeDirections {
@@ -15,19 +72,12 @@ enum WindowResizeDirections {
   downRight,
 }
 
-/// A callback when a window has been updated
-typedef WindowUpdateCallback = void Function(WindowUpdate update);
-
 /// Information about window interactions
 class WindowInteractionInfo {
-  final int id;
-  Offset offset;
-  Size size;
+  final UniqueId id;
 
   WindowInteractionInfo({
     required this.id,
-    required this.offset,
-    required this.size,
   });
 }
 
@@ -37,8 +87,6 @@ class WindowDragInfo extends WindowInteractionInfo {
   WindowDragInfo({
     required super.id,
     required this.pointerOffset,
-    required super.offset,
-    required super.size,
   });
 }
 
@@ -52,52 +100,45 @@ class WindowResizeInfo extends WindowInteractionInfo {
     required this.initialPointerOffset,
     required this.initialSize,
     required this.initialOffset,
-    required super.offset,
-    required super.size,
   });
 }
 
-/// An update to the window (either a resize or translation).
-class WindowUpdate {
-  const WindowUpdate();
-}
-
 /// Update when a window is first being dragged.
-class StartDragWindowUpdate extends WindowUpdate {
-  final int windowId;
+class WindowDragStartEvent extends WorkspaceEvent {
+  final UniqueId windowId;
   final DragStartDetails details;
 
-  const StartDragWindowUpdate({
+  WindowDragStartEvent({
     required this.windowId,
     required this.details,
   });
 }
 
 /// Update when a window is being dragged.
-class UpdateDragWindowUpdate extends WindowUpdate {
-  final int windowId;
+class WindowDragUpdate extends WorkspaceEvent {
+  final UniqueId windowId;
   final DragUpdateDetails details;
 
-  const UpdateDragWindowUpdate({
+  WindowDragUpdate({
     required this.windowId,
     required this.details,
   });
 }
 
 /// Update when the drag pointer has been removed and the window is no longer being dragged.
-class WindowDragEnd extends WindowUpdate {
-  final int windowId;
+class WindowDragEndEvent extends WorkspaceEvent {
+  final UniqueId windowId;
   final DragEndDetails details;
 
-  const WindowDragEnd({
+  WindowDragEndEvent({
     required this.windowId,
     required this.details,
   });
 }
 
 /// A window has started to be resized
-class StartWindowResize extends WindowUpdate {
-  final int windowId;
+class StartWindowResize extends WorkspaceEvent {
+  final UniqueId windowId;
   final DragStartDetails details;
 
   StartWindowResize({
@@ -107,12 +148,12 @@ class StartWindowResize extends WindowUpdate {
 }
 
 /// [WindowUpdate] to update the size of a [Window] in the parent [WorkspaceViewer].
-class UpdateWindowResize extends WindowUpdate {
-  final int windowId;
+class UpdateWindowResize extends WorkspaceEvent {
+  final UniqueId windowId;
   final DragUpdateDetails details;
   final WindowResizeDirections direction;
 
-  const UpdateWindowResize({
+  UpdateWindowResize({
     required this.windowId,
     required this.details,
     required this.direction,
@@ -120,26 +161,13 @@ class UpdateWindowResize extends WindowUpdate {
 }
 
 /// The window has finished resizing.
-class EndWindowResize extends WindowUpdate {
-  final int windowId;
+class EndWindowResize extends WorkspaceEvent {
+  final UniqueId windowId;
   final DragEndDetails details;
 
-  const EndWindowResize({
+  EndWindowResize({
     required this.windowId,
     required this.details,
-  });
-}
-
-/// Apply an update to a [Window] to the main [AppState].
-class ApplyWindowUpdate extends UiAction {
-  final int windowId;
-  final Offset offset;
-  final Size size;
-
-  ApplyWindowUpdate({
-    required this.windowId,
-    required this.offset,
-    required this.size,
   });
 }
 
@@ -148,19 +176,17 @@ class WindowTitle extends StatelessWidget {
   /// The text to display in the title
   final String? text;
 
-  /// The [ChartTheme] for the app.
-  final ChartTheme theme;
   final Widget? toolbar;
 
   const WindowTitle({
     super.key,
     required this.text,
-    required this.theme,
     this.toolbar,
   });
 
   @override
   Widget build(BuildContext context) {
+    AppTheme theme = WorkspaceViewer.of(context).info!.theme;
     if (toolbar != null) {
       return Container(
           constraints: const BoxConstraints(
@@ -177,12 +203,11 @@ class WindowTitle extends StatelessWidget {
                   size: kMinInteractiveDimension * .7,
                 ),
                 onPressed: () {
-                  print("Open menu");
+                  developer.log("Open menu", name: "rubinTV.visualization.workspace.window");
                 }),
             Expanded(
               child: Center(
-                child: Text(text ?? "",
-                    style: theme.titleStyle, textAlign: TextAlign.center),
+                child: Text(text ?? "", style: theme.titleStyle, textAlign: TextAlign.center),
               ),
             ),
             toolbar!,
@@ -204,12 +229,11 @@ class WindowTitle extends StatelessWidget {
               size: kMinInteractiveDimension * .7,
             ),
             onPressed: () {
-              print("Open menu");
+              developer.log("Open menu", name: "rubinTV.visualization.workspace.window");
             }),
         Expanded(
           child: Center(
-            child: Text(text ?? "",
-                style: theme.titleStyle, textAlign: TextAlign.center),
+            child: Text(text ?? "", style: theme.titleStyle, textAlign: TextAlign.center),
           ),
         ),
       ]),
@@ -217,38 +241,10 @@ class WindowTitle extends StatelessWidget {
   }
 }
 
-/// A single, persistable, item displayed in a [Workspace].
-abstract class Window {
-  /// The [id] of this [Window] in [Workspace.windows].
-  final int id;
-
-  /// The location of the entry in the entire workspace
-  final Offset offset;
-
-  /// The size of the entry in the entire workspace
-  final Size size;
-
-  /// The title to display in the window bar.
-  final String? title;
-
-  const Window({
-    required this.id,
-    required this.offset,
-    required this.size,
-    this.title,
-  });
-
-  Window copyWith({
-    int? id,
-    Offset? offset,
-    Size? size,
-    String? title,
-  });
-
-  /// Create a new [Widget] to display in a [Workspace].
-  Widget createWidget(BuildContext context);
-
-  Widget? createToolbar(BuildContext context);
+/// Remove a [Chart] from the [Workspace].
+class RemoveWindowEvent extends WorkspaceEvent {
+  final UniqueId windowId;
+  RemoveWindowEvent(this.windowId);
 }
 
 class ResizableWindow extends StatelessWidget {
@@ -258,18 +254,8 @@ class ResizableWindow extends StatelessWidget {
   /// The title to display in the window
   final String? title;
 
-  /// The full size of the window, including the [WindowTitle].
-  /// If [size] is null then the window will layout the child first and expand to the child size.
-  final Size size;
-
-  /// The [ChartTheme] for the app.
-  final ChartTheme theme;
-
   /// Information about the widget
   final Window info;
-
-  /// Callback to notify the [WorkspaceViewer] that this [Window] has been updated.
-  final WindowUpdateCallback dispatch;
 
   /// Toolbar associated with the window
   final Widget? toolbar;
@@ -278,385 +264,175 @@ class ResizableWindow extends StatelessWidget {
     super.key,
     required this.child,
     required this.title,
-    required this.theme,
     required this.info,
-    required this.size,
-    required this.dispatch,
     required this.toolbar,
   });
 
-  void _onResizeStart(DragStartDetails details) {
-    dispatch(StartWindowResize(windowId: info.id, details: details));
+  void _onResizeStart(DragStartDetails details, BuildContext context) {
+    context.read<WorkspaceBloc>().add(StartWindowResize(windowId: info.id, details: details));
   }
 
-  DragUpdateCallback _onResizeUpdate(WindowResizeDirections direction) {
+  DragUpdateCallback _onResizeUpdate(WindowResizeDirections direction, BuildContext context) {
     return (DragUpdateDetails details) {
-      dispatch(UpdateWindowResize(
-        windowId: info.id,
-        details: details,
-        direction: direction,
-      ));
+      context.read<WorkspaceBloc>().add(UpdateWindowResize(
+            windowId: info.id,
+            details: details,
+            direction: direction,
+          ));
     };
   }
 
-  void _onResizeEnd(DragEndDetails details) {
-    dispatch(EndWindowResize(windowId: info.id, details: details));
+  void _onResizeEnd(DragEndDetails details, BuildContext context) {
+    context.read<WorkspaceBloc>().add(EndWindowResize(windowId: info.id, details: details));
   }
 
   @override
   Widget build(BuildContext context) {
+    AppTheme theme = WorkspaceViewer.of(context).info!.theme;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: Container(
         color: theme.themeData.colorScheme.background,
         child: IntrinsicWidth(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-              GestureDetector(
-                onPanStart: (DragStartDetails details) {
-                  dispatch(StartDragWindowUpdate(
-                      windowId: info.id, details: details));
-                },
-                onPanUpdate: (DragUpdateDetails details) {
-                  dispatch(UpdateDragWindowUpdate(
-                      windowId: info.id, details: details));
-                },
-                onPanEnd: (DragEndDetails details) {
-                  dispatch(WindowDragEnd(windowId: info.id, details: details));
-                },
-                child: WindowTitle(
-                  text: title,
-                  theme: theme,
-                  toolbar: toolbar,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          GestureDetector(
+            onPanStart: (DragStartDetails details) {
+              context.read<WorkspaceBloc>().add(WindowDragStartEvent(windowId: info.id, details: details));
+            },
+            onPanUpdate: (DragUpdateDetails details) {
+              context.read<WorkspaceBloc>().add(WindowDragUpdate(windowId: info.id, details: details));
+            },
+            onPanEnd: (DragEndDetails details) {
+              context.read<WorkspaceBloc>().add(WindowDragEndEvent(windowId: info.id, details: details));
+            },
+            child: WindowTitle(
+              text: title,
+              toolbar: toolbar,
+            ),
+          ),
+          SizedBox(
+            width: info.size.width,
+            height: info.size.height,
+            child: Stack(children: [
+              Container(
+                margin: const EdgeInsets.all(5),
+                child: child,
+              ),
+
+              // Left resize
+              Positioned(
+                left: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onHorizontalDragStart: (DragStartDetails details) {
+                    _onResizeStart(details, context);
+                  },
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.left, context),
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    _onResizeEnd(details, context);
+                  },
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeLeftRight,
+                    child: SizedBox(
+                      height: info.size.height,
+                      width: theme.resizeInteractionWidth,
+                    ),
+                  ),
                 ),
               ),
-              SizedBox(
-                width: size.width,
-                height: size.height,
-                child: Stack(children: [
-                  Container(
-                    margin: const EdgeInsets.all(5),
-                    child: child,
-                  ),
 
-                  // Left resize
-                  Positioned(
-                    left: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      onHorizontalDragStart: _onResizeStart,
-                      onHorizontalDragUpdate:
-                          _onResizeUpdate(WindowResizeDirections.left),
-                      onHorizontalDragEnd: _onResizeEnd,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeLeftRight,
-                        child: SizedBox(
-                          height: size.height,
-                          width: theme.resizeInteractionWidth,
-                        ),
-                      ),
+              // right resize
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onHorizontalDragStart: (DragStartDetails details) {
+                    _onResizeStart(details, context);
+                  },
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.right, context),
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    _onResizeEnd(details, context);
+                  },
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeLeftRight,
+                    child: SizedBox(
+                      height: info.size.height,
+                      width: theme.resizeInteractionWidth,
                     ),
                   ),
-
-                  // right resize
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      onHorizontalDragStart: _onResizeStart,
-                      onHorizontalDragUpdate:
-                          _onResizeUpdate(WindowResizeDirections.right),
-                      onHorizontalDragEnd: _onResizeEnd,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeLeftRight,
-                        child: SizedBox(
-                          height: size.height,
-                          width: theme.resizeInteractionWidth,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // bottom resize
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      onHorizontalDragStart: _onResizeStart,
-                      onHorizontalDragUpdate:
-                          _onResizeUpdate(WindowResizeDirections.down),
-                      onHorizontalDragEnd: _onResizeEnd,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeUpDown,
-                        child: SizedBox(
-                          height: theme.resizeInteractionWidth,
-                          width: size.width,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // bottom-left resize
-                  Positioned(
-                    left: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      onHorizontalDragStart: _onResizeStart,
-                      onHorizontalDragUpdate:
-                          _onResizeUpdate(WindowResizeDirections.downLeft),
-                      onHorizontalDragEnd: _onResizeEnd,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeDownLeft,
-                        child: SizedBox(
-                          height: theme.resizeInteractionWidth,
-                          width: theme.resizeInteractionWidth,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // bottom-right resize
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: GestureDetector(
-                      onHorizontalDragStart: _onResizeStart,
-                      onHorizontalDragUpdate:
-                          _onResizeUpdate(WindowResizeDirections.downRight),
-                      onHorizontalDragEnd: _onResizeEnd,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeDownRight,
-                        child: SizedBox(
-                          height: theme.resizeInteractionWidth,
-                          width: theme.resizeInteractionWidth,
-                        ),
-                      ),
-                    ),
-                  ),
-                ]),
+                ),
               ),
-            ])),
+
+              // bottom resize
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onHorizontalDragStart: (DragStartDetails details) {
+                    _onResizeStart(details, context);
+                  },
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.down, context),
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    _onResizeEnd(details, context);
+                  },
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeUpDown,
+                    child: SizedBox(
+                      height: theme.resizeInteractionWidth,
+                      width: info.size.width,
+                    ),
+                  ),
+                ),
+              ),
+
+              // bottom-left resize
+              Positioned(
+                left: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onHorizontalDragStart: (DragStartDetails details) {
+                    _onResizeStart(details, context);
+                  },
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.downLeft, context),
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    _onResizeEnd(details, context);
+                  },
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeDownLeft,
+                    child: SizedBox(
+                      height: theme.resizeInteractionWidth,
+                      width: theme.resizeInteractionWidth,
+                    ),
+                  ),
+                ),
+              ),
+
+              // bottom-right resize
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onHorizontalDragStart: (DragStartDetails details) {
+                    _onResizeStart(details, context);
+                  },
+                  onHorizontalDragUpdate: _onResizeUpdate(WindowResizeDirections.downRight, context),
+                  onHorizontalDragEnd: (DragEndDetails details) {
+                    _onResizeEnd(details, context);
+                  },
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeDownRight,
+                    child: SizedBox(
+                      height: theme.resizeInteractionWidth,
+                      width: theme.resizeInteractionWidth,
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ])),
       ),
     );
-  }
-}
-
-/// A [Widget] used to display a set of re-sizable and translatable [Window] widgets in a container.
-class WorkspaceViewer extends StatefulWidget {
-  final Size size;
-  final Workspace workspace;
-  final DataCenter dataCenter;
-  final DispatchAction dispatch;
-
-  const WorkspaceViewer({
-    super.key,
-    required this.size,
-    required this.workspace,
-    required this.dataCenter,
-    required this.dispatch,
-  });
-
-  @override
-  WorkspaceViewerState createState() => WorkspaceViewerState();
-
-  /// Implement the [WorkspaceViewer.of] method to allow children
-  /// to find this container based on their [BuildContext].
-  static WorkspaceViewerState of(BuildContext context) {
-    final WorkspaceViewerState? result =
-        context.findAncestorStateOfType<WorkspaceViewerState>();
-    assert(() {
-      if (result == null) {
-        throw FlutterError.fromParts(<DiagnosticsNode>[
-          ErrorSummary(
-              'WorkspaceViewer.of() called with a context that does not '
-              'contain a WorkspaceViewer.'),
-          ErrorDescription(
-              'No WorkspaceViewer ancestor could be found starting from the context '
-              'that was passed to WorkspaceViewer.of().'),
-          ErrorHint(
-              'This probably happened when an interactive child was created '
-              'outside of an WorkspaceViewer'),
-          context.describeElement('The context used was')
-        ]);
-      }
-      return true;
-    }());
-    return result!;
-  }
-}
-
-class WorkspaceViewerState extends State<WorkspaceViewer> {
-  ChartTheme get theme => widget.workspace.theme;
-  Size get size => widget.size;
-  Workspace get info => widget.workspace;
-  DataCenter get dataCenter => widget.dataCenter;
-  DispatchAction get dispatch => widget.dispatch;
-  Map<String, Set<dynamic>> get selected => widget.workspace.selected;
-
-  WindowInteractionInfo? interactionInfo;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppMenu(
-      theme: theme,
-      dispatch: dispatch,
-      dataCenter: dataCenter,
-      child: Column(children: [
-        Toolbar(tool: widget.workspace.multiSelectionTool),
-        SizedBox(
-          width: size.width,
-          height: size.height - 2 * kToolbarHeight,
-          child: Builder(
-            builder: (BuildContext context) {
-              List<Widget> children = [];
-              for (Window window in info.windows.values) {
-                Offset offset = window.offset;
-                Size size = window.size;
-                if (interactionInfo != null &&
-                    window.id == interactionInfo!.id) {
-                  offset = interactionInfo!.offset;
-                  size = interactionInfo!.size;
-                }
-
-                children.add(Positioned(
-                  left: offset.dx,
-                  top: offset.dy,
-                  child: ResizableWindow(
-                    info: window,
-                    theme: theme,
-                    title: window.title,
-                    dispatch: _updateWindow,
-                    size: size,
-                    toolbar: window.createToolbar(context),
-                    child: window.createWidget(context),
-                  ),
-                ));
-              }
-
-              return Stack(
-                children: children,
-              );
-            },
-          ),
-        ),
-      ]),
-    );
-  }
-
-  void _updateWindow(WindowUpdate update) {
-    // Translation updates
-    if (update is StartDragWindowUpdate) {
-      return startWindowDrag(update);
-    }
-    if (update is UpdateDragWindowUpdate) {
-      return updateWindowDrag(update);
-    }
-    if (update is WindowDragEnd) {
-      return dragEnd();
-    }
-    // Resize updates
-    if (update is StartWindowResize) {
-      return startWindowResize(update);
-    }
-    if (update is UpdateWindowResize) {
-      return updateWindowReSize(update);
-    }
-    if (update is EndWindowResize) {
-      return dragEnd();
-    }
-    throw ArgumentError("Unrecognized WindowUpdate $update");
-  }
-
-  /// Keep track of the starting drag position
-  void startWindowDrag(StartDragWindowUpdate update) {
-    if (interactionInfo != null) {
-      dragEnd();
-    }
-    Window window = info.windows[update.windowId]!;
-    interactionInfo = WindowDragInfo(
-      id: update.windowId,
-      pointerOffset: window.offset - update.details.localPosition,
-      offset: window.offset,
-      size: window.size,
-    );
-    setState(() {});
-  }
-
-  void updateWindowDrag(UpdateDragWindowUpdate update) {
-    if (interactionInfo is! WindowDragInfo) {
-      dragEnd();
-      throw Exception("Mismatched interactionInfo, got $interactionInfo");
-    }
-    setState(() {
-      WindowDragInfo interaction = interactionInfo as WindowDragInfo;
-      interaction.offset = update.details.localPosition +
-          (interactionInfo as WindowDragInfo).pointerOffset;
-    });
-  }
-
-  void dragEnd() {
-    if (interactionInfo != null) {
-      dispatch(ApplyWindowUpdate(
-        windowId: interactionInfo!.id,
-        offset: interactionInfo!.offset,
-        size: interactionInfo!.size,
-      ));
-      interactionInfo = null;
-      setState(() {});
-    }
-  }
-
-  void startWindowResize(StartWindowResize update) {
-    if (interactionInfo != null) {
-      dragEnd();
-    }
-    Window window = info.windows[update.windowId]!;
-
-    interactionInfo = WindowResizeInfo(
-      id: update.windowId,
-      initialPointerOffset: update.details.globalPosition,
-      initialSize: window.size,
-      initialOffset: window.offset,
-      offset: window.offset,
-      size: window.size,
-    );
-    setState(() {});
-  }
-
-  void updateWindowReSize(UpdateWindowResize update) {
-    if (interactionInfo is! WindowResizeInfo) {
-      dragEnd();
-      throw Exception("Mismatched interactionInfo, got $interactionInfo");
-    }
-    WindowResizeInfo interaction = interactionInfo as WindowResizeInfo;
-    Offset deltaPosition =
-        update.details.globalPosition - interaction.initialPointerOffset;
-
-    double left = interaction.initialOffset.dx;
-    double top = interaction.initialOffset.dy;
-    double width = interaction.initialSize.width;
-    double height = interaction.initialSize.height;
-
-    // Update the width and x-offset
-    if (update.direction == WindowResizeDirections.right ||
-        update.direction == WindowResizeDirections.downRight) {
-      width = interaction.initialSize.width + deltaPosition.dx;
-    } else if (update.direction == WindowResizeDirections.left ||
-        update.direction == WindowResizeDirections.downLeft) {
-      left = interaction.initialOffset.dx + deltaPosition.dx;
-      width = interaction.initialSize.width - deltaPosition.dx;
-    }
-
-    // Update the height and y-offset
-    if (update.direction == WindowResizeDirections.down ||
-        update.direction == WindowResizeDirections.downLeft ||
-        update.direction == WindowResizeDirections.downRight) {
-      height = interaction.initialSize.height + deltaPosition.dy;
-    }
-
-    interaction.offset = Offset(left, top);
-    interaction.size = Size(width, height);
-    setState(() {});
   }
 }
