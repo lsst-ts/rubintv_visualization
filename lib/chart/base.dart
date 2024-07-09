@@ -72,9 +72,13 @@ class UpdateMultiSelect extends ChartEvent {
 /// Update whether or not to use the global query for a chart.
 class UpdateChartGlobalQueryEvent extends ChartEvent {
   final bool useGlobalQuery;
+  final String? dayObs;
+  final Query? globalQuery;
 
   UpdateChartGlobalQueryEvent({
     required this.useGlobalQuery,
+    required this.dayObs,
+    required this.globalQuery,
   });
 }
 
@@ -111,6 +115,17 @@ class UpdateAxisInfoEvent extends ChartEvent {
 class ResetChartEvent extends ChartEvent {
   final ChartResetTypes type;
   ResetChartEvent(this.type);
+}
+
+/// Reload all of the data from the server
+class SynchDataEvent extends ChartEvent {
+  final String? dayObs;
+  final Query? globalQuery;
+
+  SynchDataEvent({
+    required this.dayObs,
+    required this.globalQuery,
+  });
 }
 
 /// State of a chart.
@@ -271,7 +286,8 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         // Process the results of a LoadColumnsCommand.
         int rows = event.message["content"]["data"].values.first.length;
         int columns = event.message["content"]["data"].length;
-        developer.log("received $columns columns and $rows rows for ${event.message["requestId"]}",
+        developer.log(
+            "received $columns columns and $rows rows for ${event.message["requestId"]} in series $seriesId",
             name: "rubin_chart.workspace");
         DataCenter().updateSeriesData(
           series: state.series[seriesId]!,
@@ -323,6 +339,13 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     on<UpdateChartGlobalQueryEvent>((event, emit) {
       ChartStateLoaded state = this.state as ChartStateLoaded;
       emit(state.copyWith(useGlobalQuery: event.useGlobalQuery));
+      for (SeriesInfo series in state._series.values) {
+        _fetchSeriesData(
+          series: series,
+          dayObs: event.dayObs,
+          globalQuery: event.globalQuery,
+        );
+      }
     });
 
     /// A Series in the chart is updated. This will trigger a reload of the data from the remote server.
@@ -379,6 +402,19 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         ChartStateLoaded state = this.state as ChartStateLoaded;
         state.resetController.add(ResetChartAction(event.type));
         emit(state.copyWith(needsReset: false));
+      }
+    });
+
+    /// Reload all of the data from the server.
+    on<SynchDataEvent>((event, emit) {
+      ChartStateLoaded state = this.state as ChartStateLoaded;
+      for (SeriesInfo series in state._series.values) {
+        developer.log("Synching data for series ${series.id}", name: "rubintv.chart.base.dart");
+        _fetchSeriesData(
+          series: series,
+          globalQuery: event.globalQuery,
+          dayObs: event.dayObs,
+        );
       }
     });
   }
@@ -545,6 +581,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     if (state is ChartStateLoaded) {
       useGlobalQuery = (state as ChartStateLoaded).useGlobalQuery;
     }
+    WorkspaceViewerState workspace = WorkspaceViewer.of(context);
     return [
       Tooltip(
         message: "Add a new series to the chart",
@@ -565,18 +602,34 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
           onPressed: () {
             context.read<ChartBloc>().add(UpdateChartGlobalQueryEvent(
                   useGlobalQuery: !useGlobalQuery,
+                  dayObs: getFormattedDate(workspace.info!.dayObs),
+                  globalQuery: workspace.info!.globalQuery,
                 ));
           },
         ),
       ),
       const SizedBox(width: 10),
       Tooltip(
-        message: "Reset the chart",
+        message: "Reset the chart axes",
         child: IconButton(
           icon: const Icon(Icons.refresh, color: Colors.green),
           onPressed: () {
             if (state is ChartStateLoaded) {
               (state as ChartStateLoaded).resetController.add(ResetChartAction(ChartResetTypes.full));
+            }
+          },
+        ),
+      ),
+      Tooltip(
+        message: "Synch chart data with the server",
+        child: IconButton(
+          icon: const Icon(Icons.sync, color: Colors.green),
+          onPressed: () {
+            if (state is ChartStateLoaded) {
+              context.read<ChartBloc>().add(SynchDataEvent(
+                    dayObs: getFormattedDate(workspace.info!.dayObs),
+                    globalQuery: workspace.info!.globalQuery,
+                  ));
             }
           },
         ),

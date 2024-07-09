@@ -763,18 +763,21 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        SizedBox(
-                          width: 50,
-                          child: ColorbarSlider(
-                            controller: state.colorbarController,
-                            onChanged: (values) {
-                              developer.log('Values changed: $values',
-                                  name: "rubinTV.visualization.focal_plane.chart");
-                            },
-                            orientation: ColorbarOrientation.vertical,
-                            showLabels: true,
-                          ),
-                        ),
+                        Tooltip(
+                            message: "Update colorbar",
+                            waitDuration: const Duration(milliseconds: 1000),
+                            child: SizedBox(
+                              width: 50,
+                              child: ColorbarSlider(
+                                controller: state.colorbarController,
+                                onChanged: (values) {
+                                  developer.log('Values changed: $values',
+                                      name: "rubinTV.visualization.focal_plane.chart");
+                                },
+                                orientation: ColorbarOrientation.vertical,
+                                showLabels: true,
+                              ),
+                            )),
                         const SizedBox(width: 60),
                       ],
                     ),
@@ -784,34 +787,38 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
                     height: 50,
                     width: window.size.width,
                     child: Row(children: [
-                      SizedBox(
-                        width: 50,
-                        child: IconButton(
-                          icon: state.isPlaying ? const Icon(Icons.pause) : const Icon(Icons.play_arrow),
-                          onPressed: () {
-                            if (!state.isPlaying) {
-                              context.read<FocalPlaneChartBloc>().add(FocalPlaneStartTimerEvent());
-                            } else {
-                              context.read<FocalPlaneChartBloc>().add(FocalPlaneStopTimerEvent());
-                            }
-                          },
-                        ),
-                      ),
+                      Tooltip(
+                          message: "Animate selected data IDs",
+                          child: SizedBox(
+                            width: 50,
+                            child: IconButton(
+                              icon: state.isPlaying ? const Icon(Icons.pause) : const Icon(Icons.play_arrow),
+                              onPressed: () {
+                                if (!state.isPlaying) {
+                                  context.read<FocalPlaneChartBloc>().add(FocalPlaneStartTimerEvent());
+                                } else {
+                                  context.read<FocalPlaneChartBloc>().add(FocalPlaneStopTimerEvent());
+                                }
+                              },
+                            ),
+                          )),
                       const SizedBox(width: 10),
-                      Material(
-                        color: Colors.grey[300],
-                        shape: const CircleBorder(),
-                        child: IconButton(
-                          icon: const Icon(Icons.remove),
-                          onPressed: () {
-                            if (state.dataIndex > 0) {
-                              context
-                                  .read<FocalPlaneChartBloc>()
-                                  .add(FocalPlaneUpdateDataIndexEvent(state.dataIndex - 1));
-                            }
-                          },
-                        ),
-                      ),
+                      Tooltip(
+                          message: "Previous data ID",
+                          child: Material(
+                            color: Colors.grey[300],
+                            shape: const CircleBorder(),
+                            child: IconButton(
+                              icon: const Icon(Icons.remove),
+                              onPressed: () {
+                                if (state.dataIndex > 0) {
+                                  context
+                                      .read<FocalPlaneChartBloc>()
+                                      .add(FocalPlaneUpdateDataIndexEvent(state.dataIndex - 1));
+                                }
+                              },
+                            ),
+                          )),
                       Expanded(
                         child: Slider(
                           value: state.dataIndex.toDouble(),
@@ -826,20 +833,22 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
                           },
                         ),
                       ),
-                      Material(
-                        color: Colors.grey[300],
-                        shape: const CircleBorder(),
-                        child: IconButton(
-                          icon: const Icon(Icons.add),
-                          onPressed: () {
-                            if (state.dataIndex < state.dataIds.length - 1) {
-                              context
-                                  .read<FocalPlaneChartBloc>()
-                                  .add(FocalPlaneUpdateDataIndexEvent(state.dataIndex + 1));
-                            }
-                          },
-                        ),
-                      ),
+                      Tooltip(
+                          message: "Next data ID",
+                          child: Material(
+                            color: Colors.grey[300],
+                            shape: const CircleBorder(),
+                            child: IconButton(
+                              icon: const Icon(Icons.add),
+                              onPressed: () {
+                                if (state.dataIndex < state.dataIds.length - 1) {
+                                  context
+                                      .read<FocalPlaneChartBloc>()
+                                      .add(FocalPlaneUpdateDataIndexEvent(state.dataIndex + 1));
+                                }
+                              },
+                            ),
+                          )),
                     ]),
                   ),
                   SizedBox(
@@ -861,13 +870,15 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
                           ),
                         ),
                         const SizedBox(width: 20),
-                        IconButton(
-                          icon: const Icon(Icons.loop),
-                          color: state.loopPlayback ? Colors.green : Colors.grey,
-                          onPressed: () {
-                            context.read<FocalPlaneChartBloc>().add(FocalPlaneToggleLoopEvent());
-                          },
-                        ),
+                        Tooltip(
+                            message: "Loop playback",
+                            child: IconButton(
+                              icon: const Icon(Icons.loop),
+                              color: state.loopPlayback ? Colors.green : Colors.grey,
+                              onPressed: () {
+                                context.read<FocalPlaneChartBloc>().add(FocalPlaneToggleLoopEvent());
+                              },
+                            )),
                       ],
                     ),
                   ),

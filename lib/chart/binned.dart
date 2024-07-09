@@ -166,7 +166,9 @@ class BinnedChartWidget extends StatelessWidget {
           return ResizableWindow(
             info: window,
             toolbar: Row(children: [
-              SizedBox(
+              Tooltip(
+                message: "Change number of bins",
+                child: SizedBox(
                   width: 50,
                   child: TextField(
                     controller: _binController,
@@ -179,7 +181,9 @@ class BinnedChartWidget extends StatelessWidget {
                         context.read<ChartBloc>().add(UpdateBinsEvent(nBins));
                       }
                     },
-                  )),
+                  ),
+                ),
+              ),
               SegmentedButton<MultiSelectionTool>(
                 selected: {state.tool},
                 segments: [

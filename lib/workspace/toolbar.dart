@@ -74,40 +74,44 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        GestureDetector(
-          onTap: () async {
-            final DateTime? pickedDate = await showDatePicker(
-              context: context,
-              initialDate: selectedDate ?? DateTime.now(),
-              firstDate: DateTime(2000),
-              lastDate: DateTime(2101),
-            );
+        Tooltip(
+            message: "Set day_obs",
+            child: GestureDetector(
+              onTap: () async {
+                final DateTime? pickedDate = await showDatePicker(
+                  context: context,
+                  initialDate: selectedDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2101),
+                );
 
-            workspaceBloc.add(UpdateGlobalObsDateEvent(dayObs: pickedDate));
-          },
-          child: Container(
-            margin: const EdgeInsets.all(4),
-            padding: const EdgeInsets.all(4),
-            height: 40,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.blueAccent),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Center(child: Text(dateString)),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            setState(() {
-              selectedDate = null;
-              context.read<WorkspaceBloc>().add(UpdateGlobalObsDateEvent(dayObs: null));
-            });
-          },
-          child: const Icon(
-            Icons.clear,
-            color: Colors.red,
-          ),
-        ),
+                workspaceBloc.add(UpdateGlobalObsDateEvent(dayObs: pickedDate));
+              },
+              child: Container(
+                margin: const EdgeInsets.all(4),
+                padding: const EdgeInsets.all(4),
+                height: 40,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.blueAccent),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(child: Text(dateString)),
+              ),
+            )),
+        Tooltip(
+            message: "Clear day_obs",
+            child: ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  selectedDate = null;
+                  context.read<WorkspaceBloc>().add(UpdateGlobalObsDateEvent(dayObs: null));
+                });
+              },
+              child: const Icon(
+                Icons.clear,
+                color: Colors.red,
+              ),
+            )),
       ],
     );
   }
@@ -153,74 +157,79 @@ class ToolbarState extends State<Toolbar> {
       child: Row(
         children: [
           const SizedBox(width: 10),
-          MenuAnchor(
-            builder: (BuildContext context, MenuController controller, Widget? child) {
-              return IconButton(
-                icon: const Icon(Icons.menu),
-                onPressed: () {
-                  if (controller.isOpen) {
-                    controller.close();
-                  } else {
-                    controller.open();
-                  }
-                },
-              );
-            },
-            menuChildren: [
-              MenuItemButton(
-                onPressed: () {
-                  context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                        windowType: WindowTypes.cartesianScatter,
-                      ));
-                },
-                child: const Text("New Cartesian Scatter Plot"),
-              ),
-              MenuItemButton(
-                onPressed: () {
-                  context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                        windowType: WindowTypes.polarScatter,
-                      ));
-                },
-                child: const Text("New Polar Scatter Plot"),
-              ),
-              MenuItemButton(
-                onPressed: () {
-                  context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                        windowType: WindowTypes.histogram,
-                      ));
-                },
-                child: const Text("New Histogram"),
-              ),
-              MenuItemButton(
-                onPressed: () {
-                  context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                        windowType: WindowTypes.box,
-                      ));
-                },
-                child: const Text("New Box Chart"),
-              ),
-              MenuItemButton(
-                onPressed: () {
-                  context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                        windowType: WindowTypes.focalPlane,
-                      ));
-                },
-                child: const Text("New Focal Plane Chart"),
-              ),
-            ],
+          Tooltip(
+            message: "Menu",
+            child: MenuAnchor(
+              builder: (BuildContext context, MenuController controller, Widget? child) {
+                return IconButton(
+                  icon: const Icon(Icons.menu),
+                  onPressed: () {
+                    if (controller.isOpen) {
+                      controller.close();
+                    } else {
+                      controller.open();
+                    }
+                  },
+                );
+              },
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: () {
+                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                          windowType: WindowTypes.cartesianScatter,
+                        ));
+                  },
+                  child: const Text("New Cartesian Scatter Plot"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                          windowType: WindowTypes.polarScatter,
+                        ));
+                  },
+                  child: const Text("New Polar Scatter Plot"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                          windowType: WindowTypes.histogram,
+                        ));
+                  },
+                  child: const Text("New Histogram"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                          windowType: WindowTypes.box,
+                        ));
+                  },
+                  child: const Text("New Box Chart"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                          windowType: WindowTypes.focalPlane,
+                        ));
+                  },
+                  child: const Text("New Focal Plane Chart"),
+                ),
+              ],
+            ),
           ),
           const SizedBox(width: 10),
-          Center(
-              child: Container(
-            margin: const EdgeInsets.only(left: 4),
-            height: 10,
-            width: 10,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _getStatusIndicator(webSocketManager.isConnected, workspace.instrument != null),
-            ),
-          )),
+          Tooltip(
+              message: "Status Indicator",
+              child: Center(
+                  child: Container(
+                margin: const EdgeInsets.only(left: 4),
+                height: 10,
+                width: 10,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _getStatusIndicator(webSocketManager.isConnected, workspace.instrument != null),
+                ),
+              ))),
           const SizedBox(width: 30),
           DropdownButton<String?>(
             value: workspace.instrument?.name,
@@ -253,64 +262,74 @@ class ToolbarState extends State<Toolbar> {
             },
           ),
           const SizedBox(width: 10),
-          IconButton(
-            onPressed: workspace.instrument == null && !workspace.isShowingFocalPlane
-                ? null
-                : () {
-                    context.read<WorkspaceBloc>().add(ShowFocalPlaneEvent());
-                  },
-            icon: const Icon(Icons.lens_blur),
+          Tooltip(
+            message: "Show Focal Plane",
+            child: IconButton(
+              onPressed: workspace.instrument == null && !workspace.isShowingFocalPlane
+                  ? null
+                  : () {
+                      context.read<WorkspaceBloc>().add(ShowFocalPlaneEvent());
+                    },
+              icon: const Icon(Icons.lens_blur),
+            ),
           ),
-          Text(workspace.detector?.name == null
-              ? 'No detector selected'
-              : "${workspace.detector!.id}: ${workspace.detector!.name}"),
+          Tooltip(
+            message: "Detector number and name",
+            child: Text(workspace.detector?.name == null
+                ? 'No detector selected'
+                : "${workspace.detector!.id}: ${workspace.detector!.name}"),
+          ),
           const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.copy, color: Colors.green),
-            onPressed: () async {
-              String result;
-              SelectionController selectionController = ControlCenter().selectionController;
-              SelectionController drillDownController = ControlCenter().drillDownController;
-              List<Object> dataPoints = selectionController.selectedDataPoints.toList();
-              if (dataPoints.isEmpty) {
-                dataPoints = drillDownController.selectedDataPoints.toList();
-              }
-              if (dataPoints.isEmpty) {
-                result = "";
-              } else {
-                result = dataPoints.map((e) {
-                  DataId dataId = e as DataId;
-                  return "(${dataId.dayObs}, ${dataId.seqNum})";
-                }).join(',');
-              }
+          Tooltip(
+              message: "Copy",
+              child: IconButton(
+                icon: const Icon(Icons.copy, color: Colors.green),
+                onPressed: () async {
+                  String result;
+                  SelectionController selectionController = ControlCenter().selectionController;
+                  SelectionController drillDownController = ControlCenter().drillDownController;
+                  List<Object> dataPoints = selectionController.selectedDataPoints.toList();
+                  if (dataPoints.isEmpty) {
+                    dataPoints = drillDownController.selectedDataPoints.toList();
+                  }
+                  if (dataPoints.isEmpty) {
+                    result = "";
+                  } else {
+                    result = dataPoints.map((e) {
+                      DataId dataId = e as DataId;
+                      return "(${dataId.dayObs}, ${dataId.seqNum})";
+                    }).join(',');
+                  }
 
-              if (result.isNotEmpty) {
-                result = "[$result]";
-              }
+                  if (result.isNotEmpty) {
+                    result = "[$result]";
+                  }
 
-              await Clipboard.setData(ClipboardData(text: result));
-            },
-          ),
-          IconButton(
-            icon:
-                Icon(Icons.travel_explore, color: workspace.globalQuery == null ? Colors.grey : Colors.green),
-            onPressed: () {
-              WorkspaceBloc bloc = context.read<WorkspaceBloc>();
-              showDialog(
-                  context: context,
-                  builder: (BuildContext context) => Dialog(
-                        child: QueryEditor(
-                          theme: workspace.theme,
-                          expression: QueryExpression(
-                            queries: workspace.globalQuery == null ? [] : [workspace.globalQuery!],
-                          ),
-                          onCompleted: (Query? query) {
-                            bloc.add(UpdateGlobalQueryEvent(globalQuery: query));
-                          },
-                        ),
-                      ));
-            },
-          ),
+                  await Clipboard.setData(ClipboardData(text: result));
+                },
+              )),
+          Tooltip(
+              message: "Change global query",
+              child: IconButton(
+                icon: Icon(Icons.travel_explore,
+                    color: workspace.globalQuery == null ? Colors.grey : Colors.green),
+                onPressed: () {
+                  WorkspaceBloc bloc = context.read<WorkspaceBloc>();
+                  showDialog(
+                      context: context,
+                      builder: (BuildContext context) => Dialog(
+                            child: QueryEditor(
+                              theme: workspace.theme,
+                              expression: QueryExpression(
+                                queries: workspace.globalQuery == null ? [] : [workspace.globalQuery!],
+                              ),
+                              onCompleted: (Query? query) {
+                                bloc.add(UpdateGlobalQueryEvent(globalQuery: query));
+                              },
+                            ),
+                          ));
+                },
+              )),
           SizedBox(
             height: workspace.theme.toolbarHeight,
             child: DatePickerWidget(
