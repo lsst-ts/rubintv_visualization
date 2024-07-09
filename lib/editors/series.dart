@@ -164,44 +164,59 @@ class SeriesEditorState extends State<SeriesEditor> {
                 ),*/
             Row(
               children: [
-                IconButton(
-                  onPressed: () {
-                    showDialog(
-                        context: context,
-                        builder: (BuildContext context) => Dialog(
-                              child: QueryEditor(
-                                theme: theme,
-                                expression: QueryExpression(
-                                  queries: series.query == null ? [] : [series.query!],
-                                ),
-                                onCompleted: updateQuery,
-                              ),
-                            ));
-                  },
-                  icon: const Icon(Icons.query_stats),
-                ),
+                Tooltip(
+                    message: "Edit query",
+                    child: IconButton(
+                      onPressed: () {
+                        showDialog(
+                            context: context,
+                            builder: (BuildContext context) => Dialog(
+                                  child: QueryEditor(
+                                    theme: theme,
+                                    expression: QueryExpression(
+                                      queries: series.query == null ? [] : [series.query!],
+                                    ),
+                                    onCompleted: updateQuery,
+                                  ),
+                                ));
+                      },
+                      icon: const Icon(Icons.query_stats),
+                    )),
                 const Spacer(),
-                IconButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  icon: const Icon(Icons.cancel, color: Colors.red),
-                ),
-                IconButton(
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      _formKey.currentState!.save();
-                      widget.chartBloc.add(UpdateSeriesEvent(
-                        series: series,
-                        groupByColumn: groupByColumn,
-                        dayObs: getFormattedDate(widget.workspace.info!.dayObs),
-                        globalQuery: widget.workspace.info!.globalQuery,
-                      ));
-                      Navigator.pop(context);
-                    }
-                  },
-                  icon: const Icon(Icons.check_circle, color: Colors.green),
-                ),
+                Tooltip(
+                    message: "Delete Series",
+                    child: IconButton(
+                      onPressed: () {
+                        widget.chartBloc.add(DeleteSeriesEvent(series.id));
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                    )),
+                Tooltip(
+                    message: "Cancel",
+                    child: IconButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.cancel, color: Colors.red),
+                    )),
+                Tooltip(
+                    message: "Aceept",
+                    child: IconButton(
+                      onPressed: () {
+                        if (_formKey.currentState!.validate()) {
+                          _formKey.currentState!.save();
+                          widget.chartBloc.add(UpdateSeriesEvent(
+                            series: series,
+                            groupByColumn: groupByColumn,
+                            dayObs: getFormattedDate(widget.workspace.info!.dayObs),
+                            globalQuery: widget.workspace.info!.globalQuery,
+                          ));
+                          Navigator.pop(context);
+                        }
+                      },
+                      icon: const Icon(Icons.check_circle, color: Colors.green),
+                    )),
               ],
             ),
           ]),

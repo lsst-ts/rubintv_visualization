@@ -128,6 +128,12 @@ class SynchDataEvent extends ChartEvent {
   });
 }
 
+class DeleteSeriesEvent extends ChartEvent {
+  final SeriesId seriesId;
+
+  DeleteSeriesEvent(this.seriesId);
+}
+
 /// State of a chart.
 abstract class ChartState {
   /// All charts have a [UniqueId].
@@ -416,6 +422,14 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
           dayObs: event.dayObs,
         );
       }
+    });
+
+    on<DeleteSeriesEvent>((event, emit) {
+      ChartStateLoaded state = this.state as ChartStateLoaded;
+      Map<SeriesId, SeriesInfo> newSeries = {...state._series};
+      newSeries.remove(event.seriesId);
+      DataCenter().removeSeriesData(event.seriesId);
+      emit(state.copyWith(series: newSeries));
     });
   }
 
