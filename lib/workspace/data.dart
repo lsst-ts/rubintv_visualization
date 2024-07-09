@@ -144,7 +144,7 @@ class SchemaField {
   String get asLabel => unit == null ? name : "$name ($unit)";
 
   @override
-  String toString() => "SchemaField<$unit>($name, $unit)";
+  String toString() => unit == null ? name : "$name ($unit):";
 
   /// Whether or not the field is a string.
   bool get isString => dataType == ColumnDataType.string;
