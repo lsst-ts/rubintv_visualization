@@ -157,63 +157,66 @@ class ToolbarState extends State<Toolbar> {
       child: Row(
         children: [
           const SizedBox(width: 10),
-          Tooltip(
-            message: "Menu",
-            child: MenuAnchor(
-              builder: (BuildContext context, MenuController controller, Widget? child) {
-                return IconButton(
-                  icon: const Icon(Icons.menu),
-                  onPressed: () {
-                    if (controller.isOpen) {
-                      controller.close();
-                    } else {
-                      controller.open();
-                    }
-                  },
-                );
-              },
-              menuChildren: [
-                MenuItemButton(
-                  onPressed: () {
-                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                          windowType: WindowTypes.cartesianScatter,
-                        ));
-                  },
-                  child: const Text("New Cartesian Scatter Plot"),
-                ),
-                MenuItemButton(
-                  onPressed: () {
-                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                          windowType: WindowTypes.polarScatter,
-                        ));
-                  },
-                  child: const Text("New Polar Scatter Plot"),
-                ),
-                MenuItemButton(
-                  onPressed: () {
-                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                          windowType: WindowTypes.histogram,
-                        ));
-                  },
-                  child: const Text("New Histogram"),
-                ),
-                MenuItemButton(
-                  onPressed: () {
-                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                          windowType: WindowTypes.box,
-                        ));
-                  },
-                  child: const Text("New Box Chart"),
-                ),
-                MenuItemButton(
-                  onPressed: () {
-                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                          windowType: WindowTypes.focalPlane,
-                        ));
-                  },
-                  child: const Text("New Focal Plane Chart"),
-                ),
-              ],
+          Visibility(
+            visible: workspace.instrument != null,
+            child: Tooltip(
+              message: "Menu",
+              child: MenuAnchor(
+                builder: (BuildContext context, MenuController controller, Widget? child) {
+                  return IconButton(
+                    icon: const Icon(Icons.menu),
+                    onPressed: () {
+                      if (controller.isOpen) {
+                        controller.close();
+                      } else {
+                        controller.open();
+                      }
+                    },
+                  );
+                },
+                menuChildren: [
+                  MenuItemButton(
+                    onPressed: () {
+                      context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                            windowType: WindowTypes.cartesianScatter,
+                          ));
+                    },
+                    child: const Text("New Cartesian Scatter Plot"),
+                  ),
+                  MenuItemButton(
+                    onPressed: () {
+                      context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                            windowType: WindowTypes.polarScatter,
+                          ));
+                    },
+                    child: const Text("New Polar Scatter Plot"),
+                  ),
+                  MenuItemButton(
+                    onPressed: () {
+                      context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                            windowType: WindowTypes.histogram,
+                          ));
+                    },
+                    child: const Text("New Histogram"),
+                  ),
+                  MenuItemButton(
+                    onPressed: () {
+                      context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                            windowType: WindowTypes.box,
+                          ));
+                    },
+                    child: const Text("New Box Chart"),
+                  ),
+                  MenuItemButton(
+                    onPressed: () {
+                      context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                            windowType: WindowTypes.focalPlane,
+                          ));
+                    },
+                    child: const Text("New Focal Plane Chart"),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(width: 10),
