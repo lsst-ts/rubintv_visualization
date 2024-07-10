@@ -113,7 +113,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
               Toolbar(workspace: state),
               SizedBox(
                 width: size.width,
-                height: size.height - 2 * kToolbarHeight,
+                height: size.height - kToolbarHeight,
                 child: Builder(
                   builder: (BuildContext context) {
                     List<Widget> children = [];

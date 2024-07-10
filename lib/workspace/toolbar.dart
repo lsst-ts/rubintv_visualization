@@ -171,36 +171,38 @@ class ToolbarState extends State<Toolbar> {
                 ),
               ))),
           const SizedBox(width: 30),
-          DropdownButton<String?>(
-            value: workspace.instrument?.name,
-            items: const [
-              DropdownMenuItem<String?>(
-                value: null,
-                child: Text("Select Instrument"),
-              ),
-              DropdownMenuItem(
-                value: "LsstCam",
-                child: Text("LSSTCam"),
-              ),
-              DropdownMenuItem(
-                value: "LsstComCam",
-                child: Text("LsstComCam"),
-              ),
-              DropdownMenuItem(
-                value: "Latiss",
-                child: Text("Latiss"),
-              ),
-              DropdownMenuItem(
-                value: "LsstComCamSim",
-                child: Text("LsstComCamSim"),
-              ),
-            ],
-            onChanged: (String? value) {
-              if (value != null) {
-                webSocketManager.sendMessage(LoadInstrumentAction(instrument: value).toJson());
-              }
-            },
-          ),
+          Tooltip(
+              message: "Change current instrument",
+              child: DropdownButton<String?>(
+                value: workspace.instrument?.name,
+                items: const [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text("Select Instrument"),
+                  ),
+                  DropdownMenuItem(
+                    value: "LsstCam",
+                    child: Text("LSSTCam"),
+                  ),
+                  DropdownMenuItem(
+                    value: "LsstComCam",
+                    child: Text("LsstComCam"),
+                  ),
+                  DropdownMenuItem(
+                    value: "Latiss",
+                    child: Text("Latiss"),
+                  ),
+                  DropdownMenuItem(
+                    value: "LsstComCamSim",
+                    child: Text("LsstComCamSim"),
+                  ),
+                ],
+                onChanged: (String? value) {
+                  if (value != null) {
+                    webSocketManager.sendMessage(LoadInstrumentAction(instrument: value).toJson());
+                  }
+                },
+              )),
           const SizedBox(width: 10),
           Tooltip(
             message: "Show Focal Plane",
