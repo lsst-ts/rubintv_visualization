@@ -50,64 +50,22 @@ class InitializeScatterPlotEvent extends ChartEvent {
 
 /// The [Widget] used to display a scatter plot.
 class ScatterPlotWidget extends StatelessWidget {
-  /// The [Window] that contains the scatter plot and displays it on the screen.
-  final Window window;
+  /// The [WindowMetaData] that contains the scatter plot and displays it on the screen.
+  final WindowMetaData window;
+  final ChartBloc bloc;
 
   const ScatterPlotWidget({
     super.key,
     required this.window,
+    required this.bloc,
   });
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) {
-        List<ChartAxisInfo> axisInfo = [];
-        if (window.type == WindowTypes.cartesianScatter) {
-          axisInfo = [
-            ChartAxisInfo(
-              label: "<x>",
-              axisId: AxisId(AxisLocation.bottom),
-            ),
-            ChartAxisInfo(
-              label: "<y>",
-              axisId: AxisId(AxisLocation.left),
-              isInverted: true,
-            ),
-          ];
-        } else if (window.type == WindowTypes.polarScatter) {
-          axisInfo = [
-            ChartAxisInfo(
-              label: "<r>",
-              axisId: AxisId(AxisLocation.radial),
-            ),
-            ChartAxisInfo(
-              label: "<θ>",
-              axisId: AxisId(AxisLocation.angular),
-              isInverted: true,
-            ),
-          ];
-        } else {
-          throw Exception("Invalid window type: ${window.type}");
-        }
-        return ChartBloc(window.id)
-          ..add(InitializeScatterPlotEvent(
-            id: window.id,
-            axisInfo: axisInfo,
-            chartType: window.type,
-          ));
-      },
+    return BlocProvider<ChartBloc>.value(
+      value: bloc,
       child: BlocBuilder<ChartBloc, ChartState>(
         builder: (context, state) {
-          if (state is! ChartStateLoaded) {
-            /// Display an empty window while the chart is loading
-            return ResizableWindow(
-              info: window,
-              title: "loading...",
-              toolbar: Row(children: [...context.read<ChartBloc>().getDefaultTools(context)]),
-              child: const Center(child: CircularProgressIndicator()),
-            );
-          }
           if (state.needsReset) {
             context.read<ChartBloc>().add(ResetChartEvent(ChartResetTypes.full));
           }
@@ -150,7 +108,7 @@ class ScatterPlotWidget extends StatelessWidget {
             ),
             title: null,
             child: RubinChart(
-              info: window.type == WindowTypes.cartesianScatter
+              info: window.windowType == WindowTypes.cartesianScatter
                   ? CartesianScatterPlotInfo(
                       id: window.id,
                       allSeries: state.allSeries,

@@ -44,23 +44,6 @@ const int kDefaultPlaybackSpeed = 500;
 /// factor to multiply the playback speed by.
 const double kPlaybackSpeedStep = 1.25;
 
-/// Create an empty [ChartAxis].
-/// This is required for the color map slider, and is just a dummy axis.
-ChartAxis _createEmptyAxis(ChartAxisInfo axisInfo, ChartTheme theme) {
-  return NumericalChartAxis(
-    info: axisInfo,
-    bounds: const Bounds(0, 0),
-    dataBounds: const Bounds(0, 0),
-    ticks: AxisTicks(
-      majorTicks: [],
-      minorTicks: [],
-      bounds: const Bounds(0, 0),
-      tickLabels: [],
-    ),
-    theme: theme,
-  );
-}
-
 /// Format the obsDate (an integer of the form YYYYMMDD) as a string.
 String formatObsDate(int dateNumber) {
   String dateString = dateNumber.toString().padLeft(8, '0');
@@ -68,7 +51,7 @@ String formatObsDate(int dateNumber) {
 }
 
 /// An event in a [FocalPlaneChartBloc].
-abstract class FocalPlaneChartEvent {}
+abstract class FocalPlaneChartEvent extends WindowEvent {}
 
 /// An event to initialize the focal plane chart.
 class InitializeFocalPlaneChartEvent extends FocalPlaneChartEvent {
@@ -155,17 +138,8 @@ class FocalPlaneTickEvent extends FocalPlaneChartEvent {}
 /// An event to toggle the loop playback.
 class FocalPlaneToggleLoopEvent extends FocalPlaneChartEvent {}
 
-/// The state of a [FocalPlaneChartBloc].
-abstract class FocalPlaneChartState {}
-
-/// The initial state of a [FocalPlaneChartBloc].
-class FocalPlaneChartStateInitial extends FocalPlaneChartState {}
-
 /// The loaded state of a [FocalPlaneChartBloc].
-class FocalPlaneChartStateLoaded extends FocalPlaneChartState {
-  /// The unique identifier of the chart.
-  UniqueId id;
-
+class FocalPlaneChartState extends WindowState {
   /// The series information.
   SeriesInfo series;
 
@@ -201,8 +175,8 @@ class FocalPlaneChartStateLoaded extends FocalPlaneChartState {
   /// The global dayObs.
   String? dayObs;
 
-  FocalPlaneChartStateLoaded({
-    required this.id,
+  FocalPlaneChartState({
+    required super.id,
     required this.series,
     required this.dataAxis,
     required this.data,
@@ -213,10 +187,10 @@ class FocalPlaneChartStateLoaded extends FocalPlaneChartState {
     required this.isPlaying,
     required this.loopPlayback,
     required this.dayObs,
-  });
+  }) : super(windowType: WindowTypes.focalPlane);
 
   /// Copy the state with new values.
-  FocalPlaneChartStateLoaded copyWith({
+  FocalPlaneChartState copyWith({
     UniqueId? id,
     SeriesInfo? series,
     ChartAxis? dataAxis,
@@ -229,7 +203,7 @@ class FocalPlaneChartStateLoaded extends FocalPlaneChartState {
     bool? loopPlayback,
     String? dayObs,
   }) =>
-      FocalPlaneChartStateLoaded(
+      FocalPlaneChartState(
         id: id ?? this.id,
         series: series ?? this.series,
         dataAxis: dataAxis ?? this.dataAxis,
@@ -248,7 +222,13 @@ class FocalPlaneChartStateLoaded extends FocalPlaneChartState {
 }
 
 /// A bloc to manage the state of a focal plane chart.
-class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartState> {
+class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
+  /// Convert the bloc to a JSON object
+  @override
+  Map<String, dynamic> toJson() {
+    throw UnimplementedError("toJson not implemented for ChartBloc");
+  }
+
   /// The subscription to the websocket.
   late StreamSubscription _websocketSubscription;
 
@@ -261,7 +241,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
   /// The selection timer.
   Timer? _selectionTimer;
 
-  FocalPlaneChartBloc() : super(FocalPlaneChartStateInitial()) {
+  FocalPlaneChartBloc(super.initialState) {
     _websocketSubscription = WebSocketManager().messages.listen((message) {
       add(FocalPlaneReceiveMessageEvent(message));
     });
@@ -269,10 +249,6 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
     /// Subscribe to the selection controller to update the chart when points are selected.
     /// We use a timer so that we don't load data until the selection has stopped
     ControlCenter().selectionController.subscribe((Set<Object> dataPoints) {
-      if (this.state is! FocalPlaneChartStateLoaded) {
-        return;
-      }
-      FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       _selectionTimer?.cancel();
       _selectionTimer = Timer(const Duration(milliseconds: 500), () {
         add(FocalPlaneUpdateColumnEvent(
@@ -285,25 +261,21 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
 
     /// Subscribe to the global query stream to update the chart when the query changes.
     _globalQuerySubscription = ControlCenter().globalQueryStream.listen((GlobalQuery? query) {
-      if (state is FocalPlaneChartStateLoaded) {
-        FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
-        Set<DataId>? selected =
-            ControlCenter().selectionController.selectedDataPoints.map((e) => e as DataId).toSet();
-        if (selected.isEmpty) {
-          selected = ControlCenter().drillDownController.selectedDataPoints.map((e) => e as DataId).toSet();
-        }
-        if (selected.isEmpty) {
-          selected = null;
-        }
-        _fetchSeriesData(
-            series: state.series, query: query?.query, dayObs: query?.dayObs, selected: selected);
+      Set<DataId>? selected =
+          ControlCenter().selectionController.selectedDataPoints.map((e) => e as DataId).toSet();
+      if (selected.isEmpty) {
+        selected = ControlCenter().drillDownController.selectedDataPoints.map((e) => e as DataId).toSet();
       }
+      if (selected.isEmpty) {
+        selected = null;
+      }
+      _fetchSeriesData(series: state.series, query: query?.query, dayObs: query?.dayObs, selected: selected);
     });
 
     /// Initialize the chart.
     on<InitializeFocalPlaneChartEvent>((event, emit) {
       ColorbarController colorbarController = event.colorbarController;
-      emit(FocalPlaneChartStateLoaded(
+      emit(FocalPlaneChartState(
         id: event.id,
         series: event.series,
         dataAxis: event.dataAxis,
@@ -320,11 +292,6 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
 
     /// Process data received from the websocket.
     on<FocalPlaneReceiveMessageEvent>((event, emit) {
-      if (this.state is FocalPlaneChartStateInitial) {
-        return;
-      }
-      FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
-
       List<String>? splitId = event.message["requestId"]?.split(",");
       if (splitId == null || splitId.length != 2) {
         return;
@@ -332,7 +299,7 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
       UniqueId windowId = UniqueId.fromString(splitId[0]);
 
       if (event.message["type"] == "table columns" && windowId == state.id) {
-        FocalPlaneChartStateLoaded? newState = _updateSeriesData(event);
+        FocalPlaneChartState? newState = _updateSeriesData(event);
         if (newState != null) {
           emit(newState);
         }
@@ -341,7 +308,6 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
 
     /// Update the Series and fetch the data.
     on<FocalPlaneUpdateColumnEvent>((event, emit) {
-      FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       final String tableName = event.field.schema.name;
       SchemaField detectorField;
       if (kExposureTables.contains(tableName)) {
@@ -375,13 +341,11 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
 
     /// Update the data index.
     on<FocalPlaneUpdateDataIndexEvent>((event, emit) {
-      FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       emit(state.copyWith(dataIndex: event.index));
     });
 
     /// Increase the data index.
     on<FocalPlaneIncreaseDataIndexEvent>((event, emit) {
-      FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       if (state.dataIndex < state.dataIds.length - 1) {
         emit(state.copyWith(dataIndex: state.dataIndex + 1));
       }
@@ -389,7 +353,6 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
 
     /// Update the playback speed.
     on<FocalPlaneUpdatePlaybackSpeedEvent>((event, emit) {
-      FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       emit(state.copyWith(playbackSpeed: event.speed));
       if (state.isPlaying) {
         _createTimer();
@@ -399,7 +362,6 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
     /// Start the playback timer, which increases the [dataIndex] periodically.
     on<FocalPlaneStartTimerEvent>((event, emit) {
       _createTimer();
-      FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       int dataIndex = state.dataIndex;
       if (dataIndex == state.dataIds.length - 1) {
         dataIndex = 0;
@@ -409,7 +371,6 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
 
     /// Stop the playback timer.
     on<FocalPlaneStopTimerEvent>((event, emit) {
-      FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       _playTimer?.cancel();
       _playTimer = null;
       emit(state.copyWith(isPlaying: false));
@@ -417,7 +378,6 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
 
     /// Update the data index when a tick is received.
     on<FocalPlaneTickEvent>((event, emit) {
-      FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       if (state.dataIndex < state.dataIds.length - 1) {
         emit(state.copyWith(dataIndex: state.dataIndex + 1));
       } else if (state.loopPlayback) {
@@ -430,14 +390,12 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
 
     /// Toggle the loop playback.
     on<FocalPlaneToggleLoopEvent>((event, emit) {
-      FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       emit(state.copyWith(loopPlayback: !state.loopPlayback));
     });
   }
 
   /// Create the playback timer.
   void _createTimer() {
-    FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
     _playTimer?.cancel();
     _playTimer = Timer.periodic(Duration(milliseconds: (kDefaultPlaybackSpeed / state.playbackSpeed).round()),
         (timer) {
@@ -446,9 +404,8 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
   }
 
   /// Update the series data.
-  FocalPlaneChartStateLoaded? _updateSeriesData(FocalPlaneReceiveMessageEvent event) {
+  FocalPlaneChartState? _updateSeriesData(FocalPlaneReceiveMessageEvent event) {
     // Extract result
-    FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
     int rows = event.message["content"]["data"].values.first.length;
     int columns = event.message["content"]["data"].length;
     developer.log("received $columns columns and $rows rows for ${event.message["requestId"]}",
@@ -525,7 +482,6 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
   }) {
     WebSocketManager websocket = WebSocketManager();
     if (websocket.isConnected) {
-      FocalPlaneChartStateLoaded state = this.state as FocalPlaneChartStateLoaded;
       websocket.sendMessage(LoadColumnsCommand.build(
         seriesId: series.id,
         fields: series.fields.values.toList(),
@@ -550,7 +506,10 @@ class FocalPlaneChartBloc extends Bloc<FocalPlaneChartEvent, FocalPlaneChartStat
 /// A viewer for the focal plane chart.
 class FocalPlaneChartViewer extends StatefulWidget {
   /// The window to display the chart in.
-  final Window window;
+  final WindowMetaData window;
+
+  /// The bloc to manage the state of the chart.
+  final FocalPlaneChartBloc bloc;
 
   /// The state of the entire workspace.
   /// (used to get the detector and global dayObs)
@@ -559,6 +518,7 @@ class FocalPlaneChartViewer extends StatefulWidget {
   const FocalPlaneChartViewer({
     super.key,
     required this.window,
+    required this.bloc,
     required this.workspace,
   });
 
@@ -568,7 +528,7 @@ class FocalPlaneChartViewer extends StatefulWidget {
 
 /// The state of the [FocalPlaneChartViewer].
 class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
-  Window get window => widget.window;
+  WindowMetaData get window => widget.window;
   WorkspaceState get workspace => widget.workspace;
 
   /// We use a special editor for the series in a focal plane chart.
@@ -600,77 +560,35 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    widget.bloc.state.colorbarController.subscribe((ColorbarState state) {
+      setState(() {});
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (BuildContext context) {
-        // Initialize the Bloc
-        SeriesId sid = SeriesId(windowId: window.id, id: BigInt.zero);
-        AxisId valueAxisId = AxisId(AxisLocation.right);
-        AxisId detectorAxisId = AxisId(AxisLocation.color);
-        Map<AxisId, SchemaField> fields = {};
-        ChartAxisInfo axisInfo = ChartAxisInfo(
-          label: "Focal Plane color axis",
-          axisId: valueAxisId,
-        );
-        ChartAxis dataAxis = _createEmptyAxis(axisInfo, workspace.theme.chartTheme);
-
-        SeriesInfo newSeries = SeriesInfo(
-          id: sid,
-          name: "Focal Plane Chart",
-          axes: [valueAxisId, detectorAxisId],
-          fields: fields,
-        );
-
-        ColorbarController colorbarController = ColorbarController(
-          min: 0,
-          max: 100,
-          stops: {
-            0: Colors.blue,
-            100: Colors.red,
-          },
-        );
-
-        colorbarController.subscribe((ColorbarState state) {
-          setState(() {});
-        });
-
-        return FocalPlaneChartBloc()
-          ..add(
-            InitializeFocalPlaneChartEvent(
-              id: window.id,
-              series: newSeries,
-              dataAxis: dataAxis,
-              colorbarController: colorbarController,
-              dayObs: getFormattedDate(workspace.dayObs),
-            ),
-          );
-      },
+    return BlocProvider<FocalPlaneChartBloc>.value(
+      value: widget.bloc,
       child: BlocBuilder<FocalPlaneChartBloc, FocalPlaneChartState>(
         builder: (BuildContext context, FocalPlaneChartState state) {
-          if (state is FocalPlaneChartStateInitial) {
-            // The chart is still initializing
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          FocalPlaneChartStateLoaded fullState = state as FocalPlaneChartStateLoaded;
           String columnName = "chart column";
-          if (fullState.series.fields.isNotEmpty) {
-            columnName = fullState.series.fields.values.first.name;
+          if (state.series.fields.isNotEmpty) {
+            columnName = state.series.fields.values.first.name;
           }
 
           // Extract the data ID and the data
           String dayObsStr = "dayObs";
           String seqNumStr = "seqNum";
           Map<int, Color>? colors;
-          if (fullState.dataIds.isNotEmpty) {
-            DataId dataId = fullState.dataIds[fullState.dataIndex];
+          if (state.dataIds.isNotEmpty) {
+            DataId dataId = state.dataIds[state.dataIndex];
             dayObsStr = formatObsDate(dataId.dayObs);
             seqNumStr = dataId.seqNum.toString();
             colors = {};
-            for (int detector in fullState.data[dataId]!.keys) {
-              double value = fullState.dataAxis.toDouble(fullState.data[dataId]![detector]!);
+            for (int detector in state.data[dataId]!.keys) {
+              double value = state.dataAxis.toDouble(state.data[dataId]![detector]!);
               colors[detector] = state.colorbarController.getColor(value);
             }
           }
@@ -684,7 +602,7 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
                   child: IconButton(
                     icon: const Icon(Icons.edit, color: Colors.green),
                     onPressed: () {
-                      _editSeries(context, fullState.series);
+                      _editSeries(context, state.series);
                     },
                   ),
                 ),

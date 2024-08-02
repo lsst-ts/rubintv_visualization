@@ -52,7 +52,7 @@ class InitializeBinnedEvent extends ChartEvent {
 }
 
 /// The state of a binned chart.
-class BinnedState extends ChartStateLoaded {
+class BinnedState extends ChartState {
   /// The number of bins to use in the chart.
   int nBins;
 
@@ -62,7 +62,7 @@ class BinnedState extends ChartStateLoaded {
     required super.axisInfo,
     required super.legend,
     required super.useGlobalQuery,
-    required super.chartType,
+    required super.windowType,
     required super.tool,
     required this.nBins,
     required super.resetController,
@@ -77,7 +77,7 @@ class BinnedState extends ChartStateLoaded {
     Legend? legend,
     bool? useGlobalQuery,
     DataCenter? dataCenter,
-    WindowTypes? chartType,
+    WindowTypes? windowType,
     MultiSelectionTool? tool,
     int? nBins,
     StreamController<ResetChartAction>? resetController,
@@ -89,7 +89,7 @@ class BinnedState extends ChartStateLoaded {
         axisInfo: axisInfo ?? this.axisInfo,
         legend: legend ?? this.legend,
         useGlobalQuery: useGlobalQuery ?? this.useGlobalQuery,
-        chartType: chartType ?? this.chartType,
+        windowType: windowType ?? this.windowType,
         tool: tool ?? this.tool,
         nBins: nBins ?? this.nBins,
         resetController: resetController ?? this.resetController,
@@ -99,12 +99,14 @@ class BinnedState extends ChartStateLoaded {
 
 /// The [Widget] used to display a binned chart.
 class BinnedChartWidget extends StatelessWidget {
-  /// The [Window that contains the chart and displays it on the screen.
-  final Window window;
+  /// The [WindowMetaData that contains the chart and displays it on the screen.
+  final WindowMetaData window;
+  final ChartBloc bloc;
 
   BinnedChartWidget({
     super.key,
     required this.window,
+    required this.bloc,
   });
 
   /// The [TextEditingController] used to control the number of bins in the chart.
@@ -115,28 +117,9 @@ class BinnedChartWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) {
-        List<ChartAxisInfo> axisInfo = [
-          ChartAxisInfo(
-            label: "<x>",
-            axisId: AxisId(AxisLocation.bottom),
-          ),
-        ];
-        if (window.type == WindowTypes.box) {
-          axisInfo.add(ChartAxisInfo(
-            label: "<y>",
-            axisId: AxisId(AxisLocation.left),
-          ));
-        }
-        return ChartBloc(window.id)
-          ..add(InitializeBinnedEvent(
-            id: window.id,
-            axisInfo: axisInfo,
-            chartType: window.type,
-          ));
-      },
-      child: BlocBuilder<ChartBloc, ChartState>(
+    return BlocProvider<ChartBloc>.value(
+      value: bloc,
+      child: BlocBuilder<ChartBloc, WindowState>(
         builder: (context, state) {
           if (state is! BinnedState) {
             /// Display an empty window while the chart is loading
@@ -207,7 +190,7 @@ class BinnedChartWidget extends StatelessWidget {
             ]),
             title: null,
             child: RubinChart(
-              info: window.type == WindowTypes.histogram
+              info: window.windowType == WindowTypes.histogram
                   ? HistogramInfo(
                       id: window.id,
                       allSeries: state.allSeries,

@@ -53,7 +53,7 @@ enum MultiSelectionTool {
   const MultiSelectionTool(this.icon, this.cursorAction);
 }
 
-abstract class ChartEvent {}
+abstract class ChartEvent extends WindowEvent {}
 
 /// A message received via the websocket.
 class ChartReceiveMessageEvent extends ChartEvent {
@@ -134,21 +134,8 @@ class DeleteSeriesEvent extends ChartEvent {
   DeleteSeriesEvent(this.seriesId);
 }
 
-/// State of a chart.
-abstract class ChartState {
-  /// All charts have a [UniqueId].
-  UniqueId id;
-
-  ChartState(this.id);
-}
-
-/// Initial state of a chart.
-class ChartStateInitial extends ChartState {
-  ChartStateInitial(super.id);
-}
-
 /// Persistable information to generate a chart
-class ChartStateLoaded extends ChartState {
+class ChartState extends WindowState {
   /// The series that are plotted on the chart.
   final Map<SeriesId, SeriesInfo> _series;
 
@@ -160,9 +147,6 @@ class ChartStateLoaded extends ChartState {
 
   /// Whether or not to use the global query for all series in this [ChartLoadedState].
   final bool useGlobalQuery;
-
-  /// The type of chart to display.
-  final WindowTypes chartType;
 
   /// The selection tool to use for this chart.
   final MultiSelectionTool tool;
@@ -176,19 +160,18 @@ class ChartStateLoaded extends ChartState {
   /// Whether or not this chart needs a reset.
   bool needsReset;
 
-  ChartStateLoaded({
-    required UniqueId id,
+  ChartState({
+    required super.id,
+    required super.windowType,
     required Map<SeriesId, SeriesInfo> series,
     required List<ChartAxisInfo> axisInfo,
     required this.legend,
     required this.useGlobalQuery,
-    required this.chartType,
     required this.tool,
     required this.resetController,
     this.needsReset = false,
   })  : _series = Map<SeriesId, SeriesInfo>.unmodifiable(series),
-        _axisInfo = List<ChartAxisInfo>.unmodifiable(axisInfo),
-        super(id);
+        _axisInfo = List<ChartAxisInfo>.unmodifiable(axisInfo);
 
   /// Whether or not to use a selection controller.
   bool get useSelectionController => tool == MultiSelectionTool.select;
@@ -202,25 +185,25 @@ class ChartStateLoaded extends ChartState {
   /// Return a copy of the internal [List] of [ChartAxisInfo], to prevent updates.
   List<ChartAxisInfo> get axisInfo => [..._axisInfo];
 
-  /// Make a copy of this [ChartStateLoaded] with the given parameters updated.
-  ChartStateLoaded copyWith({
+  /// Make a copy of this [ChartState] with the given parameters updated.
+  ChartState copyWith({
     UniqueId? id,
     Map<SeriesId, SeriesInfo>? series,
     List<ChartAxisInfo>? axisInfo,
     Legend? legend,
     bool? useGlobalQuery,
-    WindowTypes? chartType,
+    WindowTypes? windowType,
     MultiSelectionTool? tool,
     StreamController<ResetChartAction>? resetController,
     bool? needsReset,
   }) =>
-      ChartStateLoaded(
+      ChartState(
         id: id ?? this.id,
         series: series ?? _series,
         axisInfo: axisInfo ?? _axisInfo,
         legend: legend ?? this.legend,
         useGlobalQuery: useGlobalQuery ?? this.useGlobalQuery,
-        chartType: chartType ?? this.chartType,
+        windowType: windowType ?? this.windowType,
         tool: tool ?? this.tool,
         resetController: resetController ?? this.resetController,
         needsReset: needsReset ?? false,
@@ -246,14 +229,20 @@ class ChartStateLoaded extends ChartState {
 }
 
 /// The base class for all chart blocs.
-class ChartBloc extends Bloc<ChartEvent, ChartState> {
+class ChartBloc extends WindowBloc<ChartState> {
+  /// Convert the bloc to a JSON object
+  @override
+  Map<String, dynamic> toJson() {
+    throw UnimplementedError("toJson not implemented for ChartBloc");
+  }
+
   /// Subscription to the websocket.
   late StreamSubscription _subscription;
 
   /// Subscription to changes in the global query or global dayObs values.
   late StreamSubscription _globalQuerySubscription;
 
-  ChartBloc(UniqueId id) : super(ChartStateInitial(id)) {
+  ChartBloc(super.initialState) {
     /// Listen for messages from the websocket.
     _subscription = WebSocketManager().messages.listen((message) {
       add(ChartReceiveMessageEvent(message));
@@ -261,24 +250,17 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
     /// Reload the data if the global query or global dayObs changes.
     _globalQuerySubscription = ControlCenter().globalQueryStream.listen((GlobalQuery? query) {
-      if (state is ChartStateLoaded) {
-        ChartStateLoaded state = this.state as ChartStateLoaded;
-        for (SeriesInfo series in state._series.values) {
-          add(UpdateSeriesEvent(
-            series: series,
-            globalQuery: query?.query,
-            dayObs: query?.dayObs,
-          ));
-        }
+      for (SeriesInfo series in state._series.values) {
+        add(UpdateSeriesEvent(
+          series: series,
+          globalQuery: query?.query,
+          dayObs: query?.dayObs,
+        ));
       }
     });
 
     /// A message is received from the websocket.
     on<ChartReceiveMessageEvent>((event, emit) {
-      if (this.state is ChartStateInitial) {
-        return;
-      }
-      ChartStateLoaded state = this.state as ChartStateLoaded;
       //developer.log("received message: ${event.message.keys}, requestId: ${event.message['requestId']}",
       //    name: "rubin_chart.workspace");
       List<String>? splitId = event.message["requestId"]?.split(",");
@@ -308,13 +290,13 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
     /// Initialize a scatter plot.
     on<InitializeScatterPlotEvent>((event, emit) {
-      emit(ChartStateLoaded(
+      emit(ChartState(
         id: event.id,
         series: {},
         axisInfo: event.axisInfo,
         legend: Legend(),
         useGlobalQuery: true,
-        chartType: event.chartType,
+        windowType: event.chartType,
         tool: MultiSelectionTool.select,
         resetController: StreamController<ResetChartAction>.broadcast(),
       ));
@@ -328,7 +310,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         axisInfo: event.axisInfo,
         legend: Legend(),
         useGlobalQuery: true,
-        chartType: event.chartType,
+        windowType: event.chartType,
         tool: MultiSelectionTool.select,
         nBins: 20,
         resetController: StreamController<ResetChartAction>.broadcast(),
@@ -337,13 +319,11 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
     /// Change the selection tool.
     on<UpdateMultiSelect>((event, emit) {
-      ChartStateLoaded state = this.state as ChartStateLoaded;
       emit(state.copyWith(tool: event.tool));
     });
 
     /// Toggle the use of the global query in this Chart.
     on<UpdateChartGlobalQueryEvent>((event, emit) {
-      ChartStateLoaded state = this.state as ChartStateLoaded;
       emit(state.copyWith(useGlobalQuery: event.useGlobalQuery));
       for (SeriesInfo series in state._series.values) {
         _fetchSeriesData(
@@ -356,8 +336,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
     /// A Series in the chart is updated. This will trigger a reload of the data from the remote server.
     on<UpdateSeriesEvent>((event, emit) {
-      ChartStateLoaded state = this.state as ChartStateLoaded;
-
       if (event.groupByColumn != null) {
         throw UnimplementedError("Group by column not yet implemented");
       } else {
@@ -392,7 +370,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
     /// Update the axis information for a chart.
     on<UpdateAxisInfoEvent>((event, emit) {
-      ChartStateLoaded state = this.state as ChartStateLoaded;
       List<ChartAxisInfo> newAxisInfo = state.axisInfo.map((ChartAxisInfo info) {
         if (info.axisId == event.axisInfo.axisId) {
           return event.axisInfo;
@@ -404,16 +381,12 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
     /// Reset the chart.
     on<ResetChartEvent>((event, emit) {
-      if (state is ChartStateLoaded) {
-        ChartStateLoaded state = this.state as ChartStateLoaded;
-        state.resetController.add(ResetChartAction(event.type));
-        emit(state.copyWith(needsReset: false));
-      }
+      state.resetController.add(ResetChartAction(event.type));
+      emit(state.copyWith(needsReset: false));
     });
 
     /// Reload all of the data from the server.
     on<SynchDataEvent>((event, emit) {
-      ChartStateLoaded state = this.state as ChartStateLoaded;
       for (SeriesInfo series in state._series.values) {
         developer.log("Synching data for series ${series.id}", name: "rubintv.chart.base.dart");
         _fetchSeriesData(
@@ -425,7 +398,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     });
 
     on<DeleteSeriesEvent>((event, emit) {
-      ChartStateLoaded state = this.state as ChartStateLoaded;
       Map<SeriesId, SeriesInfo> newSeries = {...state._series};
       newSeries.remove(event.seriesId);
       DataCenter().removeSeriesData(event.seriesId);
@@ -441,7 +413,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
   }) {
     WebSocketManager websocket = WebSocketManager();
     if (websocket.isConnected) {
-      ChartStateLoaded state = this.state as ChartStateLoaded;
       websocket.sendMessage(LoadColumnsCommand.build(
         seriesId: series.id,
         fields: series.fields.values.toList(),
@@ -460,8 +431,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     required SeriesInfo series,
     required DataCenter dataCenter,
   }) {
-    ChartStateLoaded state = this.state as ChartStateLoaded;
-
     final List<AxisId> mismatched = [];
     // Check that the series has the correct number of columns and axes
     if (series.fields.length != state.axisInfo.length) {
@@ -492,8 +461,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
   /// Get the next series ID for this [ChartLoadedState].
   BigInt get nextSeriesId {
-    ChartStateLoaded state = this.state as ChartStateLoaded;
-
     BigInt maxId = BigInt.zero;
     for (SeriesId sid in state._series.keys) {
       if (sid.id > maxId) {
@@ -505,8 +472,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
   /// Create a new empty Series for this [ChartLoadedState].
   SeriesInfo nextSeries() {
-    ChartStateLoaded state = this.state as ChartStateLoaded;
-
     SeriesId sid = SeriesId(windowId: state.id, id: nextSeriesId);
     DatabaseSchema database = DataCenter().databases.values.first;
     TableSchema table = database.tables.values.first;
@@ -524,17 +489,16 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
   /// Get the maximum number of axes for this chart.
   int get nMaxAxes {
-    ChartStateLoaded state = this.state as ChartStateLoaded;
-    if (state.chartType == WindowTypes.histogram) {
+    if (state.windowType == WindowTypes.histogram) {
       return 1;
-    } else if (state.chartType == WindowTypes.cartesianScatter) {
+    } else if (state.windowType == WindowTypes.cartesianScatter) {
       return 2;
-    } else if (state.chartType == WindowTypes.polarScatter) {
+    } else if (state.windowType == WindowTypes.polarScatter) {
       return 2;
-    } else if (state.chartType == WindowTypes.combination) {
+    } else if (state.windowType == WindowTypes.combination) {
       return 2;
     }
-    throw UnimplementedError("Unknown chart type: ${state.chartType}");
+    throw UnimplementedError("Unknown chart type: ${state.windowType}");
   }
 
   /// Open the [SeriesEditor] dialog to edit a series.
@@ -558,7 +522,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
   /// The action to perform when a [Series] entry in a chart [Legend] is selected.
   /// This will open the [SeriesEditor] dialog to edit the series.
   void onLegendSelect({required Series series, required BuildContext context}) {
-    ChartStateLoaded state = this.state as ChartStateLoaded;
     for (SeriesId seriesId in state.series.keys) {
       if (seriesId == series.id) {
         _editSeries(context, state.series[seriesId]!);
@@ -570,7 +533,6 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
   /// The action to perform when an [Axis] entry in a chart [Legend] is selected.
   /// This will open the [AxisEditor] dialog to edit the axis properties.
   void onAxisTap({required AxisId axisId, required BuildContext context}) {
-    ChartStateLoaded state = this.state as ChartStateLoaded;
     for (ChartAxisInfo axisInfo in state.axisInfo) {
       if (axisInfo.axisId == axisId) {
         // Open the field editor
@@ -591,10 +553,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
   /// Get the default widgets for the toolbar of all charts.
   List<Widget> getDefaultTools(BuildContext context) {
-    bool useGlobalQuery = false;
-    if (state is ChartStateLoaded) {
-      useGlobalQuery = (state as ChartStateLoaded).useGlobalQuery;
-    }
+    bool useGlobalQuery = state.useGlobalQuery;
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
     return [
       Tooltip(
@@ -628,9 +587,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         child: IconButton(
           icon: const Icon(Icons.refresh, color: Colors.green),
           onPressed: () {
-            if (state is ChartStateLoaded) {
-              (state as ChartStateLoaded).resetController.add(ResetChartAction(ChartResetTypes.full));
-            }
+            state.resetController.add(ResetChartAction(ChartResetTypes.full));
           },
         ),
       ),
@@ -639,12 +596,10 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         child: IconButton(
           icon: const Icon(Icons.sync, color: Colors.green),
           onPressed: () {
-            if (state is ChartStateLoaded) {
-              context.read<ChartBloc>().add(SynchDataEvent(
-                    dayObs: getFormattedDate(workspace.info!.dayObs),
-                    globalQuery: workspace.info!.globalQuery,
-                  ));
-            }
+            context.read<ChartBloc>().add(SynchDataEvent(
+                  dayObs: getFormattedDate(workspace.info!.dayObs),
+                  globalQuery: workspace.info!.globalQuery,
+                ));
           },
         ),
       ),
@@ -662,7 +617,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
               // Clear the window in the workspace
               context.read<WorkspaceBloc>().add(RemoveWindowEvent(state.id));
               // Remove all of the series in the chart from the DataCenter.
-              for (SeriesInfo series in (state as ChartStateLoaded)._series.values) {
+              for (SeriesInfo series in state._series.values) {
                 DataCenter().removeSeriesData(series.id);
               }
             },

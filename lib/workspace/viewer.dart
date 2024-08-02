@@ -23,6 +23,7 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rubintv_visualization/chart/base.dart';
 import 'package:rubintv_visualization/chart/binned.dart';
 import 'package:rubintv_visualization/chart/scatter.dart';
 import 'package:rubintv_visualization/focal_plane/chart.dart';
@@ -33,7 +34,7 @@ import 'package:rubintv_visualization/workspace/state.dart';
 import 'package:rubintv_visualization/workspace/toolbar.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
 
-/// A [Widget] used to display a set of re-sizable and translatable [Window] widgets in a container.
+/// A [Widget] used to display a set of re-sizable and translatable [WindowMetaData] widgets in a container.
 class WorkspaceViewer extends StatefulWidget {
   /// The size of the widget.
   final Size size;
@@ -117,7 +118,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
                 child: Builder(
                   builder: (BuildContext context) {
                     List<Widget> children = [];
-                    for (Window window in info!.windows.values) {
+                    for (WindowMetaData window in info!.windows.values) {
                       children.add(Positioned(
                         left: window.offset.dx,
                         top: window.offset.dy,
@@ -141,25 +142,26 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
   }
 
   /// Build a window widget based on the type of the window.
-  Widget buildWindow(Window window, WorkspaceState state) {
-    if (window.type == WindowTypes.cartesianScatter || window.type == WindowTypes.polarScatter) {
-      return ScatterPlotWidget(window: window);
+  Widget buildWindow(WindowMetaData window, WorkspaceState workspace) {
+    if (window.windowType == WindowTypes.cartesianScatter || window.windowType == WindowTypes.polarScatter) {
+      return ScatterPlotWidget(window: window, bloc: window.bloc as ChartBloc);
     }
-    if (window.type == WindowTypes.histogram || window.type == WindowTypes.box) {
-      return BinnedChartWidget(window: window);
+    if (window.windowType == WindowTypes.histogram || window.windowType == WindowTypes.box) {
+      return BinnedChartWidget(window: window, bloc: window.bloc as ChartBloc);
     }
-    if (window.type == WindowTypes.detectorSelector) {
+    if (window.windowType == WindowTypes.detectorSelector) {
       return DetectorSelector(
         window: window,
-        workspace: state,
+        workspace: workspace,
       );
     }
-    if (window.type == WindowTypes.focalPlane) {
+    if (window.windowType == WindowTypes.focalPlane) {
       return FocalPlaneChartViewer(
         window: window,
-        workspace: state,
+        workspace: workspace,
+        bloc: window.bloc as FocalPlaneChartBloc,
       );
     }
-    throw UnimplementedError("WindowType ${window.type} is not implemented yet");
+    throw UnimplementedError("WindowType ${window.windowType} is not implemented yet");
   }
 }

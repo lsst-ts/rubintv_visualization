@@ -35,14 +35,53 @@ enum WindowTypes {
   box,
   cartesianScatter,
   polarScatter,
-  combination,
+  combination;
+
+  /// Return true if the window is a chart.
+  bool get isChart => this != WindowTypes.detectorSelector;
+
+  // Return true if the window is a scatter plot.
+  bool get isScatter => this == WindowTypes.cartesianScatter || this == WindowTypes.polarScatter;
+
+  /// Return true if the window is a binned chart.
+  bool get isBinned => this == WindowTypes.histogram || this == WindowTypes.box;
+}
+
+/// Abstract window event
+abstract class WindowEvent {}
+
+/// State of a window.
+class WindowState {
+  /// All windows have a [UniqueId].
+  UniqueId id;
+
+  /// The type of window to display.
+  final WindowTypes windowType;
+
+  WindowState({
+    required this.id,
+    required this.windowType,
+  });
+}
+
+/// Abstract window bloc
+abstract class WindowBloc<T extends WindowState> extends Bloc<WindowEvent, T> {
+  WindowBloc(super.initialState);
+
+  /// Create a bloc from a JSON object
+  factory WindowBloc.fromJson(Map<String, dynamic> json) {
+    throw UnimplementedError();
+  }
+
+  /// Convert the bloc to a JSON object
+  Map<String, dynamic> toJson();
 }
 
 /// A single, persistable, item displayed in a [Workspace].
 @immutable
-class Window {
-  /// The [id] of this [Window] in [Workspace.windows].
-  final UniqueId id;
+class WindowMetaData {
+  /// The state of the window
+  final WindowState state;
 
   /// The location of the window in the entire workspace
   final Offset offset;
@@ -53,35 +92,43 @@ class Window {
   /// The title to display in the window bar.
   final String? title;
 
-  final WindowTypes type;
+  /// The [WindowBloc] associated with this window
+  final WindowBloc? bloc;
 
-  const Window({
-    required this.id,
+  const WindowMetaData({
+    required this.state,
     required this.offset,
     required this.size,
-    required this.type,
+    required this.bloc,
     this.title,
   });
 
-  /// Create a copy of the [Window] with the provided fields updated.
-  Window copyWith({
-    UniqueId? id,
+  /// Create a copy of the [WindowMetaData] with the provided fields updated.
+  WindowMetaData copyWith({
+    WindowState? state,
     Offset? offset,
     Size? size,
+    WindowBloc? bloc,
     String? title,
   }) =>
-      Window(
-        id: id ?? this.id,
+      WindowMetaData(
+        state: state ?? this.state,
         offset: offset ?? this.offset,
         size: size ?? this.size,
         title: title ?? this.title,
-        type: type,
+        bloc: bloc ?? this.bloc,
       );
 
   @override
   String toString() {
-    return "Window(id: $id, offset: $offset, size: $size, title: $title, type: $type)";
+    return "Window(id: $id, offset: $offset, size: $size, title: $title, type: $windowType)";
   }
+
+  /// The [id] of this [WindowMetaData] in [Workspace.windows].
+  UniqueId get id => state.id;
+
+  /// The type of window to display.
+  WindowTypes get windowType => state.windowType;
 }
 
 /// Different sides that can be resized
@@ -188,7 +235,7 @@ class StartWindowResize extends WorkspaceEvent {
   });
 }
 
-/// [WindowUpdate] to update the size of a [Window] in the parent [WorkspaceViewer].
+/// [WindowUpdate] to update the size of a [WindowMetaData] in the parent [WorkspaceViewer].
 class UpdateWindowResize extends WorkspaceEvent {
   /// The [UniqueId] of the window being resized.
   final UniqueId windowId;
@@ -308,7 +355,7 @@ class ResizableWindow extends StatelessWidget {
   final String? title;
 
   /// Information about the widget
-  final Window info;
+  final WindowMetaData info;
 
   /// Toolbar associated with the window
   final Widget? toolbar;

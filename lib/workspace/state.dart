@@ -24,8 +24,12 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/chart/base.dart';
+import 'package:rubintv_visualization/chart/binned.dart';
+import 'package:rubintv_visualization/focal_plane/chart.dart';
 import 'package:rubintv_visualization/focal_plane/instrument.dart';
+import 'package:rubintv_visualization/focal_plane/slider.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/io.dart';
 import 'package:rubintv_visualization/query/query.dart';
@@ -33,7 +37,196 @@ import 'package:rubintv_visualization/theme.dart';
 import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/controller.dart';
 import 'package:rubintv_visualization/chart/series.dart';
+import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
+
+/// Create an empty [ChartAxis].
+/// This is required for the color map slider, and is just a dummy axis.
+ChartAxis _createEmptyAxis(ChartAxisInfo axisInfo, ChartTheme theme) {
+  return NumericalChartAxis(
+    info: axisInfo,
+    bounds: const Bounds(0, 0),
+    dataBounds: const Bounds(0, 0),
+    ticks: AxisTicks(
+      majorTicks: [],
+      minorTicks: [],
+      bounds: const Bounds(0, 0),
+      tickLabels: [],
+    ),
+    theme: theme,
+  );
+}
+
+FocalPlaneChartBloc buildFocalPlaneBloc({
+  required UniqueId id,
+  required WorkspaceState workspace,
+  String? title,
+}) {
+  SeriesId sid = SeriesId(windowId: id, id: BigInt.zero);
+  AxisId valueAxisId = AxisId(AxisLocation.right);
+  AxisId detectorAxisId = AxisId(AxisLocation.color);
+  Map<AxisId, SchemaField> fields = {};
+  ChartAxisInfo axisInfo = ChartAxisInfo(
+    label: "Focal Plane color axis",
+    axisId: valueAxisId,
+  );
+  ChartAxis dataAxis = _createEmptyAxis(axisInfo, workspace.theme.chartTheme);
+
+  SeriesInfo newSeries = SeriesInfo(
+    id: sid,
+    name: "Focal Plane Chart",
+    axes: [valueAxisId, detectorAxisId],
+    fields: fields,
+  );
+
+  ColorbarController colorbarController = ColorbarController(
+    min: 0,
+    max: 100,
+    stops: {
+      0: Colors.blue,
+      100: Colors.red,
+    },
+  );
+
+  FocalPlaneChartState state = FocalPlaneChartState(
+    id: id,
+    series: newSeries,
+    dataAxis: dataAxis,
+    data: {},
+    dataIds: [],
+    dataIndex: 0,
+    colorbarController: colorbarController,
+    playbackSpeed: 1,
+    isPlaying: false,
+    loopPlayback: true,
+    dayObs: getFormattedDate(workspace.dayObs),
+  );
+
+  FocalPlaneChartBloc result = FocalPlaneChartBloc(state);
+
+  return result;
+}
+
+ChartBloc buildBinnedBloc({
+  required UniqueId id,
+  required WindowTypes windowType,
+  String? title,
+}) {
+  final List<ChartAxisInfo> axisInfo = [
+    ChartAxisInfo(
+      label: "<x>",
+      axisId: AxisId(AxisLocation.bottom),
+    ),
+  ];
+  if (windowType == WindowTypes.box) {
+    axisInfo.add(
+      ChartAxisInfo(
+        label: "<y>",
+        axisId: AxisId(AxisLocation.left),
+      ),
+    );
+  }
+  BinnedState state = BinnedState(
+    id: id,
+    series: {},
+    axisInfo: axisInfo,
+    legend: Legend(),
+    useGlobalQuery: true,
+    windowType: windowType,
+    tool: MultiSelectionTool.select,
+    nBins: 20,
+    resetController: StreamController<ResetChartAction>.broadcast(),
+  );
+  return ChartBloc(state);
+}
+
+ChartBloc buildScatterBloc({
+  required UniqueId id,
+  required WindowTypes windowType,
+  String? title,
+}) {
+  final List<ChartAxisInfo> axisInfo = [];
+  if (windowType == WindowTypes.cartesianScatter) {
+    axisInfo.addAll([
+      ChartAxisInfo(
+        label: "<x>",
+        axisId: AxisId(AxisLocation.bottom),
+      ),
+      ChartAxisInfo(
+        label: "<y>",
+        axisId: AxisId(AxisLocation.left),
+        isInverted: true,
+      ),
+    ]);
+  } else if (windowType == WindowTypes.polarScatter) {
+    axisInfo.addAll([
+      ChartAxisInfo(
+        label: "<r>",
+        axisId: AxisId(AxisLocation.radial),
+      ),
+      ChartAxisInfo(
+        label: "<θ>",
+        axisId: AxisId(AxisLocation.angular),
+        isInverted: true,
+      ),
+    ]);
+  }
+
+  ChartState state = ChartState(
+    id: id,
+    series: {},
+    axisInfo: axisInfo,
+    legend: Legend(),
+    useGlobalQuery: true,
+    windowType: windowType,
+    tool: MultiSelectionTool.select,
+    resetController: StreamController<ResetChartAction>.broadcast(),
+  );
+
+  return ChartBloc(state);
+}
+
+/// Create a new [WindowMetaData] instance.
+WindowMetaData buildWindow({
+  required UniqueId id,
+  required WindowTypes windowType,
+  required WorkspaceState workspace,
+  String? title,
+}) {
+  // Shift the location from the last window
+  Offset offset = workspace.theme.newWindowOffset;
+  if (workspace.windows.isNotEmpty) {
+    offset += workspace.windows.values.last.offset;
+  }
+
+  // Create the Bloc
+  late final WindowBloc bloc;
+  if (windowType.isBinned) {
+    bloc = buildBinnedBloc(id: id, windowType: windowType);
+  } else if (windowType.isScatter) {
+    bloc = buildScatterBloc(id: id, windowType: windowType);
+  } else if (windowType == WindowTypes.focalPlane) {
+    bloc = buildFocalPlaneBloc(id: id, workspace: workspace, title: title);
+  } else if (windowType == WindowTypes.detectorSelector) {
+    return WindowMetaData(
+      state: WindowState(id: id, windowType: WindowTypes.detectorSelector),
+      offset: offset,
+      size: workspace.theme.newPlotSize,
+      title: title,
+      bloc: null,
+    );
+  } else {
+    throw ArgumentError("Unknown window type $windowType");
+  }
+
+  return WindowMetaData(
+    state: bloc.state,
+    offset: offset,
+    size: workspace.theme.newPlotSize,
+    bloc: bloc,
+    title: title,
+  );
+}
 
 /// The global query parameters
 class GlobalQuery {
@@ -120,7 +313,7 @@ class WorkspaceStateInitial extends WorkspaceStateBase {}
 /// A fully loaded state of the [WorkspaceViewer].
 class WorkspaceState extends WorkspaceStateBase {
   /// Windows to display in the [WorkspaceState].
-  final Map<UniqueId, Window> windows;
+  final Map<UniqueId, WindowMetaData> windows;
 
   /// A query that applies to all plots (that opt in to gloabl queries)
   final Query? globalQuery;
@@ -159,7 +352,7 @@ class WorkspaceState extends WorkspaceStateBase {
 
   /// Copy the [WorkspaceState] with new values.
   WorkspaceState copyWith({
-    Map<UniqueId, Window>? windows,
+    Map<UniqueId, WindowMetaData>? windows,
     Instrument? instrument,
     Detector? detector,
     bool? showFocalPlane,
@@ -215,11 +408,11 @@ class WorkspaceState extends WorkspaceStateBase {
       theme: theme,
       interactionInfo: interactionInfo);
 
-  /// Add a new [Window] to the [WorkspaceWidgetState].
+  /// Add a new [WindowMetaData] to the [WorkspaceWidgetState].
   /// Normally the [index] is already created, unless
   /// the workspace is being loaded from disk.
-  WorkspaceState addWindow(Window window) {
-    Map<UniqueId, Window> newWindows = {...windows};
+  WorkspaceState addWindow(WindowMetaData window) {
+    Map<UniqueId, WindowMetaData> newWindows = {...windows};
     newWindows[window.id] = window;
 
     return copyWith(
@@ -228,7 +421,8 @@ class WorkspaceState extends WorkspaceStateBase {
   }
 
   /// Whether or not the window is showing the focal plane.
-  bool get isShowingFocalPlane => windows.values.any((window) => window.type == WindowTypes.detectorSelector);
+  bool get isShowingFocalPlane =>
+      windows.values.any((window) => window.windowType == WindowTypes.detectorSelector);
 
   /// Get the [GlobalQuery] for the workspace.
   GlobalQuery getGlobalQuery() {
@@ -254,19 +448,19 @@ String? getFormattedDate(DateTime? dayObs) {
 }
 
 /// Load data for all series in a given chart
-void updateAllSeriesData(WorkspaceState workspace, {ChartStateLoaded? chart}) {
+void updateAllSeriesData(WorkspaceState workspace, {ChartState? chart}) {
   String? dayObs = getFormattedDate(workspace.dayObs);
 
-  late final List<ChartStateLoaded> charts;
+  late final List<ChartState> charts;
   if (chart != null) {
     charts = [chart];
   } else {
-    charts = workspace.windows.values.whereType<ChartStateLoaded>().toList();
+    charts = workspace.windows.values.whereType<ChartState>().toList();
     developer.log("Updating all series data for ${charts.length} charts", name: "rubin_chart.workspace");
   }
   // Request the data from the server.
   if (WebSocketManager().isConnected) {
-    for (ChartStateLoaded chart in charts) {
+    for (ChartState chart in charts) {
       for (SeriesInfo series in chart.series.values) {
         WebSocketManager().sendMessage(LoadColumnsCommand.build(
           seriesId: series.id,
@@ -335,20 +529,12 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
     /// Create a new chart
     on<CreateNewWindowEvent>((event, emit) {
       WorkspaceState state = this.state as WorkspaceState;
-      Offset offset = state.theme.newWindowOffset;
-
-      if (state.windows.isNotEmpty) {
-        // Shift from last window
-        offset += state.windows.values.last.offset;
-      }
-
-      Window newWindow = Window(
+      WindowMetaData newWindow = buildWindow(
         id: UniqueId.next(),
-        offset: offset,
-        size: state.theme.newPlotSize,
-        type: event.windowType,
+        windowType: event.windowType,
+        workspace: state,
       );
-      Map<UniqueId, Window> windows = {...state.windows};
+      Map<UniqueId, WindowMetaData> windows = {...state.windows};
       windows[newWindow.id] = newWindow;
       emit(state.copyWith(windows: windows));
     });
@@ -358,25 +544,18 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       WorkspaceState state = this.state as WorkspaceState;
 
       // Make sure that the focal plane isn't already opened
-      for (Window window in state.windows.values) {
-        if (window.type == WindowTypes.detectorSelector) {
+      for (WindowMetaData window in state.windows.values) {
+        if (window.windowType == WindowTypes.detectorSelector) {
           return;
         }
       }
 
-      Offset offset = state.theme.newWindowOffset;
-      if (state.windows.isNotEmpty) {
-        // Shift from last window
-        offset += state.windows.values.last.offset;
-      }
-
-      Window newWindow = Window(
+      WindowMetaData newWindow = buildWindow(
         id: UniqueId.next(),
-        offset: offset,
-        size: state.theme.newPlotSize,
-        type: WindowTypes.detectorSelector,
+        windowType: WindowTypes.detectorSelector,
+        workspace: state,
       );
-      Map<UniqueId, Window> windows = {...state.windows};
+      Map<UniqueId, WindowMetaData> windows = {...state.windows};
       windows[newWindow.id] = newWindow;
 
       developer.log("Added new focal plane window: $newWindow", name: "rubin_chart.workspace");
@@ -397,7 +576,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
     /// Remove a window from the workspace.
     on<RemoveWindowEvent>((event, emit) {
       WorkspaceState state = this.state as WorkspaceState;
-      Map<UniqueId, Window> windows = {...state.windows};
+      Map<UniqueId, WindowMetaData> windows = {...state.windows};
       windows.remove(event.windowId);
       emit(state.copyWith(windows: windows));
     });
@@ -408,7 +587,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       if (state.interactionInfo != null) {
         state = state.updateInteractionInfo(null);
       }
-      Window window = state.windows[event.windowId]!;
+      WindowMetaData window = state.windows[event.windowId]!;
       WindowInteractionInfo interactionInfo = WindowDragInfo(
         id: event.windowId,
         pointerOffset: window.offset - event.details.localPosition,
@@ -423,8 +602,8 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
         state = state.updateInteractionInfo(null);
         throw Exception("Mismatched interactionInfo, got ${state.interactionInfo}");
       }
-      Map<UniqueId, Window> windows = {...state.windows};
-      Window window = windows[event.windowId]!;
+      Map<UniqueId, WindowMetaData> windows = {...state.windows};
+      WindowMetaData window = windows[event.windowId]!;
       Offset offset = event.details.localPosition + (state.interactionInfo as WindowDragInfo).pointerOffset;
       window = window.copyWith(offset: offset);
       windows[event.windowId] = window;
@@ -443,7 +622,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       if (state.interactionInfo != null) {
         state = state.updateInteractionInfo(null);
       }
-      Window window = state.windows[event.windowId]!;
+      WindowMetaData window = state.windows[event.windowId]!;
       WindowInteractionInfo interactionInfo = WindowResizeInfo(
         id: event.windowId,
         initialPointerOffset: event.details.globalPosition,
@@ -491,8 +670,8 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       Size size = Size(width, height);
 
       // Update the window
-      Map<UniqueId, Window> windows = {...state.windows};
-      Window window = windows[event.windowId]!;
+      Map<UniqueId, WindowMetaData> windows = {...state.windows};
+      WindowMetaData window = windows[event.windowId]!;
       window = window.copyWith(
         size: size,
         offset: offset,
