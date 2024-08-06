@@ -108,9 +108,9 @@ abstract class Query {
   QueryOperation? parent;
   Query({required this.id, this.parent});
 
-  Map<String, dynamic> toDict();
+  Map<String, dynamic> toJson();
 
-  factory Query.fromDict(Map<String, dynamic> dict) => throw UnimplementedError();
+  factory Query.fromJson(Map<String, dynamic> dict) => throw UnimplementedError();
 
   Query operator &(Query other) => QueryOperation(
         id: UniqueId.next(),
@@ -165,7 +165,7 @@ class EqualityQuery extends Query {
   }
 
   @override
-  Map<String, dynamic> toDict() {
+  Map<String, dynamic> toJson() {
     Map<String, dynamic>? leftQuery;
     Map<String, dynamic>? rightQuery;
     if (leftValue != null) {
@@ -252,13 +252,13 @@ class QueryOperation extends Query {
   String toString() => "(${children.join(' ${operator.symbol} ')})";
 
   @override
-  Map<String, dynamic> toDict() {
+  Map<String, dynamic> toJson() {
     Map<String, dynamic> result = {
       "name": "ParentQuery",
       "id": id.toSerializableString(),
       "content": {
         "operator": operator.name,
-        "children": children.map((e) => e.toDict()).toList(),
+        "children": children.map((e) => e.toJson()).toList(),
       }
     };
     return result;
@@ -268,7 +268,7 @@ class QueryOperation extends Query {
   static QueryOperation fromDict(Map<String, dynamic> dict) {
     List<Query> children = [];
     for (Map<String, dynamic> child in dict["content"]["children"]) {
-      children.add(Query.fromDict(child));
+      children.add(Query.fromJson(child));
     }
     return QueryOperation(
       id: UniqueId.fromString(dict["id"]),

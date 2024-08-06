@@ -18,6 +18,8 @@
 ///
 /// You should have received a copy of the GNU General Public License
 /// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import 'dart:convert';
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,6 +34,25 @@ import 'package:rubintv_visualization/workspace/state.dart';
 import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/viewer.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
+
+void _downloadTextAsFile(String content, {String filename = "workspace.json"}) {
+  // Encode the string as a byte array
+  final bytes = utf8.encode(content);
+
+  // Create a Blob from the byte array
+  final blob = html.Blob([bytes]);
+
+  // Create a URL for the Blob
+  final url = html.Url.createObjectUrlFromBlob(blob);
+
+  // Trigger download
+  html.AnchorElement(href: url)
+    ..setAttribute("download", filename)
+    ..click();
+
+  // Revoke the URL to free up memory
+  html.Url.revokeObjectUrl(url);
+}
 
 /// A [Widget] used to display a toolbar at the top of the workspace.
 class DatePickerWidget extends StatefulWidget {
@@ -139,6 +160,50 @@ Color _getStatusIndicator(bool isConnected, bool hasInstrument) {
   }
 }
 
+void _loadWorkspace(BuildContext context, WorkspaceBloc bloc) {
+  final TextEditingController textFieldController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Enter workspace JSON'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: TextField(
+            controller: textFieldController,
+            maxLines: null,
+            minLines: 5,
+            keyboardType: TextInputType.multiline,
+            decoration: const InputDecoration(
+              hintText: "Enter workspace JSON here",
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('CANCEL'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+          TextButton(
+            child: const Text('LOAD'),
+            onPressed: () {
+              // Load the workspace from the text field
+              String text = textFieldController.text;
+              bloc.add(LoadWorkspaceFromTextEvent(text));
+              // Add your custom action here
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
+
 /// The [State] of the [Toolbar] widget.
 class ToolbarState extends State<Toolbar> {
   WorkspaceState get workspace => widget.workspace;
@@ -222,6 +287,71 @@ class ToolbarState extends State<Toolbar> {
                 : "${workspace.detector!.id}: ${workspace.detector!.name}"),
           ),
           const Spacer(),
+          Tooltip(
+            message: "Load workspace",
+            child: MenuAnchor(
+              builder: (BuildContext context, MenuController controller, Widget? child) {
+                return IconButton(
+                  icon: const Icon(Icons.folder_open, color: Colors.green),
+                  onPressed: () {
+                    if (controller.isOpen) {
+                      controller.close();
+                    } else {
+                      controller.open();
+                    }
+                  },
+                );
+              },
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: () {
+                    _loadWorkspace(context, context.read<WorkspaceBloc>());
+                  },
+                  child: const Text("From text"),
+                ),
+                MenuItemButton(
+                  onPressed: () {},
+                  child: const Text("From file"),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Tooltip(
+            message: "Save workspace",
+            child: MenuAnchor(
+              builder: (BuildContext context, MenuController controller, Widget? child) {
+                return IconButton(
+                  icon: Icon(Icons.save,
+                      color: workspace.instrument == null && !workspace.isShowingFocalPlane
+                          ? Colors.grey[500]
+                          : Colors.green),
+                  onPressed: () {
+                    if (controller.isOpen) {
+                      controller.close();
+                    } else {
+                      controller.open();
+                    }
+                  },
+                );
+              },
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: jsonEncode(workspace.toJson())));
+                  },
+                  child: const Text("Copy to clipboard"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    _downloadTextAsFile(jsonEncode(workspace.toJson()));
+                  },
+                  child: const Text("Save to file"),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
           Tooltip(
             message: "Add a chart to the workspace",
             child: MenuAnchor(

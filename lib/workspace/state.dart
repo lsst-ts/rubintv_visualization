@@ -20,6 +20,7 @@
 /// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
@@ -208,19 +209,12 @@ WindowMetaData buildWindow({
   } else if (windowType == WindowTypes.focalPlane) {
     bloc = buildFocalPlaneBloc(id: id, workspace: workspace, title: title);
   } else if (windowType == WindowTypes.detectorSelector) {
-    return WindowMetaData(
-      state: WindowState(id: id, windowType: WindowTypes.detectorSelector),
-      offset: offset,
-      size: workspace.theme.newPlotSize,
-      title: title,
-      bloc: null,
-    );
+    bloc = WindowBloc(WindowState(id: id, windowType: WindowTypes.detectorSelector));
   } else {
     throw ArgumentError("Unknown window type $windowType");
   }
 
   return WindowMetaData(
-    state: bloc.state,
     offset: offset,
     size: workspace.theme.newPlotSize,
     bloc: bloc,
@@ -302,6 +296,12 @@ class ShowFocalPlaneEvent extends WorkspaceEvent {
   ShowFocalPlaneEvent();
 }
 
+class LoadWorkspaceFromTextEvent extends WorkspaceEvent {
+  final String text;
+
+  LoadWorkspaceFromTextEvent(this.text);
+}
+
 /// State of a [WorkspaceViewer].
 abstract class WorkspaceStateBase {
   const WorkspaceStateBase();
@@ -349,6 +349,41 @@ class WorkspaceState extends WorkspaceStateBase {
     required this.theme,
     required this.interactionInfo,
   });
+
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> result = {
+      "windows": Map<String, dynamic>.fromEntries(
+          windows.entries.map((e) => MapEntry(e.key.toSerializableString(), e.value.toJson()))),
+    };
+    if (instrument != null) {
+      result["instrument"] = instrument!.toJson();
+    }
+    if (globalQuery != null) {
+      result["globalQuery"] = globalQuery!.toJson();
+    }
+    if (dayObs != null) {
+      result["dayObs"] = dayObs!.toIso8601String();
+    }
+    if (detector != null) {
+      result["detector"] = detector!.toJson();
+    }
+    return result;
+  }
+
+  /// Create a [WorkspaceState] from a JSON object.
+  static WorkspaceState fromJson(Map<String, dynamic> json, AppTheme theme) {
+    return WorkspaceState(
+      windows: (json["windows"] as Map<String, dynamic>).map((key, value) {
+        return MapEntry(UniqueId.fromString(key), WindowMetaData.fromJson(value));
+      }),
+      instrument: json.containsKey("instrument") ? Instrument.fromJson(json["instrument"]) : null,
+      globalQuery: json.containsKey("globalQuery") ? Query.fromJson(json["globalQuery"]) : null,
+      dayObs: json.containsKey("dayObs") ? DateTime.parse(json["dayObs"]) : null,
+      detector: json.containsKey("detector") ? Detector.fromJson(json["detector"]) : null,
+      theme: theme,
+      interactionInfo: null,
+    );
+  }
 
   /// Copy the [WorkspaceState] with new values.
   WorkspaceState copyWith({
@@ -684,6 +719,22 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
     on<EndWindowResize>((event, emit) {
       WorkspaceState state = this.state as WorkspaceState;
       emit(state.updateInteractionInfo(null));
+    });
+
+    on<LoadWorkspaceFromTextEvent>((event, emit) {
+      WorkspaceState state =
+          WorkspaceState.fromJson(jsonDecode(event.text), (this.state as WorkspaceState).theme);
+      emit(state);
+
+      for (WindowMetaData window in state.windows.values) {
+        if (window.bloc is ChartBloc) {
+          ChartBloc bloc = window.bloc as ChartBloc;
+          bloc.add(SynchDataEvent(
+            dayObs: getFormattedDate(state.dayObs),
+            globalQuery: state.globalQuery,
+          ));
+        }
+      }
     });
   }
 

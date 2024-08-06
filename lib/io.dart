@@ -96,8 +96,8 @@ class LoadColumnsCommand extends ServiceCommand {
           parameters: {
             "database": database,
             "columns": columns,
-            "query": query?.toDict(),
-            "global_query": globalQuery?.toDict(),
+            "query": query?.toJson(),
+            "global_query": globalQuery?.toJson(),
             "data_ids": dataIds?.map((e) => [e.dayObs, e.seqNum]).toList(),
             "day_obs": dayObs,
           },

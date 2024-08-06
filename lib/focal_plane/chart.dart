@@ -217,18 +217,49 @@ class FocalPlaneChartState extends WindowState {
         dayObs: dayObs ?? this.dayObs,
       );
 
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id,
+      "series": series,
+      "dataAxis": dataAxis,
+      "data": data,
+      "dataIds": dataIds,
+      "dataIndex": dataIndex,
+      "colorbarController": colorbarController,
+      "playbackSpeed": playbackSpeed,
+      "isPlaying": isPlaying,
+      "loopPlayback": loopPlayback,
+      "dayObs": dayObs,
+    };
+  }
+
+  static FocalPlaneChartState fromJson(Map<String, dynamic> json) {
+    throw UnimplementedError("Not implemented");
+
+    /*return FocalPlaneChartState(
+      id: json["id"],
+      series: SeriesInfo.fromJson(json["series"]),
+      dataAxis: ChartAxis.fromJson(json["dataAxis"]),
+      data: Map<DataId, Map<int, dynamic>>.from(json["data"].map((key, value) {
+        return MapEntry(DataId.fromJson(key), Map<int, dynamic>.from(value));
+      })),
+      dataIds: List<DataId>.from(json["dataIds"].map((e) => DataId.fromJson(e))),
+      dataIndex: json["dataIndex"],
+      colorbarController: ColorbarController.fromJson(json["colorbarController"]),
+      playbackSpeed: json["playbackSpeed"],
+      isPlaying: json["isPlaying"],
+      loopPlayback: json["loopPlayback"],
+      dayObs: json["dayObs"],
+    );*/
+  }
+
   /// Get the data axis id.
   AxisId get dataAxisId => dataAxis.info.axisId;
 }
 
 /// A bloc to manage the state of a focal plane chart.
 class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
-  /// Convert the bloc to a JSON object
-  @override
-  Map<String, dynamic> toJson() {
-    throw UnimplementedError("toJson not implemented for ChartBloc");
-  }
-
   /// The subscription to the websocket.
   late StreamSubscription _websocketSubscription;
 

@@ -39,6 +39,18 @@ class Instrument {
     this.schema,
   });
 
+  /// Convert the [Instrument] to a JSON object.
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> result = {
+      "instrument": name,
+      "detectors": detectors.map((detector) => detector.toJson()).toList(),
+    };
+    if (schema != null) {
+      result["schema"] = {"name": schema};
+    }
+    return result;
+  }
+
   /// Parse the instrument from a JSON object
   static Instrument fromJson(Map<String, dynamic> json) {
     return Instrument(
@@ -104,6 +116,34 @@ class Detector {
       name: name,
       corners: corners,
       bbox: Rect.fromLTRB(left, top, right, bottom),
+    );
+  }
+
+  /// Convert the [Detector] to a JSON object.
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id,
+      "name": name,
+      "corners": corners.map((corner) {
+        return [corner.dx, corner.dy];
+      }).toList(),
+    };
+  }
+
+  /// Parse the [Detector] from a JSON object.
+  static Detector fromJson(Map<String, dynamic> json) {
+    return Detector(
+      id: json["id"],
+      name: json["name"],
+      corners: (json["corners"] as List).map((corner) {
+        return Offset(corner[0], corner[1]);
+      }).toList(),
+      bbox: Rect.fromLTRB(
+        json["corners"].map((corner) => corner[0]).reduce((a, b) => a < b ? a : b),
+        json["corners"].map((corner) => corner[1]).reduce((a, b) => a < b ? a : b),
+        json["corners"].map((corner) => corner[0]).reduce((a, b) => a > b ? a : b),
+        json["corners"].map((corner) => corner[1]).reduce((a, b) => a > b ? a : b),
+      ),
     );
   }
 }

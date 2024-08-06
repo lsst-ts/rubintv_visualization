@@ -95,6 +95,36 @@ class BinnedState extends ChartState {
         resetController: resetController ?? this.resetController,
         needsReset: needsReset ?? false,
       );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id,
+      "series": series,
+      "axisInfo": axisInfo,
+      "legend": legend,
+      "useGlobalQuery": useGlobalQuery,
+      "windowType": windowType,
+      "tool": tool,
+      "nBins": nBins,
+      "needsReset": needsReset,
+    };
+  }
+
+  @override
+  factory BinnedState.fromJson(Map<String, dynamic> json) {
+    return BinnedState(
+      id: UniqueId.fromString(json["id"]),
+      series: json["series"],
+      axisInfo: json["axisInfo"],
+      legend: json["legend"],
+      useGlobalQuery: json["useGlobalQuery"],
+      windowType: json["windowType"],
+      tool: json["tool"],
+      nBins: json["nBins"],
+      resetController: StreamController<ResetChartAction>.broadcast(),
+    );
+  }
 }
 
 /// The [Widget] used to display a binned chart.

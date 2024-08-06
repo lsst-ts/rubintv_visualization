@@ -157,6 +157,25 @@ class SchemaField {
 
   /// The [Type] of the field.
   Type get type => _dataTypeToType[dataType]!;
+
+  /// Convert the [SchemaField] to a JSON object.
+  /// We only need to persist the field [name] and the [schema.name],
+  /// since the [SchemaField] is a child of a [TableSchema] that is already loaded by the [DataCenter].
+  Map<String, dynamic> toJson() => {
+        "name": name,
+        "schema": schema.name,
+        "database": schema.database.name,
+      };
+
+  /// Retrieve a [SchemaField] from a JSON object.
+  /// The [SchemaField] must be a child of a [TableSchema]
+  /// that is already loaded by the [DataCenter].
+  static SchemaField fromJson(Map<String, dynamic> json) {
+    DataCenter dataCenter = DataCenter();
+    TableSchema schema =
+        dataCenter.databases[json["database"]]!.tables.values.firstWhere((e) => e.name == json["schema"]);
+    return schema.fields[json["name"]]!;
+  }
 }
 
 /// A table schema.
