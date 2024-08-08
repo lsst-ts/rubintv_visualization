@@ -124,6 +124,7 @@ ChartBloc buildBinnedBloc({
       ChartAxisInfo(
         label: "<y>",
         axisId: AxisId(AxisLocation.left),
+        isInverted: true,
       ),
     );
   }
