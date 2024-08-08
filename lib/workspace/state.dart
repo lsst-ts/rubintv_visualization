@@ -28,6 +28,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/chart/base.dart';
 import 'package:rubintv_visualization/chart/binned.dart';
+import 'package:rubintv_visualization/debug.dart';
 import 'package:rubintv_visualization/focal_plane/chart.dart';
 import 'package:rubintv_visualization/focal_plane/instrument.dart';
 import 'package:rubintv_visualization/focal_plane/slider.dart';
@@ -43,7 +44,7 @@ import 'package:rubintv_visualization/workspace/window.dart';
 
 /// Create an empty [ChartAxis].
 /// This is required for the color map slider, and is just a dummy axis.
-ChartAxis _createEmptyAxis(ChartAxisInfo axisInfo, ChartTheme theme) {
+ChartAxis createEmptyDataAxis(ChartAxisInfo axisInfo, ChartTheme theme) {
   return NumericalChartAxis(
     info: axisInfo,
     bounds: const Bounds(0, 0),
@@ -71,7 +72,7 @@ FocalPlaneChartBloc buildFocalPlaneBloc({
     label: "Focal Plane color axis",
     axisId: valueAxisId,
   );
-  ChartAxis dataAxis = _createEmptyAxis(axisInfo, workspace.theme.chartTheme);
+  ChartAxis dataAxis = createEmptyDataAxis(axisInfo, workspace.theme.chartTheme);
 
   SeriesInfo newSeries = SeriesInfo(
     id: sid,
@@ -373,9 +374,23 @@ class WorkspaceState extends WorkspaceStateBase {
 
   /// Create a [WorkspaceState] from a JSON object.
   static WorkspaceState fromJson(Map<String, dynamic> json, AppTheme theme) {
+    debugStatement(() {
+      WorkspaceState(
+        windows: (json["windows"] as Map<String, dynamic>).map((key, value) {
+          return MapEntry(UniqueId.fromString(key), WindowMetaData.fromJson(value, theme.chartTheme));
+        }),
+        instrument: json.containsKey("instrument") ? Instrument.fromJson(json["instrument"]) : null,
+        globalQuery: json.containsKey("globalQuery") ? Query.fromJson(json["globalQuery"]) : null,
+        dayObs: json.containsKey("dayObs") ? DateTime.parse(json["dayObs"]) : null,
+        detector: json.containsKey("detector") ? Detector.fromJson(json["detector"]) : null,
+        theme: theme,
+        interactionInfo: null,
+      );
+    });
+
     return WorkspaceState(
       windows: (json["windows"] as Map<String, dynamic>).map((key, value) {
-        return MapEntry(UniqueId.fromString(key), WindowMetaData.fromJson(value));
+        return MapEntry(UniqueId.fromString(key), WindowMetaData.fromJson(value, theme.chartTheme));
       }),
       instrument: json.containsKey("instrument") ? Instrument.fromJson(json["instrument"]) : null,
       globalQuery: json.containsKey("globalQuery") ? Query.fromJson(json["globalQuery"]) : null,
@@ -730,6 +745,12 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       for (WindowMetaData window in state.windows.values) {
         if (window.bloc is ChartBloc) {
           ChartBloc bloc = window.bloc as ChartBloc;
+          bloc.add(SynchDataEvent(
+            dayObs: getFormattedDate(state.dayObs),
+            globalQuery: state.globalQuery,
+          ));
+        } else if (window.bloc is FocalPlaneChartBloc) {
+          FocalPlaneChartBloc bloc = window.bloc as FocalPlaneChartBloc;
           bloc.add(SynchDataEvent(
             dayObs: getFormattedDate(state.dayObs),
             globalQuery: state.globalQuery,

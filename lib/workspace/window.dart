@@ -22,6 +22,7 @@
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/chart/base.dart';
 import 'package:rubintv_visualization/chart/binned.dart';
 import 'package:rubintv_visualization/focal_plane/chart.dart';
@@ -78,7 +79,7 @@ class WindowState {
   }
 
   /// Create a [WindowState] from a JSON object.
-  factory WindowState.fromJson(Map<String, dynamic> json) {
+  factory WindowState.fromJson(Map<String, dynamic> json, ChartTheme theme) {
     WindowTypes windowType = WindowTypes.fromString(json["windowType"]);
 
     late WindowState result;
@@ -88,7 +89,7 @@ class WindowState {
     } else if (windowType.isBinned) {
       result = BinnedState.fromJson(json);
     } else if (windowType == WindowTypes.focalPlane) {
-      result = FocalPlaneChartState.fromJson(json);
+      result = FocalPlaneChartState.fromJson(json, theme);
     } else {
       throw ArgumentError("Unrecognized window type $windowType");
     }
@@ -159,8 +160,8 @@ class WindowMetaData {
   }
 
   /// Create a [WindowMetaData] from a JSON object.
-  static WindowMetaData fromJson(Map<String, dynamic> json) {
-    WindowState state = WindowState.fromJson(json["state"]);
+  static WindowMetaData fromJson(Map<String, dynamic> json, ChartTheme theme) {
+    WindowState state = WindowState.fromJson(json["state"], theme);
     Offset offset = Offset(json["offset"]["dx"], json["offset"]["dy"]);
     Size size = Size(json["size"]["width"], json["size"]["height"]);
     String? title = json["title"] == "" ? null : json["title"];
