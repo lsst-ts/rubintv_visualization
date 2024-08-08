@@ -26,6 +26,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/chart/base.dart';
+import 'package:rubintv_visualization/debug.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/workspace/controller.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
@@ -99,15 +100,14 @@ class BinnedState extends ChartState {
   @override
   Map<String, dynamic> toJson() {
     return {
-      "id": id,
-      "series": series,
-      "axisInfo": axisInfo,
-      "legend": legend,
+      "id": id.toSerializableString(),
+      "series": series.values.map((e) => e.toJson()).toList(),
+      "axisInfo": axisInfo.map((e) => e.toJson()).toList(),
+      "legend": legend?.toJson(),
       "useGlobalQuery": useGlobalQuery,
-      "windowType": windowType,
-      "tool": tool,
+      "windowType": windowType.name,
+      "tool": tool.toString(),
       "nBins": nBins,
-      "needsReset": needsReset,
     };
   }
 
@@ -115,12 +115,15 @@ class BinnedState extends ChartState {
   factory BinnedState.fromJson(Map<String, dynamic> json) {
     return BinnedState(
       id: UniqueId.fromString(json["id"]),
-      series: json["series"],
-      axisInfo: json["axisInfo"],
-      legend: json["legend"],
+      series: Map.fromEntries((json["series"] as List<dynamic>).map((e) {
+        SeriesInfo seriesInfo = SeriesInfo.fromJson(e);
+        return MapEntry(seriesInfo.id, seriesInfo);
+      })),
+      axisInfo: List<ChartAxisInfo>.from(json["axisInfo"].map((e) => ChartAxisInfo.fromJson(e))),
+      legend: json["legend"] == null ? null : Legend.fromJson(json["legend"]),
       useGlobalQuery: json["useGlobalQuery"],
-      windowType: json["windowType"],
-      tool: json["tool"],
+      windowType: WindowTypes.fromString(json["windowType"]),
+      tool: MultiSelectionTool.fromString(json["tool"]),
       nBins: json["nBins"],
       resetController: StreamController<ResetChartAction>.broadcast(),
     );
