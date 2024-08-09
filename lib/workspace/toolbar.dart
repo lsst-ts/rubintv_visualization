@@ -474,6 +474,16 @@ class ToolbarState extends State<Toolbar> {
               dayObs: workspace.dayObs,
             ),
           ),
+          const SizedBox(width: 10),
+          Tooltip(
+            message: "Clear all selections",
+            child: IconButton(
+              icon: const Icon(Icons.clear_all, color: Colors.red),
+              onPressed: () {
+                context.read<WorkspaceBloc>().add(ClearWorkspaceEvent());
+              },
+            ),
+          ),
         ],
       ),
     );

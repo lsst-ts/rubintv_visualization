@@ -459,6 +459,10 @@ class DataCenter {
     _seriesData.remove(id);
   }
 
+  void clearSeriesData() {
+    _seriesData.clear();
+  }
+
   void dispose() {
     _subscription.cancel();
   }

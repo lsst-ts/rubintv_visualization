@@ -304,6 +304,9 @@ class LoadWorkspaceFromTextEvent extends WorkspaceEvent {
   LoadWorkspaceFromTextEvent(this.text);
 }
 
+/// Clear the DataCenter and the workspace
+class ClearWorkspaceEvent extends WorkspaceEvent {}
+
 /// State of a [WorkspaceViewer].
 abstract class WorkspaceStateBase {
   const WorkspaceStateBase();
@@ -737,7 +740,10 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       emit(state.updateInteractionInfo(null));
     });
 
+    /// Load a workspace from a text string.
     on<LoadWorkspaceFromTextEvent>((event, emit) {
+      DataCenter().clearSeriesData();
+
       WorkspaceState state =
           WorkspaceState.fromJson(jsonDecode(event.text), (this.state as WorkspaceState).theme);
       emit(state);
@@ -757,6 +763,14 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
           ));
         }
       }
+    });
+
+    /// Clear the workspace and DataCenter.
+    on<ClearWorkspaceEvent>((event, emit) {
+      DataCenter().clearSeriesData();
+      WorkspaceState state = this.state as WorkspaceState;
+      emit(WorkspaceStateInitial());
+      add(InitializeWorkspaceEvent(state.theme));
     });
   }
 
