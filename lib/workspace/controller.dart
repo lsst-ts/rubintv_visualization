@@ -44,10 +44,16 @@ class ControlCenter {
   final StreamController<GlobalQuery?> _globalQueryController = StreamController<GlobalQuery?>.broadcast();
 
   /// A [SelectionController] that manages the selection of data points.
-  final SelectionController selectionController = SelectionController();
+  final SelectionController _selectionController = SelectionController();
 
   /// A [SelectionController] that manages the drill down of data points.
-  final SelectionController drillDownController = SelectionController();
+  final SelectionController _drillDownController = SelectionController();
+
+  /// A [SelectionController] that manages the selection of data points.
+  SelectionController get selectionController => _selectionController;
+
+  /// A [SelectionController] that manages the drill down of data points.
+  SelectionController get drillDownController => _drillDownController;
 
   /// Update the global query.
   void updateGlobalQuery(GlobalQuery? query) {
@@ -56,16 +62,25 @@ class ControlCenter {
 
   /// Update the selection data points.
   void updateSelection(Object? chartId, Set<Object> dataPoints) {
-    selectionController.updateSelection(chartId, dataPoints);
+    _selectionController.updateSelection(chartId, dataPoints);
   }
 
   /// Update the drill down data points.
   void updateDrillDown(Object? chartId, Set<Object> dataPoints) {
-    drillDownController.updateSelection(chartId, dataPoints);
+    _drillDownController.updateSelection(chartId, dataPoints);
   }
 
   /// Dispose of the stream controllers.
   void dispose() {
     _globalQueryController.close();
+    _selectionController.dispose();
+    _drillDownController.dispose();
+  }
+
+  /// Reset the stream controllers.
+  void reset() {
+    _globalQueryController.add(null);
+    _selectionController.reset();
+    _drillDownController.reset();
   }
 }

@@ -762,6 +762,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
 
   /// Clear the workspace and the DataCenter.
   void _clearWorkspace(WorkspaceState state) {
+    ControlCenter().reset();
     DataCenter().clearSeriesData();
     for (WindowMetaData window in state.windows.values) {
       window.bloc.close();
