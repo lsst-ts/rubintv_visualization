@@ -28,7 +28,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/chart/base.dart';
 import 'package:rubintv_visualization/chart/binned.dart';
-import 'package:rubintv_visualization/debug.dart';
 import 'package:rubintv_visualization/focal_plane/chart.dart';
 import 'package:rubintv_visualization/focal_plane/instrument.dart';
 import 'package:rubintv_visualization/focal_plane/slider.dart';
@@ -377,20 +376,6 @@ class WorkspaceState extends WorkspaceStateBase {
 
   /// Create a [WorkspaceState] from a JSON object.
   static WorkspaceState fromJson(Map<String, dynamic> json, AppTheme theme) {
-    debugStatement(() {
-      WorkspaceState(
-        windows: (json["windows"] as Map<String, dynamic>).map((key, value) {
-          return MapEntry(UniqueId.fromString(key), WindowMetaData.fromJson(value, theme.chartTheme));
-        }),
-        instrument: json.containsKey("instrument") ? Instrument.fromJson(json["instrument"]) : null,
-        globalQuery: json.containsKey("globalQuery") ? Query.fromJson(json["globalQuery"]) : null,
-        dayObs: json.containsKey("dayObs") ? DateTime.parse(json["dayObs"]) : null,
-        detector: json.containsKey("detector") ? Detector.fromJson(json["detector"]) : null,
-        theme: theme,
-        interactionInfo: null,
-      );
-    });
-
     return WorkspaceState(
       windows: (json["windows"] as Map<String, dynamic>).map((key, value) {
         return MapEntry(UniqueId.fromString(key), WindowMetaData.fromJson(value, theme.chartTheme));
@@ -742,7 +727,8 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
 
     /// Load a workspace from a text string.
     on<LoadWorkspaceFromTextEvent>((event, emit) {
-      DataCenter().clearSeriesData();
+      // Close all windows, including canceling all subscriptions.
+      _clearWorkspace(this.state as WorkspaceState);
 
       WorkspaceState state =
           WorkspaceState.fromJson(jsonDecode(event.text), (this.state as WorkspaceState).theme);
@@ -767,11 +753,19 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
 
     /// Clear the workspace and DataCenter.
     on<ClearWorkspaceEvent>((event, emit) {
-      DataCenter().clearSeriesData();
       WorkspaceState state = this.state as WorkspaceState;
+      _clearWorkspace(state);
       emit(WorkspaceStateInitial());
       add(InitializeWorkspaceEvent(state.theme));
     });
+  }
+
+  /// Clear the workspace and the DataCenter.
+  void _clearWorkspace(WorkspaceState state) {
+    DataCenter().clearSeriesData();
+    for (WindowMetaData window in state.windows.values) {
+      window.bloc.close();
+    }
   }
 
   /// Cancel the subscription to the websocket.

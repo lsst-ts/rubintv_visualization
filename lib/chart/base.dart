@@ -225,10 +225,8 @@ class ChartState extends WindowState {
   List<Series> get allSeries {
     List<Series> allSeries = [];
     for (SeriesInfo seriesInfo in _series.values) {
-      Series? series = seriesInfo.toSeries();
-      if (series != null) {
-        allSeries.add(series);
-      }
+      Series series = seriesInfo.toSeries();
+      allSeries.add(series);
     }
     return allSeries;
   }

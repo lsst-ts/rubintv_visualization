@@ -431,7 +431,6 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
 
     /// Reload all of the data from the server.
     on<SynchDataEvent>((event, emit) {
-      print("synching!!! ");
       _updateSeries();
     });
   }
