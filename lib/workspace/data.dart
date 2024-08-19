@@ -24,9 +24,8 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 
-import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/error.dart';
 import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/chart/series.dart';
 
@@ -157,6 +156,25 @@ class SchemaField {
 
   /// The [Type] of the field.
   Type get type => _dataTypeToType[dataType]!;
+
+  /// Convert the [SchemaField] to a JSON object.
+  /// We only need to persist the field [name] and the [schema.name],
+  /// since the [SchemaField] is a child of a [TableSchema] that is already loaded by the [DataCenter].
+  Map<String, dynamic> toJson() => {
+        "name": name,
+        "schema": schema.name,
+        "database": schema.database.name,
+      };
+
+  /// Retrieve a [SchemaField] from a JSON object.
+  /// The [SchemaField] must be a child of a [TableSchema]
+  /// that is already loaded by the [DataCenter].
+  static SchemaField fromJson(Map<String, dynamic> json) {
+    DataCenter dataCenter = DataCenter();
+    TableSchema schema =
+        dataCenter.databases[json["database"]]!.tables.values.firstWhere((e) => e.name == json["schema"]);
+    return schema.fields[json["name"]]!;
+  }
 }
 
 /// A table schema.
@@ -297,16 +315,7 @@ class DataCenter {
   /// Add a new database schema to the [DataCenter].
   void addDatabaseSchema(Map<String, dynamic> schemaDict) {
     if (!schemaDict.containsKey("name")) {
-      String msg = "Schema does not contain a name";
-      Fluttertoast.showToast(
-          msg: msg,
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.CENTER,
-          timeInSecForIosWeb: 5,
-          backgroundColor: Colors.red,
-          webBgColor: "#e74c3c",
-          textColor: Colors.white,
-          fontSize: 16.0);
+      reportError("Schema does not contain a name");
       return;
     }
 
@@ -352,16 +361,7 @@ class DataCenter {
       _databaseSchemas[database.name] = database;
     } catch (e, s) {
       developer.log("error: $e", name: "rubinTV.workspace.data", error: e, stackTrace: s);
-      String msg = "Could not initialize database";
-      Fluttertoast.showToast(
-          msg: msg,
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.CENTER,
-          timeInSecForIosWeb: 5,
-          backgroundColor: Colors.red,
-          webBgColor: "#e74c3c",
-          textColor: Colors.white,
-          fontSize: 16.0);
+      reportError("Could not initialize database");
     }
   }
 
@@ -374,16 +374,7 @@ class DataCenter {
   }) {
     int rows = data.values.first.length;
     if (rows == 0) {
-      String msg = "No non-null data found for the selected columns.";
-      Fluttertoast.showToast(
-          msg: msg,
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.CENTER,
-          timeInSecForIosWeb: 5,
-          backgroundColor: Colors.red,
-          webBgColor: "#e74c3c",
-          textColor: Colors.white,
-          fontSize: 16.0);
+      reportError("No non-null data found for the selected columns.");
       return;
     }
 
@@ -438,6 +429,10 @@ class DataCenter {
 
   void removeSeriesData(SeriesId id) {
     _seriesData.remove(id);
+  }
+
+  void clearSeriesData() {
+    _seriesData.clear();
   }
 
   void dispose() {

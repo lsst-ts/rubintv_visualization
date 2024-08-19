@@ -42,10 +42,14 @@ class WorkspaceViewer extends StatefulWidget {
   /// The theme to use for the workspace.
   final AppTheme theme;
 
+  /// The current version of the application.
+  final AppVersion version;
+
   const WorkspaceViewer({
     super.key,
     required this.size,
     required this.theme,
+    required this.version,
   });
 
   @override
@@ -77,6 +81,7 @@ class WorkspaceViewer extends StatefulWidget {
 class WorkspaceViewerState extends State<WorkspaceViewer> {
   AppTheme get theme => widget.theme;
   Size get size => widget.size;
+  AppVersion get version => widget.version;
 
   /// The current state of the workspace.
   WorkspaceState? info;
@@ -99,7 +104,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => WorkspaceBloc()..add(InitializeWorkspaceEvent(theme)),
+      create: (context) => WorkspaceBloc()..add(InitializeWorkspaceEvent(theme, version)),
       child: BlocBuilder<WorkspaceBloc, WorkspaceStateBase>(
         builder: (context, state) {
           if (state is WorkspaceStateInitial) {

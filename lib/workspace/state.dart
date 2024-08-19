@@ -20,6 +20,7 @@
 /// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
@@ -42,7 +43,7 @@ import 'package:rubintv_visualization/workspace/window.dart';
 
 /// Create an empty [ChartAxis].
 /// This is required for the color map slider, and is just a dummy axis.
-ChartAxis _createEmptyAxis(ChartAxisInfo axisInfo, ChartTheme theme) {
+ChartAxis createEmptyDataAxis(ChartAxisInfo axisInfo, ChartTheme theme) {
   return NumericalChartAxis(
     info: axisInfo,
     bounds: const Bounds(0, 0),
@@ -70,7 +71,7 @@ FocalPlaneChartBloc buildFocalPlaneBloc({
     label: "Focal Plane color axis",
     axisId: valueAxisId,
   );
-  ChartAxis dataAxis = _createEmptyAxis(axisInfo, workspace.theme.chartTheme);
+  ChartAxis dataAxis = createEmptyDataAxis(axisInfo, workspace.theme.chartTheme);
 
   SeriesInfo newSeries = SeriesInfo(
     id: sid,
@@ -123,6 +124,7 @@ ChartBloc buildBinnedBloc({
       ChartAxisInfo(
         label: "<y>",
         axisId: AxisId(AxisLocation.left),
+        isInverted: true,
       ),
     );
   }
@@ -208,19 +210,12 @@ WindowMetaData buildWindow({
   } else if (windowType == WindowTypes.focalPlane) {
     bloc = buildFocalPlaneBloc(id: id, workspace: workspace, title: title);
   } else if (windowType == WindowTypes.detectorSelector) {
-    return WindowMetaData(
-      state: WindowState(id: id, windowType: WindowTypes.detectorSelector),
-      offset: offset,
-      size: workspace.theme.newPlotSize,
-      title: title,
-      bloc: null,
-    );
+    bloc = WindowBloc(WindowState(id: id, windowType: WindowTypes.detectorSelector));
   } else {
     throw ArgumentError("Unknown window type $windowType");
   }
 
   return WindowMetaData(
-    state: bloc.state,
     offset: offset,
     size: workspace.theme.newPlotSize,
     bloc: bloc,
@@ -258,7 +253,9 @@ class InitializeWorkspaceEvent extends WorkspaceEvent {
   /// The theme of the app.
   final AppTheme theme;
 
-  InitializeWorkspaceEvent(this.theme);
+  final AppVersion version;
+
+  InitializeWorkspaceEvent(this.theme, this.version);
 }
 
 /// A message received via the websocket.
@@ -302,16 +299,45 @@ class ShowFocalPlaneEvent extends WorkspaceEvent {
   ShowFocalPlaneEvent();
 }
 
+/// Load a workspace from a JSON text string.
+class LoadWorkspaceFromTextEvent extends WorkspaceEvent {
+  final String text;
+
+  LoadWorkspaceFromTextEvent(this.text);
+}
+
+/// Clear the DataCenter and the workspace
+class ClearWorkspaceEvent extends WorkspaceEvent {}
+
+/// The status of a workspace.
+enum WorkspaceStatus {
+  initial,
+  loadingInstrument,
+  loadingWorkspace,
+  ready,
+  error,
+}
+
 /// State of a [WorkspaceViewer].
 abstract class WorkspaceStateBase {
-  const WorkspaceStateBase();
+  /// The status of the workspace.
+  final WorkspaceStatus status;
+
+  const WorkspaceStateBase({
+    required this.status,
+  });
 }
 
 /// The initial state of the [WorkspaceViewer].
-class WorkspaceStateInitial extends WorkspaceStateBase {}
+class WorkspaceStateInitial extends WorkspaceStateBase {
+  const WorkspaceStateInitial() : super(status: WorkspaceStatus.initial);
+}
 
 /// A fully loaded state of the [WorkspaceViewer].
 class WorkspaceState extends WorkspaceStateBase {
+  /// The version of the application.
+  final AppVersion version;
+
   /// Windows to display in the [WorkspaceState].
   final Map<UniqueId, WindowMetaData> windows;
 
@@ -334,6 +360,12 @@ class WorkspaceState extends WorkspaceStateBase {
   /// The current interaction info.
   final WindowInteractionInfo? interactionInfo;
 
+  /// The error message, if any.
+  final String? errorMessage;
+
+  /// The JSON that is pending to be loaded, if any.
+  final Map<String, dynamic>? pendingJson;
+
   @override
   String toString() {
     return "WorkspaceStateLoaded(windows: $windows, instrument: $instrument, globalQuery: $globalQuery, "
@@ -341,72 +373,152 @@ class WorkspaceState extends WorkspaceStateBase {
   }
 
   const WorkspaceState({
+    required super.status,
+    required this.version,
     required this.windows,
-    required this.instrument,
-    required this.globalQuery,
-    required this.dayObs,
-    required this.detector,
+    this.instrument,
+    this.globalQuery,
+    this.dayObs,
+    this.detector,
     required this.theme,
-    required this.interactionInfo,
+    this.interactionInfo,
+    this.errorMessage,
+    this.pendingJson,
   });
+
+  /// Convert the [WorkspaceState] to a JSON object.
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> result = {
+      "windows": Map<String, dynamic>.fromEntries(
+          windows.entries.map((e) => MapEntry(e.key.toSerializableString(), e.value.toJson()))),
+      "version": version.toJson(),
+    };
+    if (instrument != null) {
+      result["instrument"] = instrument!.toJson();
+    }
+    if (globalQuery != null) {
+      result["globalQuery"] = globalQuery!.toJson();
+    }
+    if (dayObs != null) {
+      result["dayObs"] = dayObs!.toIso8601String();
+    }
+    if (detector != null) {
+      result["detector"] = detector!.toJson();
+    }
+    return result;
+  }
+
+  /// Create a [WorkspaceState] from a JSON object.
+  static WorkspaceState fromJson(
+    Map<String, dynamic> json,
+    AppTheme theme,
+    AppVersion version,
+  ) {
+    AppVersion fileVersion = AppVersion.fromJson(json["version"]);
+    if (fileVersion != version) {
+      developer.log("File version $fileVersion does not match current version $version. ",
+          name: "rubin_chart.workspace");
+      json = convertWorkspace(json, theme, version);
+    }
+
+    return WorkspaceState(
+      version: AppVersion.fromJson(json["version"]),
+      windows: (json["windows"] as Map<String, dynamic>).map((key, value) {
+        return MapEntry(UniqueId.fromString(key), WindowMetaData.fromJson(value, theme.chartTheme));
+      }),
+      instrument: json.containsKey("instrument") ? Instrument.fromJson(json["instrument"]) : null,
+      globalQuery: json.containsKey("globalQuery") ? Query.fromJson(json["globalQuery"]) : null,
+      dayObs: json.containsKey("dayObs") ? DateTime.parse(json["dayObs"]) : null,
+      detector: json.containsKey("detector") ? Detector.fromJson(json["detector"]) : null,
+      theme: theme,
+      interactionInfo: null,
+      status: WorkspaceStatus.ready,
+    );
+  }
 
   /// Copy the [WorkspaceState] with new values.
   WorkspaceState copyWith({
+    AppVersion? version,
+    WorkspaceStatus? status,
     Map<UniqueId, WindowMetaData>? windows,
     Instrument? instrument,
     Detector? detector,
     bool? showFocalPlane,
     AppTheme? theme,
+    String? errorMessage,
+    Map<String, dynamic>? pendingJson,
   }) =>
       WorkspaceState(
+          status: status ?? this.status,
+          version: version ?? this.version,
           windows: windows ?? this.windows,
           globalQuery: globalQuery,
           dayObs: dayObs,
           instrument: instrument ?? this.instrument,
           detector: detector ?? this.detector,
           theme: theme ?? this.theme,
-          interactionInfo: interactionInfo);
+          interactionInfo: interactionInfo,
+          errorMessage: errorMessage,
+          pendingJson: pendingJson);
 
   /// Because the global query can be null, we need a special copy method.
   WorkspaceState updateGlobalQuery(Query? query) => WorkspaceState(
+      status: status,
+      version: version,
+      windows: windows,
+      instrument: instrument,
+      globalQuery: query,
+      dayObs: dayObs,
+      detector: detector,
+      theme: theme,
+      interactionInfo: interactionInfo,
+      errorMessage: errorMessage,
+      pendingJson: pendingJson);
+
+  /// Becayse the dayObs can be null, we need a special copy method.
+  WorkspaceState updateObsDate(DateTime? dayObs) => WorkspaceState(
+        status: status,
+        version: version,
         windows: windows,
         instrument: instrument,
-        globalQuery: query,
+        globalQuery: globalQuery,
         dayObs: dayObs,
         detector: detector,
         theme: theme,
         interactionInfo: interactionInfo,
+        errorMessage: errorMessage,
+        pendingJson: pendingJson,
       );
-
-  /// Becayse the dayObs can be null, we need a special copy method.
-  WorkspaceState updateObsDate(DateTime? dayObs) => WorkspaceState(
-      windows: windows,
-      instrument: instrument,
-      globalQuery: globalQuery,
-      dayObs: dayObs,
-      detector: detector,
-      theme: theme,
-      interactionInfo: interactionInfo);
 
   // Because the detector can be null, we need a special copy method.
   WorkspaceState updateSelectedDetector(Detector? detector) => WorkspaceState(
-      windows: windows,
-      instrument: instrument,
-      globalQuery: globalQuery,
-      dayObs: dayObs,
-      detector: detector,
-      theme: theme,
-      interactionInfo: interactionInfo);
+        status: status,
+        version: version,
+        windows: windows,
+        instrument: instrument,
+        globalQuery: globalQuery,
+        dayObs: dayObs,
+        detector: detector,
+        theme: theme,
+        interactionInfo: interactionInfo,
+        errorMessage: errorMessage,
+        pendingJson: pendingJson,
+      );
 
   /// Update the interaction info.
   WorkspaceState updateInteractionInfo(WindowInteractionInfo? interactionInfo) => WorkspaceState(
-      windows: windows,
-      instrument: instrument,
-      globalQuery: globalQuery,
-      dayObs: dayObs,
-      detector: detector,
-      theme: theme,
-      interactionInfo: interactionInfo);
+        status: status,
+        version: version,
+        windows: windows,
+        instrument: instrument,
+        globalQuery: globalQuery,
+        dayObs: dayObs,
+        detector: detector,
+        theme: theme,
+        interactionInfo: interactionInfo,
+        errorMessage: errorMessage,
+        pendingJson: pendingJson,
+      );
 
   /// Add a new [WindowMetaData] to the [WorkspaceWidgetState].
   /// Normally the [index] is already created, unless
@@ -480,7 +592,7 @@ void updateAllSeriesData(WorkspaceState workspace, {ChartState? chart}) {
 class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
   late StreamSubscription _subscription;
 
-  WorkspaceBloc() : super(WorkspaceStateInitial()) {
+  WorkspaceBloc() : super(const WorkspaceStateInitial()) {
     /// Listen for messages from the websocket.
     _subscription = WebSocketManager().messages.listen((message) {
       add(ReceiveMessageEvent(message));
@@ -489,13 +601,10 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
     /// Initialize the workspace.
     on<InitializeWorkspaceEvent>((event, emit) {
       emit(WorkspaceState(
+        status: WorkspaceStatus.ready,
         windows: {},
-        instrument: null,
-        globalQuery: null,
-        dayObs: null,
-        detector: null,
         theme: event.theme,
-        interactionInfo: null,
+        version: event.version,
       ));
     });
 
@@ -504,8 +613,15 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       developer.log("Workspace Received message: ${event.message["type"]}", name: "rubin_chart.workspace");
       if (event.message["type"] == "instrument info") {
         // Update the workspace to use the new instrument
+        WorkspaceState state = this.state as WorkspaceState;
         Instrument instrument = Instrument.fromJson(event.message["content"]);
-        emit((state as WorkspaceState).copyWith(instrument: instrument));
+        emit(state.copyWith(instrument: instrument));
+        if (state.status == WorkspaceStatus.loadingInstrument && state.pendingJson != null) {
+          _applyWorkspaceJson(state.pendingJson!, emit);
+        }
+      } else if (event.message["type"] == "file content") {
+        // Load the workspace from the file content
+        add(LoadWorkspaceFromTextEvent(event.message["content"]["content"]));
       }
     });
 
@@ -685,6 +801,81 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       WorkspaceState state = this.state as WorkspaceState;
       emit(state.updateInteractionInfo(null));
     });
+
+    /// Load a workspace from a text string.
+    on<LoadWorkspaceFromTextEvent>(_onLoadWorkspaceFromText);
+
+    /// Clear the workspace and DataCenter.
+    on<ClearWorkspaceEvent>((event, emit) {
+      WorkspaceState state = this.state as WorkspaceState;
+      _clearWorkspace(state);
+      emit(const WorkspaceStateInitial());
+      add(InitializeWorkspaceEvent(state.theme, state.version));
+    });
+  }
+
+  /// Load a workspace from a text string.
+  void _onLoadWorkspaceFromText(LoadWorkspaceFromTextEvent event, Emitter<WorkspaceStateBase> emit) {
+    WorkspaceState state = this.state as WorkspaceState;
+
+    try {
+      Map<String, dynamic> json = jsonDecode(event.text);
+      Instrument newInstrument = Instrument.fromJson(json["instrument"]);
+
+      if (state.instrument?.name != newInstrument.name) {
+        emit(state.copyWith(
+          status: WorkspaceStatus.loadingInstrument,
+          pendingJson: json,
+        ));
+        WebSocketManager().sendMessage(LoadInstrumentAction(instrument: newInstrument.name).toJson());
+      } else {
+        _applyWorkspaceJson(json, emit);
+      }
+    } catch (e) {
+      emit(state.copyWith(status: WorkspaceStatus.error, errorMessage: "Failed to load workspace: $e"));
+    }
+  }
+
+  /// Build a workspace from a JSON object.
+  void _applyWorkspaceJson(Map<String, dynamic> json, Emitter<WorkspaceStateBase> emit) {
+    WorkspaceState state = this.state as WorkspaceState;
+    emit(state.copyWith(status: WorkspaceStatus.loadingWorkspace));
+
+    // Clear current workspace
+    _clearWorkspace(state);
+
+    // Build new workspace from JSON
+    WorkspaceState newState = WorkspaceState.fromJson(
+      json,
+      (this.state as WorkspaceState).theme,
+      state.version,
+    );
+
+    // Sync data for all windows
+    for (var window in newState.windows.values) {
+      if (window.bloc is ChartBloc) {
+        (window.bloc as ChartBloc).add(SynchDataEvent(
+          dayObs: getFormattedDate(newState.dayObs),
+          globalQuery: newState.globalQuery,
+        ));
+      } else if (window.bloc is FocalPlaneChartBloc) {
+        (window.bloc as FocalPlaneChartBloc).add(SynchDataEvent(
+          dayObs: getFormattedDate(newState.dayObs),
+          globalQuery: newState.globalQuery,
+        ));
+      }
+    }
+
+    emit(newState.copyWith(status: WorkspaceStatus.ready, pendingJson: null));
+  }
+
+  /// Clear the workspace and the DataCenter.
+  void _clearWorkspace(WorkspaceState state) {
+    ControlCenter().reset();
+    DataCenter().clearSeriesData();
+    for (WindowMetaData window in state.windows.values) {
+      window.bloc.close();
+    }
   }
 
   /// Cancel the subscription to the websocket.
@@ -693,4 +884,79 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
     await _subscription.cancel();
     return super.close();
   }
+}
+
+/// A class to represent the version of the application.
+class AppVersion {
+  /// The major version number.
+  final int major;
+
+  /// The minor version number.
+  final int minor;
+
+  /// The patch version number.
+  final int patch;
+
+  /// The build number.
+  final String buildNumber;
+
+  const AppVersion({
+    required this.major,
+    required this.minor,
+    required this.patch,
+    required this.buildNumber,
+  });
+
+  /// Create an [AppVersion] from a string.
+  static AppVersion fromString(String version, String buildNumber) {
+    List<String> parts = version.split('.');
+    if (parts.length != 3) throw Exception('Invalid version string: $version');
+
+    return AppVersion(
+      major: int.parse(parts[0]),
+      minor: int.parse(parts[1]),
+      patch: int.parse(parts[2]),
+      buildNumber: buildNumber,
+    );
+  }
+
+  @override
+  String toString() => '$major.$minor.$patch';
+
+  /// Create an [AppVersion] from a JSON object.
+  static AppVersion fromJson(Map<String, dynamic> json) {
+    return AppVersion(
+      major: json["major"],
+      minor: json["minor"],
+      patch: json["patch"],
+      buildNumber: json["buildNumber"],
+    );
+  }
+
+  /// Convert the [AppVersion] to a JSON object.
+  Map<String, dynamic> toJson() {
+    return {
+      "major": major,
+      "minor": minor,
+      "patch": patch,
+      "buildNumber": buildNumber,
+    };
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is AppVersion &&
+      other.major == major &&
+      other.minor == minor &&
+      other.patch == patch &&
+      other.buildNumber == buildNumber;
+
+  @override
+  int get hashCode => major.hashCode ^ minor.hashCode ^ patch.hashCode ^ buildNumber.hashCode;
+}
+
+/// Convert a workspace to the current version
+Map<String, dynamic> convertWorkspace(Map<String, dynamic> json, AppTheme theme, AppVersion version) {
+  // No changes have been made to the persistable workspace yet
+  return json;
 }

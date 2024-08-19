@@ -41,10 +41,21 @@ class UniqueId {
   /// Create a new child id from an existing code
   static UniqueId from({
     required BigInt id,
-  }) =>
-      UniqueId._(id);
+  }) {
+    UniqueId newId = UniqueId._(id);
+    if (id >= _nextId) {
+      _nextId = id + BigInt.one;
+    }
+    return newId;
+  }
 
-  static UniqueId fromString(String id) => UniqueId._(BigInt.parse(id));
+  static UniqueId fromString(String id) {
+    UniqueId newId = UniqueId._(BigInt.parse(id));
+    if (newId.id >= _nextId) {
+      _nextId = newId.id + BigInt.one;
+    }
+    return newId;
+  }
 
   @override
   int get hashCode => id.hashCode;

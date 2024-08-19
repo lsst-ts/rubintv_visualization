@@ -24,45 +24,8 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:rubintv_visualization/theme.dart';
 import 'package:rubintv_visualization/websocket.dart';
+import 'package:rubintv_visualization/workspace/state.dart';
 import 'package:rubintv_visualization/workspace/viewer.dart';
-
-/// A class to represent the version of the application.
-class AppVersion {
-  /// The major version number.
-  final int major;
-
-  /// The minor version number.
-  final int minor;
-
-  /// The patch version number.
-  final int patch;
-
-  /// The build number.
-  final String buildNumber;
-
-  const AppVersion({
-    required this.major,
-    required this.minor,
-    required this.patch,
-    required this.buildNumber,
-  });
-
-  /// Create an [AppVersion] from a string.
-  static AppVersion fromString(String version, String buildNumber) {
-    List<String> parts = version.split('.');
-    if (parts.length != 3) throw Exception('Invalid version string: $version');
-
-    return AppVersion(
-      major: int.parse(parts[0]),
-      minor: int.parse(parts[1]),
-      patch: int.parse(parts[2]),
-      buildNumber: buildNumber,
-    );
-  }
-
-  @override
-  String toString() => '$major.$minor.$patch';
-}
 
 /// The main application widget.
 class MainApp extends StatefulWidget {
@@ -122,6 +85,7 @@ class MainAppState extends State<MainApp> {
         body: WorkspaceViewer(
           size: screenSize,
           theme: theme,
+          version: widget.version,
         ),
       ),
     );

@@ -22,7 +22,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:rubintv_visualization/error.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/query/update.dart';
@@ -635,15 +635,7 @@ class QueryEditorState extends State<QueryEditor> {
   bool validate(Query? query) {
     if (query is QueryOperation) {
       if (query.children.length <= 1) {
-        Fluttertoast.showToast(
-            msg: "Query error",
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.CENTER,
-            timeInSecForIosWeb: 5,
-            backgroundColor: Colors.red,
-            webBgColor: "#e74c3c",
-            textColor: Colors.white,
-            fontSize: 16.0);
+        reportError("Query error: $query must containt at least 2 children");
         return false;
       }
       for (Query child in query.children) {
@@ -654,15 +646,7 @@ class QueryEditorState extends State<QueryEditor> {
       return true;
     } else if (query is EqualityQuery) {
       if (query.leftValue == null && query.rightValue == null) {
-        Fluttertoast.showToast(
-            msg: "Query $query has no comparison",
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.CENTER,
-            timeInSecForIosWeb: 5,
-            backgroundColor: Colors.red,
-            webBgColor: "#e74c3c",
-            textColor: Colors.white,
-            fontSize: 16.0);
+        reportError("Query $query has no comparison");
         return false;
       }
       return true;
@@ -696,15 +680,7 @@ class QueryEditorState extends State<QueryEditor> {
               widget.onCompleted(null);
               Navigator.pop(context);
             } else if (expression.queries.length > 1) {
-              Fluttertoast.showToast(
-                  msg: "Unconnected queries",
-                  toastLength: Toast.LENGTH_LONG,
-                  gravity: ToastGravity.CENTER,
-                  timeInSecForIosWeb: 5,
-                  backgroundColor: Colors.red,
-                  webBgColor: "#e74c3c",
-                  textColor: Colors.white,
-                  fontSize: 16.0);
+              reportError("Unconnected queries");
             } else if (validate(expression.queries.first)) {
               widget.onCompleted(expression.queries.length == 1 ? expression.queries.first : null);
               Navigator.pop(context);

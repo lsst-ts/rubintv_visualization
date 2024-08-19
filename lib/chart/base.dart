@@ -51,6 +51,12 @@ enum MultiSelectionTool {
   final CursorAction cursorAction;
 
   const MultiSelectionTool(this.icon, this.cursorAction);
+
+  /// Create a [MultiSelectionTool] from a string.
+  /// Note, to go in the other direction juse use [tool.name],
+  /// where tool is a [MultiSelectionTool].
+  static MultiSelectionTool fromString(String value) => values.firstWhere((e) => e.toString() == value,
+      orElse: () => throw ArgumentError("Unknown MultiSelectionTool: $value"));
 }
 
 abstract class ChartEvent extends WindowEvent {}
@@ -219,23 +225,47 @@ class ChartState extends WindowState {
   List<Series> get allSeries {
     List<Series> allSeries = [];
     for (SeriesInfo seriesInfo in _series.values) {
-      Series? series = seriesInfo.toSeries();
-      if (series != null) {
-        allSeries.add(series);
-      }
+      Series series = seriesInfo.toSeries();
+      allSeries.add(series);
     }
     return allSeries;
+  }
+
+  /// Convert the [ChartState] to a JSON object.
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id.toSerializableString(),
+      "series": _series.values.map((e) => e.toJson()).toList(),
+      "axisInfo": _axisInfo.map((e) => e.toJson()).toList(),
+      "legend": legend?.toJson(),
+      "useGlobalQuery": useGlobalQuery,
+      "windowType": windowType.name,
+      "tool": tool.toString(),
+    };
+  }
+
+  /// Create a [ChartState] from a JSON object.
+  @override
+  factory ChartState.fromJson(Map<String, dynamic> json) {
+    return ChartState(
+      id: UniqueId.fromString(json["id"]),
+      series: Map.fromEntries((json["series"] as List<dynamic>).map((e) {
+        SeriesInfo seriesInfo = SeriesInfo.fromJson(e);
+        return MapEntry(seriesInfo.id, seriesInfo);
+      })),
+      axisInfo: List<ChartAxisInfo>.from(json["axisInfo"].map((e) => ChartAxisInfo.fromJson(e))),
+      legend: json["legend"] == null ? null : Legend.fromJson(json["legend"]),
+      useGlobalQuery: json["useGlobalQuery"],
+      windowType: WindowTypes.fromString(json["windowType"]),
+      tool: MultiSelectionTool.fromString(json["tool"]),
+      resetController: StreamController<ResetChartAction>.broadcast(),
+    );
   }
 }
 
 /// The base class for all chart blocs.
 class ChartBloc extends WindowBloc<ChartState> {
-  /// Convert the bloc to a JSON object
-  @override
-  Map<String, dynamic> toJson() {
-    throw UnimplementedError("toJson not implemented for ChartBloc");
-  }
-
   /// Subscription to the websocket.
   late StreamSubscription _subscription;
 
@@ -394,6 +424,7 @@ class ChartBloc extends WindowBloc<ChartState> {
           globalQuery: event.globalQuery,
           dayObs: event.dayObs,
         );
+        developer.log("synch request sent", name: "rubintv.chart.base.dart");
       }
     });
 

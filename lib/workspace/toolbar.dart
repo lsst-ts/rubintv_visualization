@@ -18,11 +18,14 @@
 ///
 /// You should have received a copy of the GNU General Public License
 /// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import 'dart:convert';
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/dialog/widget.dart';
 import 'package:rubintv_visualization/io.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/editors/query.dart';
@@ -139,6 +142,51 @@ Color _getStatusIndicator(bool isConnected, bool hasInstrument) {
   }
 }
 
+/// Display a dialog to load a workspace from a JSON string.
+void _loadWorkspace(BuildContext context, WorkspaceBloc bloc) {
+  final TextEditingController textFieldController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Enter workspace JSON'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: TextField(
+            controller: textFieldController,
+            maxLines: null,
+            minLines: 5,
+            keyboardType: TextInputType.multiline,
+            decoration: const InputDecoration(
+              hintText: "Enter workspace JSON here",
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('CANCEL'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+          TextButton(
+            child: const Text('LOAD'),
+            onPressed: () {
+              // Load the workspace from the text field
+              String text = textFieldController.text;
+              bloc.add(LoadWorkspaceFromTextEvent(text));
+              // Add your custom action here
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
+
 /// The [State] of the [Toolbar] widget.
 class ToolbarState extends State<Toolbar> {
   WorkspaceState get workspace => widget.workspace;
@@ -222,6 +270,88 @@ class ToolbarState extends State<Toolbar> {
                 : "${workspace.detector!.id}: ${workspace.detector!.name}"),
           ),
           const Spacer(),
+          Tooltip(
+            message: "Load workspace",
+            child: MenuAnchor(
+              builder: (BuildContext context, MenuController controller, Widget? child) {
+                return IconButton(
+                  icon: const Icon(Icons.folder_open, color: Colors.green),
+                  onPressed: () {
+                    if (controller.isOpen) {
+                      controller.close();
+                    } else {
+                      controller.open();
+                    }
+                  },
+                );
+              },
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: () {
+                    _loadWorkspace(context, context.read<WorkspaceBloc>());
+                  },
+                  child: const Text("From text"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) => const Dialog(
+                        child: FileDialogWidget(
+                          action: FileDialogAction.load,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text("From file"),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Tooltip(
+            message: "Save workspace",
+            child: MenuAnchor(
+              builder: (BuildContext context, MenuController controller, Widget? child) {
+                return IconButton(
+                  icon: Icon(Icons.save,
+                      color: workspace.instrument == null && !workspace.isShowingFocalPlane
+                          ? Colors.grey[500]
+                          : Colors.green),
+                  onPressed: () {
+                    if (controller.isOpen) {
+                      controller.close();
+                    } else {
+                      controller.open();
+                    }
+                  },
+                );
+              },
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: jsonEncode(workspace.toJson())));
+                  },
+                  child: const Text("Copy to clipboard"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) => Dialog(
+                        child: FileDialogWidget(
+                          action: FileDialogAction.save,
+                          content: jsonEncode(workspace.toJson()),
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text("Save to file"),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
           Tooltip(
             message: "Add a chart to the workspace",
             child: MenuAnchor(
@@ -341,6 +471,16 @@ class ToolbarState extends State<Toolbar> {
             height: workspace.theme.toolbarHeight,
             child: DatePickerWidget(
               dayObs: workspace.dayObs,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Tooltip(
+            message: "Clear all selections",
+            child: IconButton(
+              icon: const Icon(Icons.clear_all, color: Colors.red),
+              onPressed: () {
+                context.read<WorkspaceBloc>().add(ClearWorkspaceEvent());
+              },
             ),
           ),
         ],

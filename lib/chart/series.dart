@@ -120,10 +120,15 @@ class SeriesInfo {
   String toString() => "Series<$id:$name>";
 
   /// Convert this [SeriesInfo] to a [Series].
-  Series? toSeries() {
+  Series toSeries() {
     SeriesData? seriesData = DataCenter().getSeriesData(id);
     if (seriesData == null) {
-      return null;
+      List<SchemaField> plotColumns = fields.values.toList();
+      seriesData = SeriesData(
+        data: Map.fromEntries(fields.entries.map((entry) => MapEntry(entry.value, <Object, dynamic>{}))),
+        plotColumns: fields,
+        columnTypes: {for (SchemaField e in plotColumns) e: e.dataType},
+      );
     }
     return Series(
       id: id,
@@ -131,6 +136,35 @@ class SeriesInfo {
       marker: marker,
       errorBars: errorBars,
       data: seriesData,
+    );
+  }
+
+  /// Convert this [SeriesInfo] to a JSON object.
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id.shortString,
+      "name": name,
+      "marker": marker?.toJson(),
+      "errorBars": errorBars?.toJson(),
+      "axes": axes.map((e) => e.toJson()).toList(),
+      "fields": fields.entries.map((entry) => [entry.key.toJson(), entry.value.toJson()]).toList(),
+      "query": query?.toJson(),
+    };
+  }
+
+  /// Create a [SeriesInfo] from a JSON object.
+  static SeriesInfo fromJson(Map<String, dynamic> json) {
+    return SeriesInfo(
+      id: SeriesId.fromString(json["id"]),
+      name: json["name"],
+      marker: json["marker"] == null ? null : Marker.fromJson(json["marker"]),
+      errorBars: json["errorBars"] == null ? null : ErrorBars.fromJson(json["errorBars"]),
+      axes: (json["axes"] as List).map((e) => AxisId.fromJson(e)).toList(),
+      fields: Map.fromEntries((json["fields"] as List).map((e) {
+        List<dynamic> entry = e;
+        return MapEntry(AxisId.fromJson(entry[0]), SchemaField.fromJson(entry[1]));
+      })),
+      query: json["query"] == null ? null : Query.fromJson(json["query"]),
     );
   }
 }

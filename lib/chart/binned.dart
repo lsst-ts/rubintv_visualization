@@ -95,6 +95,38 @@ class BinnedState extends ChartState {
         resetController: resetController ?? this.resetController,
         needsReset: needsReset ?? false,
       );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id.toSerializableString(),
+      "series": series.values.map((e) => e.toJson()).toList(),
+      "axisInfo": axisInfo.map((e) => e.toJson()).toList(),
+      "legend": legend?.toJson(),
+      "useGlobalQuery": useGlobalQuery,
+      "windowType": windowType.name,
+      "tool": tool.toString(),
+      "nBins": nBins,
+    };
+  }
+
+  @override
+  factory BinnedState.fromJson(Map<String, dynamic> json) {
+    return BinnedState(
+      id: UniqueId.fromString(json["id"]),
+      series: Map.fromEntries((json["series"] as List<dynamic>).map((e) {
+        SeriesInfo seriesInfo = SeriesInfo.fromJson(e);
+        return MapEntry(seriesInfo.id, seriesInfo);
+      })),
+      axisInfo: List<ChartAxisInfo>.from(json["axisInfo"].map((e) => ChartAxisInfo.fromJson(e))),
+      legend: json["legend"] == null ? null : Legend.fromJson(json["legend"]),
+      useGlobalQuery: json["useGlobalQuery"],
+      windowType: WindowTypes.fromString(json["windowType"]),
+      tool: MultiSelectionTool.fromString(json["tool"]),
+      nBins: json["nBins"],
+      resetController: StreamController<ResetChartAction>.broadcast(),
+    );
+  }
 }
 
 /// The [Widget] used to display a binned chart.

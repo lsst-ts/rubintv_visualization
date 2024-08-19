@@ -24,6 +24,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/chart/base.dart';
 import 'package:rubintv_visualization/chart/series.dart';
 import 'package:rubintv_visualization/focal_plane/editor.dart';
 import 'package:rubintv_visualization/focal_plane/slider.dart';
@@ -217,18 +218,49 @@ class FocalPlaneChartState extends WindowState {
         dayObs: dayObs ?? this.dayObs,
       );
 
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id.toSerializableString(),
+      "series": series.toJson(),
+      "axisInfo": dataAxis.info.toJson(),
+      "playbackSpeed": playbackSpeed,
+      "loopPlayback": loopPlayback,
+      "dayObs": dayObs,
+      "windowType": windowType.name,
+    };
+  }
+
+  static FocalPlaneChartState fromJson(Map<String, dynamic> json, ChartTheme theme) {
+    ChartAxisInfo axisInfo = ChartAxisInfo.fromJson(json["axisInfo"]);
+    return FocalPlaneChartState(
+      id: UniqueId.fromString(json["id"]),
+      series: SeriesInfo.fromJson(json["series"]),
+      dataAxis: createEmptyDataAxis(axisInfo, theme),
+      data: {},
+      dataIds: [],
+      dataIndex: 0,
+      colorbarController: ColorbarController(
+        min: 0,
+        max: 100,
+        stops: {
+          0: Colors.blue,
+          100: Colors.red,
+        },
+      ),
+      playbackSpeed: json["playbackSpeed"],
+      isPlaying: false,
+      loopPlayback: json["loopPlayback"],
+      dayObs: json["dayObs"],
+    );
+  }
+
   /// Get the data axis id.
   AxisId get dataAxisId => dataAxis.info.axisId;
 }
 
 /// A bloc to manage the state of a focal plane chart.
 class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
-  /// Convert the bloc to a JSON object
-  @override
-  Map<String, dynamic> toJson() {
-    throw UnimplementedError("toJson not implemented for ChartBloc");
-  }
-
   /// The subscription to the websocket.
   late StreamSubscription _websocketSubscription;
 
@@ -241,6 +273,14 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
   /// The selection timer.
   Timer? _selectionTimer;
 
+  void _updateSeries([Set<Object> dataPoints = const {}]) {
+    add(FocalPlaneUpdateColumnEvent(
+      field: state.series.fields.values.first,
+      dayObs: state.dayObs,
+      selected: dataPoints.map((e) => e as DataId).toSet(),
+    ));
+  }
+
   FocalPlaneChartBloc(super.initialState) {
     _websocketSubscription = WebSocketManager().messages.listen((message) {
       add(FocalPlaneReceiveMessageEvent(message));
@@ -251,11 +291,7 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
     ControlCenter().selectionController.subscribe((Set<Object> dataPoints) {
       _selectionTimer?.cancel();
       _selectionTimer = Timer(const Duration(milliseconds: 500), () {
-        add(FocalPlaneUpdateColumnEvent(
-          field: state.series.fields.values.first,
-          dayObs: state.dayObs,
-          selected: dataPoints.map((e) => e as DataId).toSet(),
-        ));
+        _updateSeries(dataPoints);
       });
     });
 
@@ -391,6 +427,11 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
     /// Toggle the loop playback.
     on<FocalPlaneToggleLoopEvent>((event, emit) {
       emit(state.copyWith(loopPlayback: !state.loopPlayback));
+    });
+
+    /// Reload all of the data from the server.
+    on<SynchDataEvent>((event, emit) {
+      _updateSeries();
     });
   }
 

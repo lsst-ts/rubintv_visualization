@@ -21,6 +21,7 @@
 
 import 'dart:convert';
 
+import 'package:rubintv_visualization/dialog/base.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/query/query.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
@@ -96,8 +97,8 @@ class LoadColumnsCommand extends ServiceCommand {
           parameters: {
             "database": database,
             "columns": columns,
-            "query": query?.toDict(),
-            "global_query": globalQuery?.toDict(),
+            "query": query?.toJson(),
+            "global_query": globalQuery?.toJson(),
             "data_ids": dataIds?.map((e) => [e.dayObs, e.seqNum]).toList(),
             "day_obs": dayObs,
           },
@@ -123,6 +124,132 @@ class LoadColumnsCommand extends ServiceCommand {
       globalQuery: useGlobalQuery ? globalQuery : null,
       dayObs: dayObs,
       dataIds: dataIds,
+    );
+  }
+}
+
+/// RequestID for commands sent from the file dialog.
+const String kFileDialogRequestId = "file dialog";
+
+/// A command sent by the file dialog.
+class FileDialogCommand extends ServiceCommand {
+  FileDialogCommand({required super.name, required super.parameters})
+      : super(requestId: kFileDialogRequestId);
+}
+
+/// Load the contents of a directory.
+class LoadDirectoryCommand extends FileDialogCommand {
+  LoadDirectoryCommand({required List<String> path})
+      : super(
+          name: "list directory",
+          parameters: {
+            "path": path,
+          },
+        );
+}
+
+/// Create a new directory.
+class CreateDirectoryCommand extends FileDialogCommand {
+  CreateDirectoryCommand({required List<String> path, required String name})
+      : super(
+          name: "create directory",
+          parameters: {
+            "path": path,
+            "name": name,
+          },
+        );
+}
+
+/// Rename a file.
+class RenameFileCommand extends FileDialogCommand {
+  RenameFileCommand({required List<String> path, required String newName})
+      : super(
+          name: "rename",
+          parameters: {
+            "path": path,
+            "new_name": newName,
+          },
+        );
+}
+
+/// Delete a file.
+class DeleteFileCommand extends FileDialogCommand {
+  DeleteFileCommand({required List<String> path})
+      : super(
+          name: "delete",
+          parameters: {
+            "path": path,
+          },
+        );
+}
+
+/// Duplicate a file.
+class DuplicateFileCommand extends FileDialogCommand {
+  DuplicateFileCommand({required List<String> path})
+      : super(
+          name: "duplicate",
+          parameters: {
+            "path": path,
+          },
+        );
+}
+
+/// Move a file.
+class MoveFileCommand extends FileDialogCommand {
+  MoveFileCommand({required List<String> sourcePath, required List<String> destinationPath})
+      : super(
+          name: "move",
+          parameters: {
+            "source_path": sourcePath,
+            "destination_path": destinationPath,
+          },
+        );
+}
+
+/// Save the contents of a file.
+class SaveFileCommand extends FileDialogCommand {
+  SaveFileCommand({required List<String> path, required String content})
+      : super(
+          name: "save",
+          parameters: {
+            "path": path,
+            "content": content,
+          },
+        );
+}
+
+/// Load the contents of a file.
+class LoadFileCommand extends FileDialogCommand {
+  LoadFileCommand({required List<String> path})
+      : super(
+          name: "load",
+          parameters: {
+            "path": path,
+          },
+        );
+}
+
+/// A persisted workspace file on a file system
+class WorkspaceFile extends FileElement {
+  /// The JSON string to create the workspace.
+  final String contents;
+
+  WorkspaceFile({
+    required super.id,
+    required super.name,
+    required this.contents,
+  });
+
+  @override
+  WorkspaceFile copyWith({
+    String? id,
+    String? name,
+    String? contents,
+  }) {
+    return WorkspaceFile(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      contents: contents ?? this.contents,
     );
   }
 }

@@ -55,10 +55,19 @@ enum EqualityOperator {
     return parts[1];
   }
 
-  static EqualityOperator? fromString(String symbol) {
+  static EqualityOperator? fromSymbol(String symbol) {
     for (var op in EqualityOperator.values) {
       if (op.symbol == symbol) {
         return op;
+      }
+    }
+    return null; // or throw an exception if a symbol is not found
+  }
+
+  static EqualityOperator? fromString(String name) {
+    for (String op in EqualityOperator.values.map((e) => e.name)) {
+      if (op == name) {
+        return EqualityOperator.values.firstWhere((element) => element.name == name);
       }
     }
     return null; // or throw an exception if a symbol is not found
@@ -81,10 +90,19 @@ enum QueryOperator {
   /// The name of the operator
   final String name;
 
-  static QueryOperator? fromString(String symbol) {
+  static QueryOperator? fromSymbol(String symbol) {
     for (var op in QueryOperator.values) {
       if (op.symbol == symbol) {
         return op;
+      }
+    }
+    return null; // or throw an exception if a symbol is not found
+  }
+
+  static QueryOperator? fromString(String name) {
+    for (String op in QueryOperator.values.map((e) => e.name)) {
+      if (op == name) {
+        return QueryOperator.values.firstWhere((element) => element.name == name);
       }
     }
     return null; // or throw an exception if a symbol is not found
@@ -108,9 +126,39 @@ abstract class Query {
   QueryOperation? parent;
   Query({required this.id, this.parent});
 
-  Map<String, dynamic> toDict();
+  Map<String, dynamic> toJson();
 
-  factory Query.fromDict(Map<String, dynamic> dict) => throw UnimplementedError();
+  factory Query.fromJson(Map<String, dynamic> dict) {
+    if (!dict.containsKey("name")) {
+      throw QueryError("Cannot create Query from dictionary without a name key!");
+    }
+    if (dict["name"] == "EqualityQuery") {
+      String operator = dict["content"]["operator"];
+      if (operator == "gt" || operator == "lt") {
+        operator = "l${operator.substring(1)}";
+        return EqualityQuery(
+          id: UniqueId.next(),
+          leftValue: dict["content"]["value"],
+          leftOperator: EqualityOperator.fromString(operator),
+          field: SchemaField.fromJson(dict["content"]["column"]),
+        );
+      }
+      return EqualityQuery(
+        id: UniqueId.next(),
+        rightValue: dict["content"]["value"],
+        rightOperator: EqualityOperator.fromString(dict["content"]["operator"]),
+        field: SchemaField.fromJson(dict["content"]["column"]),
+      );
+    } else if (dict["name"] == "ParentQuery") {
+      return QueryOperation(
+        id: UniqueId.next(),
+        operator: QueryOperator.fromString(dict["content"]["operator"])!,
+        children: (dict["content"]["children"] as List).map((e) => Query.fromJson(e)).toList(),
+      );
+    } else {
+      throw QueryError("Cannot create Query from dictionary with name ${dict["name"]}!");
+    }
+  }
 
   Query operator &(Query other) => QueryOperation(
         id: UniqueId.next(),
@@ -165,14 +213,14 @@ class EqualityQuery extends Query {
   }
 
   @override
-  Map<String, dynamic> toDict() {
+  Map<String, dynamic> toJson() {
     Map<String, dynamic>? leftQuery;
     Map<String, dynamic>? rightQuery;
     if (leftValue != null) {
       leftQuery = {
         "name": "EqualityQuery",
         "content": {
-          "column": "${field.schema.name}.${field.name}",
+          "column": field.toJson(),
           "operator": leftOperator!.queryLeft,
           "value": "$leftValue",
         }
@@ -182,7 +230,7 @@ class EqualityQuery extends Query {
       rightQuery = {
         "name": "EqualityQuery",
         "content": {
-          "column": "${field.schema.name}.${field.name}",
+          "column": field.toJson(),
           "operator": rightOperator!.queryRight,
           "value": "$rightValue",
         }
@@ -252,13 +300,13 @@ class QueryOperation extends Query {
   String toString() => "(${children.join(' ${operator.symbol} ')})";
 
   @override
-  Map<String, dynamic> toDict() {
+  Map<String, dynamic> toJson() {
     Map<String, dynamic> result = {
       "name": "ParentQuery",
       "id": id.toSerializableString(),
       "content": {
         "operator": operator.name,
-        "children": children.map((e) => e.toDict()).toList(),
+        "children": children.map((e) => e.toJson()).toList(),
       }
     };
     return result;
@@ -268,7 +316,7 @@ class QueryOperation extends Query {
   static QueryOperation fromDict(Map<String, dynamic> dict) {
     List<Query> children = [];
     for (Map<String, dynamic> child in dict["content"]["children"]) {
-      children.add(Query.fromDict(child));
+      children.add(Query.fromJson(child));
     }
     return QueryOperation(
       id: UniqueId.fromString(dict["id"]),
