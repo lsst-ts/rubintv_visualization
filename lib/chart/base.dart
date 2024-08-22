@@ -31,7 +31,7 @@ import 'package:rubintv_visualization/editors/axis.dart';
 import 'package:rubintv_visualization/editors/series.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/io.dart';
-import 'package:rubintv_visualization/query/query.dart';
+import 'package:rubintv_visualization/query/primitives.dart';
 import 'package:rubintv_visualization/workspace/controller.dart';
 import 'package:rubintv_visualization/workspace/state.dart';
 import 'package:rubintv_visualization/websocket.dart';
@@ -79,7 +79,7 @@ class UpdateMultiSelect extends ChartEvent {
 class UpdateChartGlobalQueryEvent extends ChartEvent {
   final bool useGlobalQuery;
   final String? dayObs;
-  final Query? globalQuery;
+  final QueryExpression? globalQuery;
 
   UpdateChartGlobalQueryEvent({
     required this.useGlobalQuery,
@@ -92,7 +92,7 @@ class UpdateChartGlobalQueryEvent extends ChartEvent {
 class UpdateSeriesEvent extends ChartEvent {
   final SeriesInfo series;
   final String? dayObs;
-  final Query? globalQuery;
+  final QueryExpression? globalQuery;
   final SchemaField? groupByColumn;
 
   UpdateSeriesEvent({
@@ -126,7 +126,7 @@ class ResetChartEvent extends ChartEvent {
 /// Reload all of the data from the server
 class SynchDataEvent extends ChartEvent {
   final String? dayObs;
-  final Query? globalQuery;
+  final QueryExpression? globalQuery;
 
   SynchDataEvent({
     required this.dayObs,
@@ -440,7 +440,7 @@ class ChartBloc extends WindowBloc<ChartState> {
   void _fetchSeriesData({
     required SeriesInfo series,
     required String? dayObs,
-    required Query? globalQuery,
+    required QueryExpression? globalQuery,
   }) {
     WebSocketManager websocket = WebSocketManager();
     if (websocket.isConnected) {

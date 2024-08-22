@@ -27,8 +27,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/dialog/widget.dart';
 import 'package:rubintv_visualization/io.dart';
-import 'package:rubintv_visualization/query/query.dart';
-import 'package:rubintv_visualization/editors/query.dart';
+import 'package:rubintv_visualization/query/bloc.dart';
+import 'package:rubintv_visualization/query/primitives.dart';
+import 'package:rubintv_visualization/query/widget.dart';
 import 'package:rubintv_visualization/workspace/controller.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/state.dart';
@@ -454,17 +455,19 @@ class ToolbarState extends State<Toolbar> {
                   WorkspaceBloc bloc = context.read<WorkspaceBloc>();
                   showDialog(
                       context: context,
-                      builder: (BuildContext context) => Dialog(
+                      builder: (BuildContext context) {
+                        return Dialog(
+                          child: BlocProvider(
+                            create: (context) => QueryBloc(workspace.globalQuery),
                             child: QueryEditor(
                               theme: workspace.theme,
-                              expression: QueryExpression(
-                                queries: workspace.globalQuery == null ? [] : [workspace.globalQuery!],
-                              ),
-                              onCompleted: (Query? query) {
+                              onCompleted: (QueryExpression? query) {
                                 bloc.add(UpdateGlobalQueryEvent(globalQuery: query));
                               },
                             ),
-                          ));
+                          ),
+                        );
+                      });
                 },
               )),
           SizedBox(

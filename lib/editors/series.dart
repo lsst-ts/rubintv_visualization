@@ -22,10 +22,12 @@
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/chart/base.dart';
-import 'package:rubintv_visualization/query/query.dart';
-import 'package:rubintv_visualization/editors/query.dart';
+import 'package:rubintv_visualization/query/bloc.dart';
+import 'package:rubintv_visualization/query/primitives.dart';
+import 'package:rubintv_visualization/query/widget.dart';
 import 'package:rubintv_visualization/theme.dart';
 import 'package:rubintv_visualization/workspace/state.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
@@ -86,8 +88,8 @@ class SeriesEditorState extends State<SeriesEditor> {
   }
 
   /// Update the series query.
-  void updateQuery(Query? query) {
-    series = series.copyWith(query: query);
+  void updateQuery(QueryExpression? query) {
+    series = series.copyWithQuery(query);
   }
 
   /// Update a column in the series.
@@ -171,12 +173,12 @@ class SeriesEditorState extends State<SeriesEditor> {
                         showDialog(
                             context: context,
                             builder: (BuildContext context) => Dialog(
-                                  child: QueryEditor(
-                                    theme: theme,
-                                    expression: QueryExpression(
-                                      queries: series.query == null ? [] : [series.query!],
+                                  child: BlocProvider(
+                                    create: (BuildContext context) => QueryBloc(series.query),
+                                    child: QueryEditor(
+                                      theme: theme,
+                                      onCompleted: updateQuery,
                                     ),
-                                    onCompleted: updateQuery,
                                   ),
                                 ));
                       },

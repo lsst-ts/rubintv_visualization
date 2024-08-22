@@ -23,7 +23,7 @@ import 'dart:convert';
 
 import 'package:rubintv_visualization/dialog/base.dart';
 import 'package:rubintv_visualization/id.dart';
-import 'package:rubintv_visualization/query/query.dart';
+import 'package:rubintv_visualization/query/primitives.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/chart/series.dart';
 
@@ -88,8 +88,8 @@ class LoadColumnsCommand extends ServiceCommand {
     required String database,
     required List<String> columns,
     Set<DataId>? dataIds,
-    Query? query,
-    Query? globalQuery,
+    QueryExpression? query,
+    QueryExpression? globalQuery,
     String? dayObs,
   }) : super(
           name: "load columns",
@@ -97,8 +97,8 @@ class LoadColumnsCommand extends ServiceCommand {
           parameters: {
             "database": database,
             "columns": columns,
-            "query": query?.toJson(),
-            "global_query": globalQuery?.toJson(),
+            "query": query?.toCommand(),
+            "global_query": globalQuery?.toCommand(),
             "data_ids": dataIds?.map((e) => [e.dayObs, e.seqNum]).toList(),
             "day_obs": dayObs,
           },
@@ -110,8 +110,8 @@ class LoadColumnsCommand extends ServiceCommand {
     required UniqueId windowId,
     required SeriesId seriesId,
     required bool useGlobalQuery,
-    Query? query,
-    Query? globalQuery,
+    QueryExpression? query,
+    QueryExpression? globalQuery,
     String? dayObs,
     Set<DataId>? dataIds,
   }) {

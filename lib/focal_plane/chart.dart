@@ -31,7 +31,7 @@ import 'package:rubintv_visualization/focal_plane/slider.dart';
 import 'package:rubintv_visualization/focal_plane/viewer.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/io.dart';
-import 'package:rubintv_visualization/query/query.dart';
+import 'package:rubintv_visualization/query/primitives.dart';
 import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/controller.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
@@ -518,7 +518,7 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
   void _fetchSeriesData({
     required SeriesInfo series,
     Set<DataId>? selected,
-    Query? query,
+    QueryExpression? query,
     String? dayObs,
   }) {
     WebSocketManager websocket = WebSocketManager();

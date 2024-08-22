@@ -23,7 +23,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/id.dart';
-import 'package:rubintv_visualization/query/query.dart';
+import 'package:rubintv_visualization/query/primitives.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 
 /// The ID of a [Series].
@@ -82,7 +82,7 @@ class SeriesInfo {
   final Map<AxisId, SchemaField> fields;
 
   /// A query used to load the series data.
-  final Query? query;
+  final QueryExpression? query;
 
   const SeriesInfo({
     required this.id,
@@ -102,7 +102,6 @@ class SeriesInfo {
     ErrorBars? errorBars,
     List<AxisId>? axes,
     Map<AxisId, SchemaField>? fields,
-    Query? query,
   }) =>
       SeriesInfo(
         id: id ?? this.id,
@@ -111,7 +110,18 @@ class SeriesInfo {
         axes: axes ?? this.axes,
         marker: marker ?? this.marker,
         errorBars: errorBars ?? this.errorBars,
-        query: query ?? this.query,
+        query: query,
+      );
+
+  /// Since the query can be changed to null, create a copy with a new query separately.
+  SeriesInfo copyWithQuery(QueryExpression? query) => SeriesInfo(
+        id: id,
+        name: name,
+        fields: fields,
+        axes: axes,
+        marker: marker,
+        errorBars: errorBars,
+        query: query,
       );
 
   SeriesInfo copy() => copyWith();
@@ -164,7 +174,7 @@ class SeriesInfo {
         List<dynamic> entry = e;
         return MapEntry(AxisId.fromJson(entry[0]), SchemaField.fromJson(entry[1]));
       })),
-      query: json["query"] == null ? null : Query.fromJson(json["query"]),
+      query: json["query"] == null ? null : QueryExpression.fromJson(json["query"]),
     );
   }
 }

@@ -33,7 +33,7 @@ import 'package:rubintv_visualization/focal_plane/instrument.dart';
 import 'package:rubintv_visualization/focal_plane/slider.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/io.dart';
-import 'package:rubintv_visualization/query/query.dart';
+import 'package:rubintv_visualization/query/primitives.dart';
 import 'package:rubintv_visualization/theme.dart';
 import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/controller.dart';
@@ -226,7 +226,7 @@ WindowMetaData buildWindow({
 /// The global query parameters
 class GlobalQuery {
   /// The global query.
-  final Query? query;
+  final QueryExpression? query;
 
   /// The global observation date.
   final String? dayObs;
@@ -269,7 +269,7 @@ class ReceiveMessageEvent extends WorkspaceEvent {
 /// Update the global query.
 class UpdateGlobalQueryEvent extends WorkspaceEvent {
   /// The new global query.
-  final Query? globalQuery;
+  final QueryExpression? globalQuery;
 
   UpdateGlobalQueryEvent({
     required this.globalQuery,
@@ -342,7 +342,7 @@ class WorkspaceState extends WorkspaceStateBase {
   final Map<UniqueId, WindowMetaData> windows;
 
   /// A query that applies to all plots (that opt in to gloabl queries)
-  final Query? globalQuery;
+  final QueryExpression? globalQuery;
 
   /// The observation date for any tables that have an observation date column.
   final DateTime? dayObs;
@@ -427,7 +427,7 @@ class WorkspaceState extends WorkspaceStateBase {
         return MapEntry(UniqueId.fromString(key), WindowMetaData.fromJson(value, theme.chartTheme));
       }),
       instrument: json.containsKey("instrument") ? Instrument.fromJson(json["instrument"]) : null,
-      globalQuery: json.containsKey("globalQuery") ? Query.fromJson(json["globalQuery"]) : null,
+      globalQuery: json.containsKey("globalQuery") ? QueryExpression.fromJson(json["globalQuery"]) : null,
       dayObs: json.containsKey("dayObs") ? DateTime.parse(json["dayObs"]) : null,
       detector: json.containsKey("detector") ? Detector.fromJson(json["detector"]) : null,
       theme: theme,
@@ -462,7 +462,7 @@ class WorkspaceState extends WorkspaceStateBase {
           pendingJson: pendingJson);
 
   /// Because the global query can be null, we need a special copy method.
-  WorkspaceState updateGlobalQuery(Query? query) => WorkspaceState(
+  WorkspaceState updateGlobalQuery(QueryExpression? query) => WorkspaceState(
       status: status,
       version: version,
       windows: windows,
