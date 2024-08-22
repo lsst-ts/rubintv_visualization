@@ -558,7 +558,7 @@ class ChartBloc extends WindowBloc<ChartState> {
         _editSeries(context, state.series[seriesId]!);
       }
     }
-    throw ArgumentError("Series not found in chart");
+    throw ArgumentError("Series ${series.id} not found in chart with series ${state.series.keys}");
   }
 
   /// The action to perform when an [Axis] entry in a chart [Legend] is selected.

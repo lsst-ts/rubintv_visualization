@@ -391,11 +391,16 @@ class ParentQueryWidget extends StatelessWidget {
 
 /// Widget to create a new query.
 class NewQueryWidget extends StatefulWidget {
+  /// The theme to use for the widget.
   final AppTheme theme;
+
+  /// The database schema to use for the widget.
+  final DatabaseSchema database;
 
   const NewQueryWidget({
     super.key,
     required this.theme,
+    required this.database,
   });
 
   @override
@@ -404,9 +409,6 @@ class NewQueryWidget extends StatefulWidget {
 
 /// State for the [NewQueryWidget] widget.
 class NewQueryWidgetState extends State<NewQueryWidget> {
-  /// The currently selected database.
-  DatabaseSchema? _database;
-
   /// The currently selected table.
   TableSchema? _table;
 
@@ -416,22 +418,15 @@ class NewQueryWidgetState extends State<NewQueryWidget> {
   @override
   void initState() {
     super.initState();
-    _database = DataCenter().databases.values.first;
-    _table = _database!.tables.values.first;
+    _table = widget.database.tables.values.first;
     _field = _table!.fields.values.first;
   }
 
   @override
   Widget build(BuildContext context) {
-    List<DropdownMenuItem<DatabaseSchema>> databaseEntries = DataCenter()
-        .databases
-        .entries
+    List<DropdownMenuItem<TableSchema>> tableEntries = widget.database.tables.entries
         .map((e) => DropdownMenuItem(value: e.value, child: Text(e.key)))
         .toList();
-
-    List<DropdownMenuItem<TableSchema>> tableEntries =
-        _database?.tables.entries.map((e) => DropdownMenuItem(value: e.value, child: Text(e.key))).toList() ??
-            [];
 
     List<DropdownMenuItem<SchemaField>> columnEntries =
         _table?.fields.values.map((e) => DropdownMenuItem(value: e, child: Text(e.name))).toList() ?? [];
@@ -445,18 +440,6 @@ class NewQueryWidgetState extends State<NewQueryWidget> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DropdownButton<DatabaseSchema>(
-              value: _database,
-              items: databaseEntries,
-              onChanged: (DatabaseSchema? newDatabase) {
-                setState(() {
-                  _database = newDatabase;
-                  _table = _database!.tables.values.first;
-                  _field = _table!.fields.values.first;
-                });
-              },
-            ),
-            const SizedBox(height: 10),
             DropdownButton<TableSchema>(
               value: _table,
               items: tableEntries,
@@ -505,6 +488,9 @@ class QueryEditor extends StatelessWidget {
   /// The theme to use for the widget.
   final AppTheme theme;
 
+  /// The database schema to use for the widget.
+  final DatabaseSchema database;
+
   /// Callback to call when the query is completed.
   final SeriesQueryCallback onCompleted;
 
@@ -512,6 +498,7 @@ class QueryEditor extends StatelessWidget {
     super.key,
     required this.theme,
     required this.onCompleted,
+    required this.database,
   });
 
   @override
@@ -532,7 +519,7 @@ class QueryEditor extends StatelessWidget {
                     depth: 0,
                   ),
                 ),
-                NewQueryWidget(theme: theme),
+                NewQueryWidget(theme: theme, database: database),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

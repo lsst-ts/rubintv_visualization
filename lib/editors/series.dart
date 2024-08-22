@@ -178,6 +178,8 @@ class SeriesEditorState extends State<SeriesEditor> {
                                     child: QueryEditor(
                                       theme: theme,
                                       onCompleted: updateQuery,
+                                      database:
+                                          DataCenter().databases[widget.workspace.info!.instrument!.schema]!,
                                     ),
                                   ),
                                 ));

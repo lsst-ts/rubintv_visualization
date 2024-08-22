@@ -464,6 +464,7 @@ class ToolbarState extends State<Toolbar> {
                               onCompleted: (QueryExpression? query) {
                                 bloc.add(UpdateGlobalQueryEvent(globalQuery: query));
                               },
+                              database: DataCenter().databases[workspace.instrument!.schema]!,
                             ),
                           ),
                         );
