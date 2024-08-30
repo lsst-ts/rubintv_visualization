@@ -51,7 +51,8 @@ class MainAppState extends State<MainApp> {
   @override
   void initState() {
     super.initState();
-    developer.log('Connecting to WebSocket at ${widget.websocketUri}', name: 'rubinTV.visualization.app');
+    developer.log('Connecting to WebSocket at ${widget.websocketUri}',
+        name: 'rubinTV.visualization.app');
     WebSocketManager().connect(widget.websocketUri);
   }
 
@@ -66,28 +67,82 @@ class MainAppState extends State<MainApp> {
   @override
   Widget build(BuildContext context) {
     developer.log("building main app", name: "rubinTV.visualization.app");
+
     ThemeData themeData = ThemeData(
       colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF058b8c)),
       useMaterial3: true,
     );
-    themeData = themeData.copyWith(scaffoldBackgroundColor: themeData.colorScheme.secondaryContainer);
+    themeData = themeData.copyWith(
+        scaffoldBackgroundColor: themeData.colorScheme.secondaryContainer);
 
     AppTheme theme = AppTheme(
       themeData: themeData,
     );
 
+    return MaterialApp(
+        title: 'rubinTV visualization',
+        theme: theme.themeData,
+        home: HomePage(theme: theme, version: widget.version));
+  }
+}
+
+class HomePage extends StatelessWidget {
+  final AppTheme theme;
+  final AppVersion version;
+
+  const HomePage({super.key, required this.theme, required this.version});
+
+  @override
+  Widget build(BuildContext context) {
     Size screenSize = MediaQuery.of(context).size;
 
-    return MaterialApp(
-      title: 'rubinTV visualization',
-      theme: theme.themeData,
-      home: Scaffold(
+    // PopScope used to attempt to tame the browser back button.
+    // It works in FF & Chrome but not in Safari.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, result) async {
+        if (didPop) {
+          return;
+        }
+        final bool shouldPop = await _showBackDialog(context);
+        if (shouldPop) {
+          // Use this to trigger actual navigation
+          if (context.mounted) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: Scaffold(
         body: WorkspaceViewer(
           size: screenSize,
           theme: theme,
-          version: widget.version,
+          version: version,
         ),
       ),
     );
+  }
+
+  Future<bool> _showBackDialog(BuildContext context) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Are you sure?'),
+              content:
+                  const Text('Leaving this page will erase any unsaved work'),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('Stay on page'),
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
+                TextButton(
+                  child: const Text('Leave'),
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
   }
 }
