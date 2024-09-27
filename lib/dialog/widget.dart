@@ -49,7 +49,8 @@ class FileDialogWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-        create: (context) => FileDialogBloc()..add(const LoadDirectoryEvent([])),
+        create: (context) =>
+            FileDialogBloc()..add(const LoadDirectoryEvent([])),
         child: BlocBuilder<FileDialogBloc, FileDialogState>(
           builder: (context, state) {
             if (state.isLoading) {
@@ -127,7 +128,8 @@ class FileDialogContentState extends State<FileDialogContent> {
                     children: [
                       Expanded(
                         flex: 1,
-                        child: _buildDirectoryTree(context, state.root.root, state.root),
+                        child: _buildDirectoryTree(
+                            context, state.root.root, state.root),
                       ),
                       const VerticalDivider(),
                       Expanded(
@@ -155,14 +157,17 @@ class FileDialogContentState extends State<FileDialogContent> {
           border: OutlineInputBorder(),
         ),
         onEditingComplete: () {
-          context.read<FileDialogBloc>().add(UpdateFilenameEvent(_textController.text));
+          context
+              .read<FileDialogBloc>()
+              .add(UpdateFilenameEvent(_textController.text));
         },
       ),
     );
   }
 
   /// Build the directory tree pane.
-  Widget _buildDirectoryTree(BuildContext context, DirectoryElement directory, RootDirectory root) {
+  Widget _buildDirectoryTree(
+      BuildContext context, DirectoryElement directory, RootDirectory root) {
     return ListView(
       children: [
         _buildDirectoryTreeItem(context, directory, root, 0),
@@ -187,8 +192,8 @@ class FileDialogContentState extends State<FileDialogContent> {
   /// Build an item in the directory tree.
   /// This can either be a file or a directory, in which case it will
   /// recursively build the children of the directory.
-  Widget _buildDirectoryTreeItem(
-      BuildContext context, DirectoryElement directory, RootDirectory root, int depth) {
+  Widget _buildDirectoryTreeItem(BuildContext context,
+      DirectoryElement directory, RootDirectory root, int depth) {
     FileDialogState state = context.read<FileDialogBloc>().state;
     bool isSelected = state.currentDirectoryId == directory.id &&
         state.currentDirectoryId != root.rootId &&
@@ -199,7 +204,8 @@ class FileDialogContentState extends State<FileDialogContent> {
       children: [
         Padding(
           padding: EdgeInsets.only(left: depth * 16.0),
-          child: _buildDraggableDirectoryItem(directory, root, state, isSelected),
+          child:
+              _buildDraggableDirectoryItem(directory, root, state, isSelected),
         ),
         // Only build the children if the directory is expanded
         if (directory.isExpanded)
@@ -218,8 +224,8 @@ class FileDialogContentState extends State<FileDialogContent> {
   }
 
   /// Build a draggable directory item.
-  Widget _buildDraggableDirectoryItem(
-      DirectoryElement directory, RootDirectory root, FileDialogState state, bool isSelected) {
+  Widget _buildDraggableDirectoryItem(DirectoryElement directory,
+      RootDirectory root, FileDialogState state, bool isSelected) {
     return LongPressDraggable<String>(
       data: directory.id,
       // The feedback widget is what the user sees when they drag the item
@@ -255,14 +261,16 @@ class FileDialogContentState extends State<FileDialogContent> {
   }
 
   /// Build the content of a directory item.
-  Widget _buildDirectoryItemContent(
-      DirectoryElement directory, RootDirectory root, FileDialogState state, bool isSelected) {
+  Widget _buildDirectoryItemContent(DirectoryElement directory,
+      RootDirectory root, FileDialogState state, bool isSelected) {
     return Row(
       children: [
         IconButton(
-          icon: Icon(directory.isExpanded ? Icons.expand_more : Icons.chevron_right),
+          icon: Icon(
+              directory.isExpanded ? Icons.expand_more : Icons.chevron_right),
           onPressed: () {
-            context.read<FileDialogBloc>().add(ToggleExpandDirectoryEvent(root.getPathById(directory.id)));
+            context.read<FileDialogBloc>().add(
+                ToggleExpandDirectoryEvent(root.getPathById(directory.id)));
           },
         ),
         Container(
@@ -282,7 +290,8 @@ class FileDialogContentState extends State<FileDialogContent> {
                     controller: _renameController,
                     onSubmitted: (String value) {
                       if (value != directory.name) {
-                        _renameDirectory(state.root.getPathById(directory.id), value);
+                        _renameDirectory(
+                            state.root.getPathById(directory.id), value);
                       } else {
                         setState(() {
                           isRenaming = false;
@@ -292,7 +301,8 @@ class FileDialogContentState extends State<FileDialogContent> {
                     onTapOutside: (PointerDownEvent event) {
                       String value = _renameController.text;
                       if (value != directory.name) {
-                        _renameDirectory(state.root.getPathById(directory.id), value);
+                        _renameDirectory(
+                            state.root.getPathById(directory.id), value);
                       } else {
                         setState(() {
                           isRenaming = false;
@@ -309,11 +319,12 @@ class FileDialogContentState extends State<FileDialogContent> {
                         _renameController.text = directory.name;
                       });
                     }
-                    context.read<FileDialogBloc>().add(SelectDirectoryEvent(root.getPathById(directory.id)));
+                    context.read<FileDialogBloc>().add(
+                        SelectDirectoryEvent(root.getPathById(directory.id)));
                     if (!directory.isExpanded) {
-                      context
-                          .read<FileDialogBloc>()
-                          .add(ToggleExpandDirectoryEvent(root.getPathById(directory.id)));
+                      context.read<FileDialogBloc>().add(
+                          ToggleExpandDirectoryEvent(
+                              root.getPathById(directory.id)));
                     }
                   },
                   child: Text(directory.name == "" ? "/" : directory.name),
@@ -324,7 +335,8 @@ class FileDialogContentState extends State<FileDialogContent> {
   }
 
   /// Build a draggable file item.
-  Widget _buildDraggableFileItem(FileElement file, RootDirectory root, FileDialogState state) {
+  Widget _buildDraggableFileItem(
+      FileElement file, RootDirectory root, FileDialogState state) {
     bool isSelected = state.selectedFile?.id == file.id;
 
     return LongPressDraggable<String>(
@@ -358,10 +370,12 @@ class FileDialogContentState extends State<FileDialogContent> {
   }
 
   /// Build the content of a file item.
-  Widget _buildFileItemContent(FileElement file, FileDialogState state, bool isSelected) {
+  Widget _buildFileItemContent(
+      FileElement file, FileDialogState state, bool isSelected) {
     return Container(
       decoration: BoxDecoration(
-        color: isSelected && !isRenaming ? Colors.grey[300] : Colors.transparent,
+        color:
+            isSelected && !isRenaming ? Colors.grey[300] : Colors.transparent,
         borderRadius: BorderRadius.circular(5.0),
       ),
       child: ListTile(
@@ -374,7 +388,9 @@ class FileDialogContentState extends State<FileDialogContent> {
                   onSubmitted: (String value) {
                     if (value != file.name) {
                       // Rename the directory if the user has changed the name
-                      _renameDirectory(state.root.getPathById(state.selectedFile!.id), value);
+                      _renameDirectory(
+                          state.root.getPathById(state.selectedFile!.id),
+                          value);
                     } else {
                       isRenaming = false;
                     }
@@ -385,7 +401,8 @@ class FileDialogContentState extends State<FileDialogContent> {
                     if (value != file.name) {
                       // Rename the directory if the user has changed the name
                       _renameDirectory(
-                          state.root.getPathById(state.selectedFile!.id), _renameController.text);
+                          state.root.getPathById(state.selectedFile!.id),
+                          _renameController.text);
                     } else {
                       isRenaming = false;
                     }
@@ -418,7 +435,8 @@ class FileDialogContentState extends State<FileDialogContent> {
         return details.data != itemId;
       },
       onAcceptWithDetails: (DragTargetDetails<String> details) {
-        _showMoveConfirmationDialog(details.data, itemId, context.read<FileDialogBloc>());
+        _showMoveConfirmationDialog(
+            details.data, itemId, context.read<FileDialogBloc>());
       },
       onMove: (DragTargetDetails<String> details) {
         setState(() {
@@ -434,18 +452,20 @@ class FileDialogContentState extends State<FileDialogContent> {
   }
 
   /// Show a dialog to confirm moving a file.
-  void _showMoveConfirmationDialog(String sourceId, String targetId, FileDialogBloc bloc) {
+  void _showMoveConfirmationDialog(
+      String sourceId, String targetId, FileDialogBloc bloc) {
     FileDialogState state = bloc.state;
     FileElement sourceElement = state.root.getElementById(sourceId)!;
-    DirectoryElement targetDirectory = state.root.getElementById(targetId) as DirectoryElement;
+    DirectoryElement targetDirectory =
+        state.root.getElementById(targetId) as DirectoryElement;
 
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text("Move Item"),
-          content:
-              Text("Are you sure you want to move '${sourceElement.name}' to '${targetDirectory.name}'?"),
+          content: Text(
+              "Are you sure you want to move '${sourceElement.name}' to '${targetDirectory.name}'?"),
           actions: [
             TextButton(
               onPressed: () {
@@ -473,7 +493,8 @@ class FileDialogContentState extends State<FileDialogContent> {
   /// Build the current directory pane.
   Widget _buildCurrentDirectory(BuildContext context, FileDialogState state) {
     List<String> path = state.root.getPathById(state.currentDirectoryId);
-    DirectoryElement directory = state.root.getElementById(state.currentDirectoryId) as DirectoryElement;
+    DirectoryElement directory =
+        state.root.getElementById(state.currentDirectoryId) as DirectoryElement;
     return Column(
       children: [
         ListTile(
@@ -482,9 +503,8 @@ class FileDialogContentState extends State<FileDialogContent> {
             onPressed: state.currentDirectoryId == state.root.rootId
                 ? null
                 : () {
-                    context
-                        .read<FileDialogBloc>()
-                        .add(SelectDirectoryEvent(path.sublist(0, path.length - 1)));
+                    context.read<FileDialogBloc>().add(
+                        SelectDirectoryEvent(path.sublist(0, path.length - 1)));
                   },
           ),
           title: Text(path.join('/')),
@@ -494,16 +514,21 @@ class FileDialogContentState extends State<FileDialogContent> {
             itemCount: directory.childrenIds.length,
             itemBuilder: (context, index) {
               final List<String> childIds = directory.childrenIds;
-              final FileElement item = state.root.getElementById(childIds[index])!;
+              final FileElement item =
+                  state.root.getElementById(childIds[index])!;
               final bool isDirectory = item is DirectoryElement;
               return ListTile(
-                leading: Icon(isDirectory ? Icons.folder : Icons.insert_drive_file),
+                leading:
+                    Icon(isDirectory ? Icons.folder : Icons.insert_drive_file),
                 title: Text(item.name),
                 onTap: () {
                   if (isDirectory) {
-                    context.read<FileDialogBloc>().add(SelectDirectoryEvent(state.root.getPathById(item.id)));
+                    context.read<FileDialogBloc>().add(
+                        SelectDirectoryEvent(state.root.getPathById(item.id)));
                   } else {
-                    context.read<FileDialogBloc>().add(UpdateFilenameEvent(item.name));
+                    context
+                        .read<FileDialogBloc>()
+                        .add(UpdateFilenameEvent(item.name));
                   }
                 },
               );
@@ -517,7 +542,7 @@ class FileDialogContentState extends State<FileDialogContent> {
   /// Build the action buttons
   /// (create directory, delete, duplicate, save, load, cancel).
   Widget _buildActionButtons(BuildContext context, FileDialogState state) {
-    return ButtonBar(
+    return OverflowBar(
       alignment: MainAxisAlignment.center,
       children: [
         ElevatedButton(
@@ -529,7 +554,8 @@ class FileDialogContentState extends State<FileDialogContent> {
             _showConfirmationDialog(
               context: context,
               title: "Create Directrory",
-              content: "Are you sure you want to create a directory named $newDirectory?",
+              content:
+                  "Are you sure you want to create a directory named $newDirectory?",
               onConfirm: () {
                 context.read<FileDialogBloc>().add(CreateDirectoryEvent(
                       state.root.getPathById(state.currentDirectoryId),
@@ -550,7 +576,8 @@ class FileDialogContentState extends State<FileDialogContent> {
                   _showConfirmationDialog(
                     context: context,
                     title: "Delete file",
-                    content: "Are you sure you want to delete ${state.selectedFile!.name}",
+                    content:
+                        "Are you sure you want to delete ${state.selectedFile!.name}",
                     onConfirm: () {
                       context.read<FileDialogBloc>().add(DeleteFileEvent(
                             state.root.getPathById(state.selectedFile!.id),
@@ -560,12 +587,14 @@ class FileDialogContentState extends State<FileDialogContent> {
                 }
               : () {
                   DirectoryElement directory =
-                      state.root.getElementById(state.currentDirectoryId) as DirectoryElement;
+                      state.root.getElementById(state.currentDirectoryId)
+                          as DirectoryElement;
 
                   _showConfirmationDialog(
                     context: context,
                     title: "Delete file",
-                    content: "Are you sure you want to delete ${directory.name}",
+                    content:
+                        "Are you sure you want to delete ${directory.name}",
                     onConfirm: () {
                       context.read<FileDialogBloc>().add(DeleteFileEvent(
                             state.root.getPathById(directory.id),
@@ -578,9 +607,8 @@ class FileDialogContentState extends State<FileDialogContent> {
         ElevatedButton(
           onPressed: state.selectedFile != null
               ? () {
-                  context
-                      .read<FileDialogBloc>()
-                      .add(DuplicateFileEvent(state.root.getPathById(state.selectedFile!.id)));
+                  context.read<FileDialogBloc>().add(DuplicateFileEvent(
+                      state.root.getPathById(state.selectedFile!.id)));
                 }
               : null,
           child: const Text('Duplicate'),
@@ -591,9 +619,12 @@ class FileDialogContentState extends State<FileDialogContent> {
               if (_textController.text.isEmpty) {
                 return;
               }
-              List<String> savePath = state.root.getPathById(state.currentDirectoryId);
+              List<String> savePath =
+                  state.root.getPathById(state.currentDirectoryId);
               savePath.add(_textController.text);
-              context.read<FileDialogBloc>().add(SaveFileEvent(savePath, widget.content!));
+              context
+                  .read<FileDialogBloc>()
+                  .add(SaveFileEvent(savePath, widget.content!));
               Navigator.of(context).pop();
             },
             child: const Text('Save'),
@@ -602,9 +633,8 @@ class FileDialogContentState extends State<FileDialogContent> {
           ElevatedButton(
             onPressed: state.selectedFile != null
                 ? () {
-                    context
-                        .read<FileDialogBloc>()
-                        .add(LoadFileEvent(state.root.getPathById(state.selectedFile!.id)));
+                    context.read<FileDialogBloc>().add(LoadFileEvent(
+                        state.root.getPathById(state.selectedFile!.id)));
                     Navigator.of(context).pop();
                   }
                 : null,

@@ -67,7 +67,8 @@ enum EqualityOperator {
   static EqualityOperator? fromString(String name) {
     for (String op in EqualityOperator.values.map((e) => e.name)) {
       if (op == name) {
-        return EqualityOperator.values.firstWhere((element) => element.name == name);
+        return EqualityOperator.values
+            .firstWhere((element) => element.name == name);
       }
     }
     return null; // or throw an exception if a symbol is not found
@@ -102,7 +103,8 @@ enum QueryOperator {
   static QueryOperator? fromString(String name) {
     for (String op in QueryOperator.values.map((e) => e.name)) {
       if (op == name) {
-        return QueryOperator.values.firstWhere((element) => element.name == name);
+        return QueryOperator.values
+            .firstWhere((element) => element.name == name);
       }
     }
     return null; // or throw an exception if a symbol is not found
@@ -161,8 +163,10 @@ class EqualityQuery extends Query {
     required this.field,
     this.rightOperator,
     this.rightValue,
-  }) : assert((leftValue == null && leftOperator == null || leftValue != null && leftOperator != null) &&
-            (rightValue == null && rightOperator == null || rightValue != null && rightOperator != null));
+  }) : assert((leftValue == null && leftOperator == null ||
+                leftValue != null && leftOperator != null) &&
+            (rightValue == null && rightOperator == null ||
+                rightValue != null && rightOperator != null));
 
   @override
   String toString() {
@@ -206,11 +210,13 @@ class EqualityQuery extends Query {
       id: UniqueId.fromString(json['id']),
       field: SchemaField.fromJson(json['field']),
       leftOperator: json['leftOperator'] != null
-          ? EqualityOperator.values.firstWhere((e) => e.name == json['leftOperator'])
+          ? EqualityOperator.values
+              .firstWhere((e) => e.name == json['leftOperator'])
           : null,
       leftValue: json['leftValue'],
       rightOperator: json['rightOperator'] != null
-          ? EqualityOperator.values.firstWhere((e) => e.name == json['rightOperator'])
+          ? EqualityOperator.values
+              .firstWhere((e) => e.name == json['rightOperator'])
           : null,
       rightValue: json['rightValue'],
     );
@@ -231,7 +237,8 @@ class EqualityQuery extends Query {
   }
 
   /// Create a copy of the query with the left value and operator updated.
-  EqualityQuery updateLeft(EqualityOperator operator, dynamic value) => EqualityQuery(
+  EqualityQuery updateLeft(EqualityOperator operator, dynamic value) =>
+      EqualityQuery(
         id: id,
         leftValue: value,
         leftOperator: operator,
@@ -241,7 +248,8 @@ class EqualityQuery extends Query {
       );
 
   /// Create a copy of the query with the right value and operator updated.
-  EqualityQuery updateRight(EqualityOperator operator, dynamic value) => EqualityQuery(
+  EqualityQuery updateRight(EqualityOperator operator, dynamic value) =>
+      EqualityQuery(
         id: id,
         leftValue: leftValue,
         leftOperator: leftOperator,
@@ -266,7 +274,9 @@ class ParentQuery extends Query {
 
   @override
   Map<String, dynamic> toJson(QueryExpression expression) {
-    List<Query> children = expression!.children[id]!.map((childId) => expression.nodes[childId]!).toList();
+    List<Query> children = expression.children[id]!
+        .map((childId) => expression.nodes[childId]!)
+        .toList();
     return {
       'type': 'ParentQuery',
       'id': id.toSerializableString(),
@@ -279,7 +289,8 @@ class ParentQuery extends Query {
   static ParentQuery fromJson(Map<String, dynamic> json) {
     return ParentQuery(
       id: UniqueId.fromString(json["id"]),
-      operator: QueryOperator.values.firstWhere((element) => element.name == json["content"]["operator"]),
+      operator: QueryOperator.values
+          .firstWhere((element) => element.name == json["content"]["operator"]),
     );
   }
 
@@ -311,10 +322,12 @@ class QueryExpression {
 
   /// Private constructor to create a query expression
   /// with the given nodes, roots, children, and parents.
-  const QueryExpression._internal(this._nodes, this._roots, this._children, this._parents);
+  const QueryExpression._internal(
+      this._nodes, this._roots, this._children, this._parents);
 
   /// Create an empty query expression.
-  factory QueryExpression.empty() => const QueryExpression._internal({}, {}, {}, {});
+  factory QueryExpression.empty() =>
+      const QueryExpression._internal({}, {}, {}, {});
 
   /// Get the map of queryID: qurery for all nodes in the expression.
   Map<UniqueId, Query> get nodes => Map.unmodifiable(_nodes);
@@ -337,16 +350,19 @@ class QueryExpression {
 
     if (parentId != null) {
       if (newNodes[parentId] is! ParentQuery) {
-        throw StateError('Parent must be a ParentQuery, got ${newNodes[parentId]}');
+        throw StateError(
+            'Parent must be a ParentQuery, got ${newNodes[parentId]}');
       }
-      newChildren.update(parentId, (list) => list + [node.id], ifAbsent: () => [node.id]);
+      newChildren.update(parentId, (list) => list + [node.id],
+          ifAbsent: () => [node.id]);
       newParents[node.id] = parentId;
       newRoots.remove(node.id);
     } else {
       newRoots.add(node.id);
     }
 
-    return QueryExpression._internal(newNodes, newRoots, newChildren, newParents);
+    return QueryExpression._internal(
+        newNodes, newRoots, newChildren, newParents);
   }
 
   /// Update a node in the expression.
@@ -378,7 +394,8 @@ class QueryExpression {
     // Update parent
     _removeFromParent(newNodes, newChildren, newParents, newRoots, nodeId);
 
-    return QueryExpression._internal(newNodes, newRoots, newChildren, newParents);
+    return QueryExpression._internal(
+        newNodes, newRoots, newChildren, newParents);
   }
 
   /// Remove a node from its parent.
@@ -391,7 +408,8 @@ class QueryExpression {
   ) {
     final parentId = newParents[nodeId];
     if (parentId != null) {
-      newChildren[parentId] = newChildren[parentId]!.where((id) => id != nodeId).toList();
+      newChildren[parentId] =
+          newChildren[parentId]!.where((id) => id != nodeId).toList();
       if (newChildren[parentId]!.isEmpty) {
         // The parent is now empty, so remove it
         newChildren.remove(parentId);
@@ -407,7 +425,8 @@ class QueryExpression {
           // This should never happend, but just in case
           if (newChildren[grandParentId]!.contains(child.id)) {
             newChildren[grandParentId]!.remove(child.id);
-            assert(true, "Child already exists in grandparent, this should never happen");
+            assert(true,
+                "Child already exists in grandparent, this should never happen");
           }
           newChildren[grandParentId]!.add(child.id);
         } else {
@@ -441,27 +460,32 @@ class QueryExpression {
     // Add to new parent
     if (newParentId != null) {
       if (newNodes[newParentId] is! ParentQuery) {
-        throw StateError('New parent must be a ParentQuery, got ${newNodes[newParentId]}');
+        throw StateError(
+            'New parent must be a ParentQuery, got ${newNodes[newParentId]}');
       }
-      newChildren.update(newParentId, (list) => [...list, nodeId], ifAbsent: () => [nodeId]);
+      newChildren.update(newParentId, (list) => [...list, nodeId],
+          ifAbsent: () => [nodeId]);
       newParents[nodeId] = newParentId;
       newRoots.remove(nodeId);
     } else {
       newRoots.add(nodeId);
     }
 
-    return QueryExpression._internal(newNodes, newRoots, newChildren, newParents);
+    return QueryExpression._internal(
+        newNodes, newRoots, newChildren, newParents);
   }
 
   /// Connect two queries with a binary operator.
-  QueryExpression connectQueries(UniqueId targetId, UniqueId queryId, QueryOperator operator) {
+  QueryExpression connectQueries(
+      UniqueId targetId, UniqueId queryId, QueryOperator operator) {
     final newNodes = {..._nodes};
     final newRoots = {..._roots};
     final newChildren = {..._children};
     final newParents = {..._parents};
 
     // Create a new parent to combine both queries
-    ParentQuery newParent = ParentQuery(id: UniqueId.next(), operator: operator);
+    ParentQuery newParent =
+        ParentQuery(id: UniqueId.next(), operator: operator);
     newNodes[newParent.id] = newParent;
     newParents[targetId] = newParent.id;
     newParents[queryId] = newParent.id;
@@ -475,7 +499,8 @@ class QueryExpression {
       newRoots.remove(queryId);
     }
 
-    return QueryExpression._internal(newNodes, newRoots, newChildren, newParents);
+    return QueryExpression._internal(
+        newNodes, newRoots, newChildren, newParents);
   }
 
   /// Check to see if the expression is valid.
@@ -512,12 +537,14 @@ class QueryExpression {
   /// Convert the expression to a JSON formatted string.
   Map<String, dynamic> toJson() {
     return {
-      'nodes': _nodes.map((id, node) => MapEntry(id.toSerializableString(), node.toJson(this))),
+      'nodes': _nodes.map(
+          (id, node) => MapEntry(id.toSerializableString(), node.toJson(this))),
       'roots': _roots.map((id) => id.toSerializableString()).toList(),
       'children': _children.map((id, children) => MapEntry(
-          id.toSerializableString(), children.map((childId) => childId.toSerializableString()).toList())),
-      'parents': _parents
-          .map((id, parentId) => MapEntry(id.toSerializableString(), parentId.toSerializableString())),
+          id.toSerializableString(),
+          children.map((childId) => childId.toSerializableString()).toList())),
+      'parents': _parents.map((id, parentId) =>
+          MapEntry(id.toSerializableString(), parentId.toSerializableString())),
     };
   }
 
@@ -526,7 +553,9 @@ class QueryExpression {
     final nodes = (json['nodes'] as Map<String, dynamic>).map(
       (key, value) => MapEntry(UniqueId.fromString(key), Query.fromJson(value)),
     );
-    final roots = (json['roots'] as List).map((id) => UniqueId.fromString(id as String)).toSet();
+    final roots = (json['roots'] as List)
+        .map((id) => UniqueId.fromString(id as String))
+        .toSet();
     final children = (json['children'] as Map<String, dynamic>).map(
       (key, value) => MapEntry(
         UniqueId.fromString(key),

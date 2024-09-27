@@ -19,7 +19,6 @@
 /// You should have received a copy of the GNU General Public License
 /// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import 'dart:convert';
-import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -71,7 +70,9 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
   @override
   Widget build(BuildContext context) {
     DateTime? date = selectedDate?.toLocal();
-    String dateString = date != null ? "${date.year}-${date.month}-${date.day}" : 'No date selected';
+    String dateString = date != null
+        ? "${date.year}-${date.month}-${date.day}"
+        : 'No date selected';
     WorkspaceBloc workspaceBloc = context.read<WorkspaceBloc>();
 
     return Row(
@@ -108,7 +109,9 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
               onPressed: () {
                 setState(() {
                   selectedDate = null;
-                  context.read<WorkspaceBloc>().add(UpdateGlobalObsDateEvent(dayObs: null));
+                  context
+                      .read<WorkspaceBloc>()
+                      .add(UpdateGlobalObsDateEvent(dayObs: null));
                 });
               },
               child: const Icon(
@@ -216,7 +219,8 @@ class ToolbarState extends State<Toolbar> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _getStatusIndicator(webSocketManager.isConnected, workspace.instrument != null),
+                  color: _getStatusIndicator(webSocketManager.isConnected,
+                      workspace.instrument != null),
                 ),
               ))),
           const SizedBox(width: 30),
@@ -248,7 +252,8 @@ class ToolbarState extends State<Toolbar> {
                 ],
                 onChanged: (String? value) {
                   if (value != null) {
-                    webSocketManager.sendMessage(LoadInstrumentAction(instrument: value).toJson());
+                    webSocketManager.sendMessage(
+                        LoadInstrumentAction(instrument: value).toJson());
                   }
                 },
               )),
@@ -256,7 +261,8 @@ class ToolbarState extends State<Toolbar> {
           Tooltip(
             message: "Show Focal Plane",
             child: IconButton(
-              onPressed: workspace.instrument == null && !workspace.isShowingFocalPlane
+              onPressed: workspace.instrument == null &&
+                      !workspace.isShowingFocalPlane
                   ? null
                   : () {
                       context.read<WorkspaceBloc>().add(ShowFocalPlaneEvent());
@@ -274,7 +280,8 @@ class ToolbarState extends State<Toolbar> {
           Tooltip(
             message: "Load workspace",
             child: MenuAnchor(
-              builder: (BuildContext context, MenuController controller, Widget? child) {
+              builder: (BuildContext context, MenuController controller,
+                  Widget? child) {
                 return IconButton(
                   icon: const Icon(Icons.folder_open, color: Colors.green),
                   onPressed: () {
@@ -313,10 +320,12 @@ class ToolbarState extends State<Toolbar> {
           Tooltip(
             message: "Save workspace",
             child: MenuAnchor(
-              builder: (BuildContext context, MenuController controller, Widget? child) {
+              builder: (BuildContext context, MenuController controller,
+                  Widget? child) {
                 return IconButton(
                   icon: Icon(Icons.save,
-                      color: workspace.instrument == null && !workspace.isShowingFocalPlane
+                      color: workspace.instrument == null &&
+                              !workspace.isShowingFocalPlane
                           ? Colors.grey[500]
                           : Colors.green),
                   onPressed: () {
@@ -331,7 +340,8 @@ class ToolbarState extends State<Toolbar> {
               menuChildren: [
                 MenuItemButton(
                   onPressed: () async {
-                    await Clipboard.setData(ClipboardData(text: jsonEncode(workspace.toJson())));
+                    await Clipboard.setData(
+                        ClipboardData(text: jsonEncode(workspace.toJson())));
                   },
                   child: const Text("Copy to clipboard"),
                 ),
@@ -356,13 +366,16 @@ class ToolbarState extends State<Toolbar> {
           Tooltip(
             message: "Add a chart to the workspace",
             child: MenuAnchor(
-              builder: (BuildContext context, MenuController controller, Widget? child) {
+              builder: (BuildContext context, MenuController controller,
+                  Widget? child) {
                 return IconButton(
                   icon: Icon(Icons.add_chart,
-                      color: workspace.instrument == null && !workspace.isShowingFocalPlane
+                      color: workspace.instrument == null &&
+                              !workspace.isShowingFocalPlane
                           ? Colors.grey[500]
                           : Colors.green),
-                  onPressed: workspace.instrument == null && !workspace.isShowingFocalPlane
+                  onPressed: workspace.instrument == null &&
+                          !workspace.isShowingFocalPlane
                       ? null
                       : () {
                           if (controller.isOpen) {
@@ -424,11 +437,15 @@ class ToolbarState extends State<Toolbar> {
                 icon: const Icon(Icons.copy, color: Colors.green),
                 onPressed: () async {
                   String result;
-                  SelectionController selectionController = ControlCenter().selectionController;
-                  SelectionController drillDownController = ControlCenter().drillDownController;
-                  List<Object> dataPoints = selectionController.selectedDataPoints.toList();
+                  SelectionController selectionController =
+                      ControlCenter().selectionController;
+                  SelectionController drillDownController =
+                      ControlCenter().drillDownController;
+                  List<Object> dataPoints =
+                      selectionController.selectedDataPoints.toList();
                   if (dataPoints.isEmpty) {
-                    dataPoints = drillDownController.selectedDataPoints.toList();
+                    dataPoints =
+                        drillDownController.selectedDataPoints.toList();
                   }
                   if (dataPoints.isEmpty) {
                     result = "";
@@ -450,7 +467,9 @@ class ToolbarState extends State<Toolbar> {
               message: "Change global query",
               child: IconButton(
                 icon: Icon(Icons.travel_explore,
-                    color: workspace.globalQuery == null ? Colors.grey : Colors.green),
+                    color: workspace.globalQuery == null
+                        ? Colors.grey
+                        : Colors.green),
                 onPressed: () {
                   WorkspaceBloc bloc = context.read<WorkspaceBloc>();
                   showDialog(
@@ -458,13 +477,16 @@ class ToolbarState extends State<Toolbar> {
                       builder: (BuildContext context) {
                         return Dialog(
                           child: BlocProvider(
-                            create: (context) => QueryBloc(workspace.globalQuery),
+                            create: (context) =>
+                                QueryBloc(workspace.globalQuery),
                             child: QueryEditor(
                               theme: workspace.theme,
                               onCompleted: (QueryExpression? query) {
-                                bloc.add(UpdateGlobalQueryEvent(globalQuery: query));
+                                bloc.add(
+                                    UpdateGlobalQueryEvent(globalQuery: query));
                               },
-                              database: DataCenter().databases[workspace.instrument!.schema]!,
+                              database: DataCenter()
+                                  .databases[workspace.instrument!.schema]!,
                             ),
                           ),
                         );
