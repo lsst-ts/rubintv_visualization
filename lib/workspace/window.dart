@@ -22,6 +22,10 @@
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/chart/base.dart';
+import 'package:rubintv_visualization/chart/binned.dart';
+import 'package:rubintv_visualization/focal_plane/chart.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/theme.dart';
 import 'package:rubintv_visualization/workspace/state.dart';
@@ -35,15 +39,72 @@ enum WindowTypes {
   box,
   cartesianScatter,
   polarScatter,
-  combination,
+  combination;
+
+  /// Return true if the window is a chart.
+  bool get isChart => this != WindowTypes.detectorSelector;
+
+  // Return true if the window is a scatter plot.
+  bool get isScatter => this == WindowTypes.cartesianScatter || this == WindowTypes.polarScatter;
+
+  /// Return true if the window is a binned chart.
+  bool get isBinned => this == WindowTypes.histogram || this == WindowTypes.box;
+
+  /// Create a [WindowTypes] from a string.
+  static WindowTypes fromString(String value) => WindowTypes.values.firstWhere((e) => e.name == value);
+}
+
+/// Abstract window event
+abstract class WindowEvent {}
+
+/// State of a window.
+class WindowState {
+  /// All windows have a [UniqueId].
+  UniqueId id;
+
+  /// The type of window to display.
+  final WindowTypes windowType;
+
+  WindowState({
+    required this.id,
+    required this.windowType,
+  });
+
+  /// Convert the state to a JSON object.
+  Map<String, dynamic> toJson() {
+    return {
+      "id": id.toSerializableString(),
+      "windowType": windowType.toString(),
+    };
+  }
+
+  /// Create a [WindowState] from a JSON object.
+  factory WindowState.fromJson(Map<String, dynamic> json, ChartTheme theme) {
+    WindowTypes windowType = WindowTypes.fromString(json["windowType"]);
+
+    late WindowState result;
+
+    if (windowType.isScatter) {
+      result = ChartState.fromJson(json);
+    } else if (windowType.isBinned) {
+      result = BinnedState.fromJson(json);
+    } else if (windowType == WindowTypes.focalPlane) {
+      result = FocalPlaneChartState.fromJson(json, theme);
+    } else {
+      throw ArgumentError("Unrecognized window type $windowType");
+    }
+    return result;
+  }
+}
+
+/// Abstract window bloc
+class WindowBloc<T extends WindowState> extends Bloc<WindowEvent, T> {
+  WindowBloc(super.initialState);
 }
 
 /// A single, persistable, item displayed in a [Workspace].
 @immutable
-class Window {
-  /// The [id] of this [Window] in [Workspace.windows].
-  final UniqueId id;
-
+class WindowMetaData {
   /// The location of the window in the entire workspace
   final Offset offset;
 
@@ -53,34 +114,70 @@ class Window {
   /// The title to display in the window bar.
   final String? title;
 
-  final WindowTypes type;
+  /// The [WindowBloc] associated with this window
+  final WindowBloc bloc;
 
-  const Window({
-    required this.id,
+  const WindowMetaData({
     required this.offset,
     required this.size,
-    required this.type,
+    required this.bloc,
     this.title,
   });
 
-  /// Create a copy of the [Window] with the provided fields updated.
-  Window copyWith({
-    UniqueId? id,
+  /// Create a copy of the [WindowMetaData] with the provided fields updated.
+  WindowMetaData copyWith({
     Offset? offset,
     Size? size,
+    WindowBloc? bloc,
     String? title,
   }) =>
-      Window(
-        id: id ?? this.id,
+      WindowMetaData(
         offset: offset ?? this.offset,
         size: size ?? this.size,
         title: title ?? this.title,
-        type: type,
+        bloc: bloc ?? this.bloc,
       );
 
   @override
   String toString() {
-    return "Window(id: $id, offset: $offset, size: $size, title: $title, type: $type)";
+    return "Window(id: $id, offset: $offset, size: $size, title: $title, type: $windowType)";
+  }
+
+  /// The [id] of this [WindowMetaData] in [Workspace.windows].
+  UniqueId get id => bloc.state.id;
+
+  /// The type of window to display.
+  WindowTypes get windowType => bloc.state.windowType;
+
+  /// Convert the [WindowMetaData] to a JSON object.
+  Map<String, dynamic> toJson() {
+    return {
+      "state": bloc.state.toJson(),
+      "offset": {"dx": offset.dx, "dy": offset.dy},
+      "size": {"width": size.width, "height": size.height},
+      "title": title,
+    };
+  }
+
+  /// Create a [WindowMetaData] from a JSON object.
+  static WindowMetaData fromJson(Map<String, dynamic> json, ChartTheme theme) {
+    WindowState state = WindowState.fromJson(json["state"], theme);
+    Offset offset = Offset(json["offset"]["dx"], json["offset"]["dy"]);
+    Size size = Size(json["size"]["width"], json["size"]["height"]);
+    String? title = json["title"] == "" ? null : json["title"];
+    late WindowBloc bloc;
+    if (state.windowType == WindowTypes.detectorSelector) {
+      bloc = WindowBloc(state);
+    } else if (state.windowType.isBinned) {
+      bloc = ChartBloc(state as BinnedState);
+    } else if (state.windowType.isScatter) {
+      bloc = ChartBloc(state as ChartState);
+    } else if (state.windowType == WindowTypes.focalPlane) {
+      bloc = FocalPlaneChartBloc(state as FocalPlaneChartState);
+    } else {
+      throw ArgumentError("Unrecognized window type ${state.windowType}");
+    }
+    return WindowMetaData(offset: offset, size: size, title: title, bloc: bloc);
   }
 }
 
@@ -188,7 +285,7 @@ class StartWindowResize extends WorkspaceEvent {
   });
 }
 
-/// [WindowUpdate] to update the size of a [Window] in the parent [WorkspaceViewer].
+/// [WindowUpdate] to update the size of a [WindowMetaData] in the parent [WorkspaceViewer].
 class UpdateWindowResize extends WorkspaceEvent {
   /// The [UniqueId] of the window being resized.
   final UniqueId windowId;
@@ -308,7 +405,7 @@ class ResizableWindow extends StatelessWidget {
   final String? title;
 
   /// Information about the widget
-  final Window info;
+  final WindowMetaData info;
 
   /// Toolbar associated with the window
   final Widget? toolbar;

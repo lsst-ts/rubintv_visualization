@@ -54,6 +54,7 @@ dependencies:
   flutter_bloc: ^8.1.6
   # Color picker for ColorSlideer
   flutter_colorpicker: ^1.1.0
+  uuid: ^4.4.2
 
 dev_dependencies:
   flutter_test:

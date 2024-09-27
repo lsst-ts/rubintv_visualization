@@ -21,8 +21,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:rubintv_visualization/error.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'dart:developer' as developer;
 
@@ -74,15 +73,7 @@ class WebSocketManager {
       });
     } catch (e) {
       developer.log('Failed to connect to $uri: $e', name: 'rubinTV.visualization.websocket');
-      Fluttertoast.showToast(
-          msg: "Failed to connect to $uri",
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.CENTER,
-          timeInSecForIosWeb: 5,
-          backgroundColor: Colors.red,
-          webBgColor: "#e74c3c",
-          textColor: Colors.white,
-          fontSize: 16.0);
+      reportError("Failed to connect to $uri: $e");
     }
   }
 

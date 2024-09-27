@@ -41,7 +41,7 @@ typedef FocalPlanePainterCallback = void Function(DetectorPaintInfo info);
 /// A [StatefulWidget] that displays the focal plane of an instrument.
 class FocalPlaneViewer extends StatefulWidget {
   /// The window that contains the viewer.
-  final Window window;
+  final WindowMetaData window;
 
   /// The instrument to display.
   final Instrument instrument;

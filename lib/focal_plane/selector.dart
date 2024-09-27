@@ -27,8 +27,8 @@ import 'package:rubintv_visualization/workspace/window.dart';
 
 /// A [Widget] used to display a [DetectorSelector] in a container.
 class DetectorSelector extends StatelessWidget {
-  /// The [Window] to display the [DetectorSelector] in.
-  final Window window;
+  /// The [WindowMetaData] to display the [DetectorSelector] in.
+  final WindowMetaData window;
 
   /// The [WorkspaceState].
   final WorkspaceState workspace;

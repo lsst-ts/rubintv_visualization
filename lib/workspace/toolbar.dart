@@ -18,14 +18,18 @@
 ///
 /// You should have received a copy of the GNU General Public License
 /// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import 'dart:convert';
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubin_chart/rubin_chart.dart';
+import 'package:rubintv_visualization/dialog/widget.dart';
 import 'package:rubintv_visualization/io.dart';
-import 'package:rubintv_visualization/query/query.dart';
-import 'package:rubintv_visualization/editors/query.dart';
+import 'package:rubintv_visualization/query/bloc.dart';
+import 'package:rubintv_visualization/query/primitives.dart';
+import 'package:rubintv_visualization/query/widget.dart';
 import 'package:rubintv_visualization/workspace/controller.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/state.dart';
@@ -74,40 +78,44 @@ class DatePickerWidgetState extends State<DatePickerWidget> {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        GestureDetector(
-          onTap: () async {
-            final DateTime? pickedDate = await showDatePicker(
-              context: context,
-              initialDate: selectedDate ?? DateTime.now(),
-              firstDate: DateTime(2000),
-              lastDate: DateTime(2101),
-            );
+        Tooltip(
+            message: "Set day_obs",
+            child: GestureDetector(
+              onTap: () async {
+                final DateTime? pickedDate = await showDatePicker(
+                  context: context,
+                  initialDate: selectedDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2101),
+                );
 
-            workspaceBloc.add(UpdateGlobalObsDateEvent(dayObs: pickedDate));
-          },
-          child: Container(
-            margin: const EdgeInsets.all(4),
-            padding: const EdgeInsets.all(4),
-            height: 40,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.blueAccent),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Center(child: Text(dateString)),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            setState(() {
-              selectedDate = null;
-              context.read<WorkspaceBloc>().add(UpdateGlobalObsDateEvent(dayObs: null));
-            });
-          },
-          child: const Icon(
-            Icons.clear,
-            color: Colors.red,
-          ),
-        ),
+                workspaceBloc.add(UpdateGlobalObsDateEvent(dayObs: pickedDate));
+              },
+              child: Container(
+                margin: const EdgeInsets.all(4),
+                padding: const EdgeInsets.all(4),
+                height: 40,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.blueAccent),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(child: Text(dateString)),
+              ),
+            )),
+        Tooltip(
+            message: "Clear day_obs",
+            child: ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  selectedDate = null;
+                  context.read<WorkspaceBloc>().add(UpdateGlobalObsDateEvent(dayObs: null));
+                });
+              },
+              child: const Icon(
+                Icons.clear,
+                color: Colors.red,
+              ),
+            )),
       ],
     );
   }
@@ -135,6 +143,51 @@ Color _getStatusIndicator(bool isConnected, bool hasInstrument) {
   }
 }
 
+/// Display a dialog to load a workspace from a JSON string.
+void _loadWorkspace(BuildContext context, WorkspaceBloc bloc) {
+  final TextEditingController textFieldController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Enter workspace JSON'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: TextField(
+            controller: textFieldController,
+            maxLines: null,
+            minLines: 5,
+            keyboardType: TextInputType.multiline,
+            decoration: const InputDecoration(
+              hintText: "Enter workspace JSON here",
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('CANCEL'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+          TextButton(
+            child: const Text('LOAD'),
+            onPressed: () {
+              // Load the workspace from the text field
+              String text = textFieldController.text;
+              bloc.add(LoadWorkspaceFromTextEvent(text));
+              // Add your custom action here
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
+
 /// The [State] of the [Toolbar] widget.
 class ToolbarState extends State<Toolbar> {
   WorkspaceState get workspace => widget.workspace;
@@ -153,168 +206,285 @@ class ToolbarState extends State<Toolbar> {
       child: Row(
         children: [
           const SizedBox(width: 10),
-          MenuAnchor(
-            builder: (BuildContext context, MenuController controller, Widget? child) {
-              return IconButton(
-                icon: const Icon(Icons.menu),
-                onPressed: () {
-                  if (controller.isOpen) {
-                    controller.close();
-                  } else {
-                    controller.open();
+          Tooltip(
+              message: "Status Indicator",
+              child: Center(
+                  child: Container(
+                margin: const EdgeInsets.only(left: 4),
+                height: 10,
+                width: 10,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _getStatusIndicator(webSocketManager.isConnected, workspace.instrument != null),
+                ),
+              ))),
+          const SizedBox(width: 30),
+          Tooltip(
+              message: "Change current instrument",
+              child: DropdownButton<String?>(
+                value: workspace.instrument?.name,
+                items: const [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text("Select Instrument"),
+                  ),
+                  DropdownMenuItem(
+                    value: "LsstCam",
+                    child: Text("LSSTCam"),
+                  ),
+                  DropdownMenuItem(
+                    value: "LsstComCam",
+                    child: Text("LsstComCam"),
+                  ),
+                  DropdownMenuItem(
+                    value: "Latiss",
+                    child: Text("Latiss"),
+                  ),
+                  DropdownMenuItem(
+                    value: "LsstComCamSim",
+                    child: Text("LsstComCamSim"),
+                  ),
+                ],
+                onChanged: (String? value) {
+                  if (value != null) {
+                    webSocketManager.sendMessage(LoadInstrumentAction(instrument: value).toJson());
                   }
                 },
-              );
-            },
-            menuChildren: [
-              MenuItemButton(
-                onPressed: () {
-                  context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                        windowType: WindowTypes.cartesianScatter,
-                      ));
-                },
-                child: const Text("New Cartesian Scatter Plot"),
-              ),
-              MenuItemButton(
-                onPressed: () {
-                  context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                        windowType: WindowTypes.polarScatter,
-                      ));
-                },
-                child: const Text("New Polar Scatter Plot"),
-              ),
-              MenuItemButton(
-                onPressed: () {
-                  context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                        windowType: WindowTypes.histogram,
-                      ));
-                },
-                child: const Text("New Histogram"),
-              ),
-              MenuItemButton(
-                onPressed: () {
-                  context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                        windowType: WindowTypes.box,
-                      ));
-                },
-                child: const Text("New Box Chart"),
-              ),
-              MenuItemButton(
-                onPressed: () {
-                  context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
-                        windowType: WindowTypes.focalPlane,
-                      ));
-                },
-                child: const Text("New Focal Plane Chart"),
-              ),
-            ],
-          ),
+              )),
           const SizedBox(width: 10),
-          Center(
-              child: Container(
-            margin: const EdgeInsets.only(left: 4),
-            height: 10,
-            width: 10,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _getStatusIndicator(webSocketManager.isConnected, workspace.instrument != null),
+          Tooltip(
+            message: "Show Focal Plane",
+            child: IconButton(
+              onPressed: workspace.instrument == null && !workspace.isShowingFocalPlane
+                  ? null
+                  : () {
+                      context.read<WorkspaceBloc>().add(ShowFocalPlaneEvent());
+                    },
+              icon: const Icon(Icons.lens_blur),
             ),
-          )),
-          const SizedBox(width: 30),
-          DropdownButton<String?>(
-            value: workspace.instrument?.name,
-            items: const [
-              DropdownMenuItem<String?>(
-                value: null,
-                child: Text("Select Instrument"),
-              ),
-              DropdownMenuItem(
-                value: "LsstCam",
-                child: Text("LSSTCam"),
-              ),
-              DropdownMenuItem(
-                value: "LsstComCam",
-                child: Text("LsstComCam"),
-              ),
-              DropdownMenuItem(
-                value: "Latiss",
-                child: Text("Latiss"),
-              ),
-              DropdownMenuItem(
-                value: "LsstComCamSim",
-                child: Text("LsstComCamSim"),
-              ),
-            ],
-            onChanged: (String? value) {
-              if (value != null) {
-                webSocketManager.sendMessage(LoadInstrumentAction(instrument: value).toJson());
-              }
-            },
+          ),
+          Tooltip(
+            message: "Detector number and name",
+            child: Text(workspace.detector?.name == null
+                ? 'No detector selected'
+                : "${workspace.detector!.id}: ${workspace.detector!.name}"),
+          ),
+          const Spacer(),
+          Tooltip(
+            message: "Load workspace",
+            child: MenuAnchor(
+              builder: (BuildContext context, MenuController controller, Widget? child) {
+                return IconButton(
+                  icon: const Icon(Icons.folder_open, color: Colors.green),
+                  onPressed: () {
+                    if (controller.isOpen) {
+                      controller.close();
+                    } else {
+                      controller.open();
+                    }
+                  },
+                );
+              },
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: () {
+                    _loadWorkspace(context, context.read<WorkspaceBloc>());
+                  },
+                  child: const Text("From text"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) => const Dialog(
+                        child: FileDialogWidget(
+                          action: FileDialogAction.load,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text("From file"),
+                ),
+              ],
+            ),
           ),
           const SizedBox(width: 10),
-          IconButton(
-            onPressed: workspace.instrument == null && !workspace.isShowingFocalPlane
-                ? null
-                : () {
-                    context.read<WorkspaceBloc>().add(ShowFocalPlaneEvent());
+          Tooltip(
+            message: "Save workspace",
+            child: MenuAnchor(
+              builder: (BuildContext context, MenuController controller, Widget? child) {
+                return IconButton(
+                  icon: Icon(Icons.save,
+                      color: workspace.instrument == null && !workspace.isShowingFocalPlane
+                          ? Colors.grey[500]
+                          : Colors.green),
+                  onPressed: () {
+                    if (controller.isOpen) {
+                      controller.close();
+                    } else {
+                      controller.open();
+                    }
                   },
-            icon: const Icon(Icons.lens_blur),
-          ),
-          Text(workspace.detector?.name == null
-              ? 'No detector selected'
-              : "${workspace.detector!.id}: ${workspace.detector!.name}"),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.copy, color: Colors.green),
-            onPressed: () async {
-              String result;
-              SelectionController selectionController = ControlCenter().selectionController;
-              SelectionController drillDownController = ControlCenter().drillDownController;
-              List<Object> dataPoints = selectionController.selectedDataPoints.toList();
-              if (dataPoints.isEmpty) {
-                dataPoints = drillDownController.selectedDataPoints.toList();
-              }
-              if (dataPoints.isEmpty) {
-                result = "";
-              } else {
-                result = dataPoints.map((e) {
-                  DataId dataId = e as DataId;
-                  return "(${dataId.dayObs}, ${dataId.seqNum})";
-                }).join(',');
-              }
-
-              if (result.isNotEmpty) {
-                result = "[$result]";
-              }
-
-              await Clipboard.setData(ClipboardData(text: result));
-            },
-          ),
-          IconButton(
-            icon:
-                Icon(Icons.travel_explore, color: workspace.globalQuery == null ? Colors.grey : Colors.green),
-            onPressed: () {
-              WorkspaceBloc bloc = context.read<WorkspaceBloc>();
-              showDialog(
-                  context: context,
-                  builder: (BuildContext context) => Dialog(
-                        child: QueryEditor(
-                          theme: workspace.theme,
-                          expression: QueryExpression(
-                            queries: workspace.globalQuery == null ? [] : [workspace.globalQuery!],
-                          ),
-                          onCompleted: (Query? query) {
-                            bloc.add(UpdateGlobalQueryEvent(globalQuery: query));
-                          },
+                );
+              },
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: jsonEncode(workspace.toJson())));
+                  },
+                  child: const Text("Copy to clipboard"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) => Dialog(
+                        child: FileDialogWidget(
+                          action: FileDialogAction.save,
+                          content: jsonEncode(workspace.toJson()),
                         ),
-                      ));
-            },
+                      ),
+                    );
+                  },
+                  child: const Text("Save to file"),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 10),
+          Tooltip(
+            message: "Add a chart to the workspace",
+            child: MenuAnchor(
+              builder: (BuildContext context, MenuController controller, Widget? child) {
+                return IconButton(
+                  icon: Icon(Icons.add_chart,
+                      color: workspace.instrument == null && !workspace.isShowingFocalPlane
+                          ? Colors.grey[500]
+                          : Colors.green),
+                  onPressed: workspace.instrument == null && !workspace.isShowingFocalPlane
+                      ? null
+                      : () {
+                          if (controller.isOpen) {
+                            controller.close();
+                          } else {
+                            controller.open();
+                          }
+                        },
+                );
+              },
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: () {
+                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                          windowType: WindowTypes.cartesianScatter,
+                        ));
+                  },
+                  child: const Text("New Cartesian Scatter Plot"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                          windowType: WindowTypes.polarScatter,
+                        ));
+                  },
+                  child: const Text("New Polar Scatter Plot"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                          windowType: WindowTypes.histogram,
+                        ));
+                  },
+                  child: const Text("New Histogram"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                          windowType: WindowTypes.box,
+                        ));
+                  },
+                  child: const Text("New Box Chart"),
+                ),
+                MenuItemButton(
+                  onPressed: () {
+                    context.read<WorkspaceBloc>().add(CreateNewWindowEvent(
+                          windowType: WindowTypes.focalPlane,
+                        ));
+                  },
+                  child: const Text("New Focal Plane Chart"),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Tooltip(
+              message: "Copy",
+              child: IconButton(
+                icon: const Icon(Icons.copy, color: Colors.green),
+                onPressed: () async {
+                  String result;
+                  SelectionController selectionController = ControlCenter().selectionController;
+                  SelectionController drillDownController = ControlCenter().drillDownController;
+                  List<Object> dataPoints = selectionController.selectedDataPoints.toList();
+                  if (dataPoints.isEmpty) {
+                    dataPoints = drillDownController.selectedDataPoints.toList();
+                  }
+                  if (dataPoints.isEmpty) {
+                    result = "";
+                  } else {
+                    result = dataPoints.map((e) {
+                      DataId dataId = e as DataId;
+                      return "(${dataId.dayObs}, ${dataId.seqNum})";
+                    }).join(',');
+                  }
+
+                  if (result.isNotEmpty) {
+                    result = "[$result]";
+                  }
+
+                  await Clipboard.setData(ClipboardData(text: result));
+                },
+              )),
+          Tooltip(
+              message: "Change global query",
+              child: IconButton(
+                icon: Icon(Icons.travel_explore,
+                    color: workspace.globalQuery == null ? Colors.grey : Colors.green),
+                onPressed: () {
+                  WorkspaceBloc bloc = context.read<WorkspaceBloc>();
+                  showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return Dialog(
+                          child: BlocProvider(
+                            create: (context) => QueryBloc(workspace.globalQuery),
+                            child: QueryEditor(
+                              theme: workspace.theme,
+                              onCompleted: (QueryExpression? query) {
+                                bloc.add(UpdateGlobalQueryEvent(globalQuery: query));
+                              },
+                              database: DataCenter().databases[workspace.instrument!.schema]!,
+                            ),
+                          ),
+                        );
+                      });
+                },
+              )),
           SizedBox(
             height: workspace.theme.toolbarHeight,
             child: DatePickerWidget(
               dayObs: workspace.dayObs,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Tooltip(
+            message: "Clear all selections",
+            child: IconButton(
+              icon: const Icon(Icons.clear_all, color: Colors.red),
+              onPressed: () {
+                context.read<WorkspaceBloc>().add(ClearWorkspaceEvent());
+              },
             ),
           ),
         ],
