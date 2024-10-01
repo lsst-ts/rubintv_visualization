@@ -307,7 +307,21 @@ class LoadWorkspaceFromTextEvent extends WorkspaceEvent {
 }
 
 /// Clear the DataCenter and the workspace
-class ClearWorkspaceEvent extends WorkspaceEvent {}
+class ClearWorkspaceEvent extends WorkspaceEvent {
+  final WorkspaceState? state;
+
+  ClearWorkspaceEvent({this.state});
+}
+
+/// Update the workspace in the [WorkspaceBloc].
+/// This should usually occur after a [ClearWorkspaceEvent]
+/// to ensure that all data from the current workspace is cleared
+/// and that all listener subscriptions ahve been closed.
+class UpdateWorkspaceEvent extends WorkspaceEvent {
+  final WorkspaceState state;
+
+  UpdateWorkspaceEvent(this.state);
+}
 
 /// The status of a workspace.
 enum WorkspaceStatus {
@@ -617,7 +631,13 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
         Instrument instrument = Instrument.fromJson(event.message["content"]);
         emit(state.copyWith(instrument: instrument));
         if (state.status == WorkspaceStatus.loadingInstrument && state.pendingJson != null) {
-          _applyWorkspaceJson(state.pendingJson!, emit);
+          // Build new workspace from JSON
+          WorkspaceState newState = WorkspaceState.fromJson(
+            state.pendingJson!,
+            (this.state as WorkspaceState).theme,
+            state.version,
+          );
+          _applyWorkspaceJson(emit, newState);
         }
       } else if (event.message["type"] == "file content") {
         // Load the workspace from the file content
@@ -806,11 +826,30 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
     on<LoadWorkspaceFromTextEvent>(_onLoadWorkspaceFromText);
 
     /// Clear the workspace and DataCenter.
-    on<ClearWorkspaceEvent>((event, emit) {
+    on<ClearWorkspaceEvent>((event, emit) async {
       WorkspaceState state = this.state as WorkspaceState;
-      _clearWorkspace(state);
-      emit(const WorkspaceStateInitial());
+      await _clearWorkspace(state);
       add(InitializeWorkspaceEvent(state.theme, state.version));
+    });
+
+    /// Update the workspace state with a new state.
+    on<UpdateWorkspaceEvent>((event, emit) {
+      // Sync data for all windows
+      WorkspaceState state = event.state;
+      for (var window in state.windows.values) {
+        if (window.bloc is ChartBloc) {
+          (window.bloc as ChartBloc).add(SynchDataEvent(
+            dayObs: getFormattedDate(state.dayObs),
+            globalQuery: state.globalQuery,
+          ));
+        } else if (window.bloc is FocalPlaneChartBloc) {
+          (window.bloc as FocalPlaneChartBloc).add(SynchDataEvent(
+            dayObs: getFormattedDate(state.dayObs),
+            globalQuery: state.globalQuery,
+          ));
+        }
+      }
+      emit(event.state);
     });
   }
 
@@ -829,7 +868,13 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
         ));
         WebSocketManager().sendMessage(LoadInstrumentAction(instrument: newInstrument.name).toJson());
       } else {
-        _applyWorkspaceJson(json, emit);
+        // Build new workspace from JSON
+        WorkspaceState newState = WorkspaceState.fromJson(
+          json,
+          (this.state as WorkspaceState).theme,
+          state.version,
+        );
+        _applyWorkspaceJson(emit, newState);
       }
     } catch (e) {
       emit(state.copyWith(status: WorkspaceStatus.error, errorMessage: "Failed to load workspace: $e"));
@@ -837,45 +882,23 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
   }
 
   /// Build a workspace from a JSON object.
-  void _applyWorkspaceJson(Map<String, dynamic> json, Emitter<WorkspaceStateBase> emit) {
+  void _applyWorkspaceJson(Emitter<WorkspaceStateBase> emit, WorkspaceState newState) async {
     WorkspaceState state = this.state as WorkspaceState;
-    emit(state.copyWith(status: WorkspaceStatus.loadingWorkspace));
-
     // Clear current workspace
-    _clearWorkspace(state);
-
-    // Build new workspace from JSON
-    WorkspaceState newState = WorkspaceState.fromJson(
-      json,
-      (this.state as WorkspaceState).theme,
-      state.version,
-    );
-
-    // Sync data for all windows
-    for (var window in newState.windows.values) {
-      if (window.bloc is ChartBloc) {
-        (window.bloc as ChartBloc).add(SynchDataEvent(
-          dayObs: getFormattedDate(newState.dayObs),
-          globalQuery: newState.globalQuery,
-        ));
-      } else if (window.bloc is FocalPlaneChartBloc) {
-        (window.bloc as FocalPlaneChartBloc).add(SynchDataEvent(
-          dayObs: getFormattedDate(newState.dayObs),
-          globalQuery: newState.globalQuery,
-        ));
-      }
-    }
-
-    emit(newState.copyWith(status: WorkspaceStatus.ready, pendingJson: null));
+    await _clearWorkspace(state);
+    add(UpdateWorkspaceEvent(newState));
   }
 
   /// Clear the workspace and the DataCenter.
-  void _clearWorkspace(WorkspaceState state) {
-    ControlCenter().reset();
-    DataCenter().clearSeriesData();
+  Future<void> _clearWorkspace(WorkspaceState state) async {
+    // Close all of the windows and cancel their subscriptions.
     for (WindowMetaData window in state.windows.values) {
-      window.bloc.close();
+      await window.bloc.close();
     }
+    // Clear the Streams for updating controllers.
+    ControlCenter().reset();
+    // Clear the DataCenter Series Data.
+    DataCenter().clearSeriesData();
   }
 
   /// Cancel the subscription to the websocket.
