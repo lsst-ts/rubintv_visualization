@@ -339,13 +339,16 @@ class DataCenter {
             );
           }
         }
-        String indexKey;
+        String? indexKey;
         if (kExposureTables.contains(tableDict["name"])) {
           indexKey = "exposure_id";
         } else if (kVisit1Tables.contains(tableDict["name"])) {
           indexKey = "visit_id";
         } else {
-          throw DataAccessException("Unknown table: ${tableDict["name"]}");
+          reportError("Unknown table: ${tableDict["name"]}");
+        }
+        if (indexKey == null) {
+          continue;
         }
         TableSchema schema = TableSchema(
           name: tableDict["name"],
