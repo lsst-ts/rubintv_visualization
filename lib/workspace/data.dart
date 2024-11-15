@@ -35,8 +35,10 @@ int _nextDataset = 0;
 /// Names of tables with exposure data
 const List<String> kExposureTables = [
   "exposure",
+  "exposure_quicklook",
   "ccdexposure",
   "ccdexposure_camera",
+  "ccdexposure_quicklook",
 ];
 
 /// Names of tables with single visit exposure data
@@ -53,6 +55,7 @@ const List<String> kCcdTables = [
   "ccdexposure_camera",
   "ccdvisit1",
   "ccdvisit1_quicklook",
+  "ccdexposure_quicklook",
 ];
 
 /// An exception thrown when there is an issue with data access.
