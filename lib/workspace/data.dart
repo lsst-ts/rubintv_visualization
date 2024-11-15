@@ -54,8 +54,8 @@ const List<String> kCcdTables = [
   "ccdexposure",
   "ccdexposure_camera",
   "ccdvisit1",
-  "ccdvisit1_quicklook",
   "ccdexposure_quicklook",
+  "ccdvisit1_quicklook",
 ];
 
 /// An exception thrown when there is an issue with data access.
@@ -99,7 +99,8 @@ ColumnDataType? dataTypeFromString(String dataType) {
 DateTime convertRubinDate(String date) {
   List<String> dateSplit = date.split("-");
   if (dateSplit.length == 1) {
-    date = "${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6)}";
+    date =
+        "${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6)}";
   }
   return dateFromString(date);
 }
@@ -174,8 +175,8 @@ class SchemaField {
   /// that is already loaded by the [DataCenter].
   static SchemaField fromJson(Map<String, dynamic> json) {
     DataCenter dataCenter = DataCenter();
-    TableSchema schema =
-        dataCenter.databases[json["database"]]!.tables.values.firstWhere((e) => e.name == json["schema"]);
+    TableSchema schema = dataCenter.databases[json["database"]]!.tables.values
+        .firstWhere((e) => e.name == json["schema"]);
     return schema.fields[json["name"]]!;
   }
 }
@@ -194,7 +195,8 @@ class TableSchema {
   /// The database that contains the [TableSchema].
   late final DatabaseSchema database;
 
-  TableSchema({required this.name, required this.indexKey, required this.fields}) {
+  TableSchema(
+      {required this.name, required this.indexKey, required this.fields}) {
     for (SchemaField field in fields.values) {
       field.schema = this;
     }
@@ -298,9 +300,12 @@ class DataCenter {
 
   /// Subscribe to the [WebSocketManager] messages.
   void initialize() {
-    _subscription = WebSocketManager().messages.listen((Map<String, dynamic> message) {
-      developer.log("DataCenter received message: ${message['type']}", name: "rubinTV.workspace.data");
-      if (message['type'] == 'instrument info' && message['content'].containsKey('schema')) {
+    _subscription =
+        WebSocketManager().messages.listen((Map<String, dynamic> message) {
+      developer.log("DataCenter received message: ${message['type']}",
+          name: "rubinTV.workspace.data");
+      if (message['type'] == 'instrument info' &&
+          message['content'].containsKey('schema')) {
         addDatabaseSchema(message['content']['schema']);
       }
     });
@@ -362,11 +367,14 @@ class DataCenter {
       }
 
       // Create the DatabaseSchema
-      DatabaseSchema database =
-          DatabaseSchema(name: schemaDict["name"], description: schemaDict["description"], tables: tables);
+      DatabaseSchema database = DatabaseSchema(
+          name: schemaDict["name"],
+          description: schemaDict["description"],
+          tables: tables);
       _databaseSchemas[database.name] = database;
     } catch (e, s) {
-      developer.log("error: $e", name: "rubinTV.workspace.data", error: e, stackTrace: s);
+      developer.log("error: $e",
+          name: "rubinTV.workspace.data", error: e, stackTrace: s);
       reportError("Could not initialize database");
     }
   }
@@ -402,18 +410,23 @@ class DataCenter {
           if (field.isString) {
             columns[field] = List<String>.from(data[plotColumn]!.map((e) => e));
           } else if (field.isNumerical) {
-            columns[field] = List<double>.from(data[plotColumn]!.map((e) => e.toDouble()));
+            columns[field] =
+                List<double>.from(data[plotColumn]!.map((e) => e.toDouble()));
           } else if (field.isDateTime) {
-            columns[field] = List<DateTime>.from(data[plotColumn]!.map((e) => convertRubinDate(e)));
+            columns[field] = List<DateTime>.from(
+                data[plotColumn]!.map((e) => convertRubinDate(e)));
           }
 
           // Add the column to the series columns
-          AxisId axisId = series.axes[series.fields.values.toList().indexOf(field)];
+          AxisId axisId =
+              series.axes[series.fields.values.toList().indexOf(field)];
           seriesColumns[axisId] = field;
         }
       }
       List<DataId> dataIds = List.generate(
-          data['seq_num']!.length, (i) => DataId(seqNum: data['seq_num']![i], dayObs: data['day_obs']![i]));
+          data['seq_num']!.length,
+          (i) =>
+              DataId(seqNum: data['seq_num']![i], dayObs: data['day_obs']![i]));
 
       SeriesData seriesData = SeriesData.fromData(
         data: columns,
@@ -428,7 +441,8 @@ class DataCenter {
   }
 
   /// Check if two [SchemaField]s are compatible
-  bool isFieldCompatible(SchemaField field1, SchemaField field2) => throw UnimplementedError();
+  bool isFieldCompatible(SchemaField field1, SchemaField field2) =>
+      throw UnimplementedError();
 
   @override
   String toString() => "DataCenter:[${databases.keys}]";
@@ -457,7 +471,8 @@ class DataId {
   const DataId({required this.seqNum, required this.dayObs});
 
   @override
-  bool operator ==(Object other) => other is DataId && other.seqNum == seqNum && other.dayObs == dayObs;
+  bool operator ==(Object other) =>
+      other is DataId && other.seqNum == seqNum && other.dayObs == dayObs;
 
   @override
   int get hashCode => seqNum.hashCode ^ dayObs.hashCode;
