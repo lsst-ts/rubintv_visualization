@@ -205,7 +205,7 @@ class SeriesEditorState extends State<SeriesEditor> {
                       icon: const Icon(Icons.cancel, color: Colors.red),
                     )),
                 Tooltip(
-                    message: "Aceept",
+                    message: "Accept",
                     child: IconButton(
                       onPressed: () {
                         if (_formKey.currentState!.validate()) {
@@ -247,37 +247,44 @@ class ColumnEditorFormField extends FormField<Map<AxisId, SchemaField?>> {
     required this.databaseSchema,
     bool autovalidate = false,
   }) : super(
-            onSaved: onSaved,
-            validator: validator,
-            initialValue: initialValue,
-            builder: (FormFieldState<Map<AxisId, SchemaField?>> formState) {
-              return SizedBox(
-                child: ListView.builder(
-                  itemCount: initialValue.length,
-                  shrinkWrap: true,
-                  itemBuilder: (BuildContext context, int index) {
-                    AxisId axisId = initialValue.keys.toList()[index];
-                    return Container(
-                        margin: const EdgeInsets.all(10),
-                        child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: "axis $index",
-                              border: const OutlineInputBorder(),
-                            ),
-                            child: ColumnEditor(
-                              theme: theme,
-                              initialValue: initialValue[axisId]!,
-                              onChanged: (SchemaField? field) {
-                                Map<AxisId, SchemaField?> fields = {...formState.value!};
-                                fields[axisId] = field;
-                                formState.didChange(fields);
-                              },
-                              databaseSchema: databaseSchema,
-                            )));
-                  },
-                ),
-              );
-            });
+          onSaved: onSaved,
+          validator: validator,
+          initialValue: initialValue,
+          builder: (FormFieldState<Map<AxisId, SchemaField?>> formState) {
+            return SizedBox(
+              child: ListView.builder(
+                itemCount: initialValue.length,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemBuilder: (BuildContext context, int index) {
+                  AxisId axisId = initialValue.keys.toList()[index];
+                  SchemaField? currentValue = formState.value![axisId];
+
+                  return Container(
+                    margin: const EdgeInsets.all(10),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: "axis $index",
+                        border: const OutlineInputBorder(),
+                      ),
+                      child: ColumnEditor(
+                        theme: theme,
+                        initialValue: currentValue ??
+                            databaseSchema.tables.values.first.fields.values.first, // Fallback to default
+                        onChanged: (SchemaField? field) {
+                          Map<AxisId, SchemaField?> fields = {...formState.value!};
+                          fields[axisId] = field;
+                          formState.didChange(fields);
+                        },
+                        databaseSchema: databaseSchema,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
 }
 
 /// A [StatefulWidget] used to edit a column in a series.
@@ -307,6 +314,8 @@ class ColumnEditor extends StatefulWidget {
 }
 
 /// The [State] object for the [ColumnEditor] widget.
+/// TODO: Fix width of Column options and include validation for names
+/// See SITCOM-1779
 class ColumnEditorState extends State<ColumnEditor> {
   AppTheme get theme => widget.theme;
 
@@ -337,7 +346,6 @@ class ColumnEditorState extends State<ColumnEditor> {
     }
 
     List<DropdownMenuItem<TableSchema>> tableEntries = [];
-    List<DropdownMenuItem<SchemaField>> columnEntries = [];
 
     // We don't allow the user to select from the CCD tables because the DataIds of visits/exposures
     // are the same for all detectors, which means they cannot be properly searched.
@@ -346,15 +354,15 @@ class ColumnEditorState extends State<ColumnEditor> {
         .where((e) => (!kCcdTables.contains(e.value!.name)))
         .toList();
 
-    if (_table != null) {
-      columnEntries =
-          _table!.fields.values.map((e) => DropdownMenuItem(value: e, child: Text(e.name))).toList();
-    }
+    // Define the list of columns based on the selected table
+    final List<SchemaField> allColumns = _table?.fields.values.toList() ?? <SchemaField>[];
+    final List<String> columnNames = allColumns.map((field) => field.name).toList();
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        const SizedBox(height: 6),
         DropdownButtonFormField<TableSchema>(
           decoration: const InputDecoration(
             labelText: "Table",
@@ -370,20 +378,54 @@ class ColumnEditorState extends State<ColumnEditor> {
             widget.onChanged(_field);
           },
         ),
+
         const SizedBox(height: 10),
-        DropdownButtonFormField<SchemaField>(
-          decoration: const InputDecoration(
-            labelText: "Column",
-            border: OutlineInputBorder(),
-          ),
-          value: _field,
-          items: columnEntries,
-          onChanged: (SchemaField? newField) {
-            setState(() {
-              newField ??= _table!.fields.values.first;
-              _field = newField;
+
+        // Dropdown for Columns
+        Autocomplete<String>(
+          fieldViewBuilder: (BuildContext context, TextEditingController textEditingController,
+              FocusNode focusNode, VoidCallback onFieldSubmitted) {
+            // Pre-populate text for re-editing
+            if (textEditingController.text.isEmpty && _field != null) {
+              textEditingController.text = _field!.name;
+            }
+
+            // Add listener to select all text when the field gains focus
+            focusNode.addListener(() {
+              if (focusNode.hasFocus) {
+                textEditingController.selection = TextSelection(
+                  baseOffset: 0,
+                  extentOffset: textEditingController.text.length,
+                );
+              }
             });
-            widget.onChanged(newField);
+
+            return TextField(
+              controller: textEditingController,
+              focusNode: focusNode,
+              onSubmitted: (_) {
+                onFieldSubmitted(); // Notify Autocomplete about the submission
+              },
+              decoration: const InputDecoration(
+                labelText: "Column",
+                border: OutlineInputBorder(),
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+              ),
+            );
+          },
+          optionsBuilder: (TextEditingValue textEditingValue) {
+            if (textEditingValue.text.isEmpty) {
+              return columnNames; // Show all column names if input is empty
+            }
+            return columnNames.where((String columnName) {
+              return columnName.toLowerCase().contains(textEditingValue.text.toLowerCase());
+            });
+          },
+          onSelected: (String selectedColumn) {
+            setState(() {
+              _field = allColumns.firstWhere((field) => field.name == selectedColumn);
+            });
+            widget.onChanged(_field);
           },
         ),
       ],
