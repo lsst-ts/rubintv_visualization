@@ -128,6 +128,54 @@ class LoadColumnsCommand extends ServiceCommand {
   }
 }
 
+/// A command to load a new series.
+class CountRowsCommand extends ServiceCommand {
+  CountRowsCommand({
+    required UniqueId windowId,
+    required SeriesId seriesId,
+    required String database,
+    required List<String> columns,
+    Set<DataId>? dataIds,
+    QueryExpression? query,
+    QueryExpression? globalQuery,
+    String? dayObs,
+  }) : super(
+          name: "count rows",
+          requestId: "${windowId.id},${seriesId.shortString}",
+          parameters: {
+            "database": database,
+            "columns": columns,
+            "query": query?.toCommand(),
+            "global_query": globalQuery?.toCommand(),
+            "data_ids": dataIds?.map((e) => [e.dayObs, e.seqNum]).toList(),
+            "day_obs": dayObs,
+          },
+        );
+
+  /// Build a new [CountRowsCommand] from the given parameters.
+  static CountRowsCommand build({
+    required List<SchemaField> fields,
+    required UniqueId windowId,
+    required SeriesId seriesId,
+    required bool useGlobalQuery,
+    QueryExpression? query,
+    QueryExpression? globalQuery,
+    String? dayObs,
+    Set<DataId>? dataIds,
+  }) {
+    return CountRowsCommand(
+      windowId: windowId,
+      seriesId: seriesId,
+      database: fields.first.database.name,
+      columns: fields.map((e) => "${e.schema.name}.${e.name}").toList(),
+      query: query,
+      globalQuery: useGlobalQuery ? globalQuery : null,
+      dayObs: dayObs,
+      dataIds: dataIds,
+    );
+  }
+}
+
 /// RequestID for commands sent from the file dialog.
 const String kFileDialogRequestId = "file dialog";
 
