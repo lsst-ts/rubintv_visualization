@@ -22,6 +22,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubintv_visualization/focal_plane/instrument.dart';
 import 'package:rubintv_visualization/workspace/state.dart';
@@ -73,37 +74,127 @@ class FocalPlaneViewer extends StatefulWidget {
 class FocalPlaneViewerState extends State<FocalPlaneViewer> {
   /// The information about the detectors on the focal plane.
   DetectorPaintInfo? _detectorPaintInfo;
+  Detector? _currentSelectedDetector;
+
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSelectedDetector = widget.selectedDetector;
+    _focusNode.requestFocus(); // Automatically focus on this widget
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapUp: (TapUpDetails details) {
-        RenderBox renderBox = context.findRenderObject() as RenderBox;
-        Offset localPosition = renderBox.globalToLocal(details.globalPosition);
-        // Check which detector was tapped
-        for (Detector detector in widget.instrument.detectors) {
-          if (_detectorPaintInfo != null &&
-              _detectorPaintInfo!.detectorPaths[detector.id]!.contains(localPosition)) {
-            // Handle tap on the detector
-            context.read<WorkspaceBloc>().add(SelectDetectorEvent(detector));
-            return;
-          }
+    return Focus(
+      focusNode: _focusNode,
+      onKeyEvent: (FocusNode node, KeyEvent event) {
+        if (event is KeyDownEvent) {
+          return _handleKeyEvent(event);
         }
-        context.read<WorkspaceBloc>().add(SelectDetectorEvent(null));
+        return KeyEventResult.ignored;
       },
-      child: SizedBox.expand(
-        child: CustomPaint(
-          painter: FocalPlanePainter(
-            widget.instrument.detectors,
-            widget.selectedDetector,
-            (info) {
-              _detectorPaintInfo = info;
-            },
-            widget.detectorColors,
+      child: GestureDetector(
+        onTapUp: (TapUpDetails details) => _handleTap(details, context),
+        child: SizedBox.expand(
+          child: CustomPaint(
+            painter: FocalPlanePainter(
+              widget.instrument.detectors,
+              widget.selectedDetector,
+              (info) {
+                _detectorPaintInfo = info;
+              },
+              widget.detectorColors,
+            ),
           ),
         ),
       ),
     );
+  }
+
+  KeyEventResult _handleKeyEvent(KeyDownEvent event) {
+    if (_detectorPaintInfo == null) return KeyEventResult.ignored;
+
+    // Navigation logic based on arrow keys
+    Detector? nextDetector;
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      nextDetector = _findNearestDetector(const Offset(0, -1));
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      nextDetector = _findNearestDetector(const Offset(0, 1));
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      nextDetector = _findNearestDetector(const Offset(-1, 0));
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      nextDetector = _findNearestDetector(const Offset(1, 0));
+    }
+
+    if (nextDetector != null) {
+      _currentSelectedDetector = nextDetector;
+      context.read<WorkspaceBloc>().add(SelectDetectorEvent(nextDetector));
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  Detector? _findNearestDetector(Offset direction) {
+    if (_currentSelectedDetector == null || _detectorPaintInfo == null) return null;
+
+    final Path? currentPath = _detectorPaintInfo!.detectorPaths[_currentSelectedDetector!.id];
+    if (currentPath == null) {
+      return null;
+    }
+
+    Offset currentCenter = currentPath.getBounds().center;
+
+    Detector? bestDetector;
+    double bestDistance = double.infinity;
+
+    for (final detector in widget.instrument.detectors) {
+      if (detector.id == _currentSelectedDetector!.id) continue;
+
+      final Path? path = _detectorPaintInfo!.detectorPaths[detector.id];
+      if (path == null) continue;
+
+      Offset center = path.getBounds().center;
+      Offset diff = center - currentCenter;
+
+      if (direction.dx > 0 && diff.dx <= 0) continue; // Ignore detectors to the left
+      if (direction.dx < 0 && diff.dx >= 0) continue; // Ignore detectors to the right
+      if (direction.dy > 0 && diff.dy <= 0) continue; // Ignore detectors below
+      if (direction.dy < 0 && diff.dy >= 0) continue; // Ignore detectors above
+
+      // Distance calculation
+      double distance = diff.distanceSquared;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestDetector = detector;
+      }
+    }
+
+    return bestDetector;
+  }
+
+  void _handleTap(TapUpDetails details, BuildContext context) {
+    RenderBox renderBox = context.findRenderObject() as RenderBox;
+    Offset localPosition = renderBox.globalToLocal(details.globalPosition);
+
+    for (Detector detector in widget.instrument.detectors) {
+      if (_detectorPaintInfo != null &&
+          _detectorPaintInfo!.detectorPaths[detector.id]!.contains(localPosition)) {
+        context.read<WorkspaceBloc>().add(SelectDetectorEvent(detector));
+        _currentSelectedDetector = detector;
+        return;
+      }
+    }
+    context.read<WorkspaceBloc>().add(SelectDetectorEvent(null));
+    _currentSelectedDetector = null;
   }
 }
 
