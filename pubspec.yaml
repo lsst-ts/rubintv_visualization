@@ -61,6 +61,7 @@ dev_dependencies:
     sdk: flutter
     
   mockito: ^5.4.0 # For mocking if needed
+  build_runner: ^2.4.0 # For generating code
   bloc_test: ^9.1.7 # For testing WorkspaceBloc behavior
 
   # The "flutter_lints" package below contains a set of recommended lints to
