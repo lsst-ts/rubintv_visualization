@@ -19,9 +19,11 @@
 /// You should have received a copy of the GNU General Public License
 /// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import 'dart:developer' as developer;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rubintv_visualization/focal_plane/instrument.dart';
@@ -283,7 +285,14 @@ class FocalPlanePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true; // You could improve this by only repainting if data changes
+  bool shouldRepaint(covariant FocalPlanePainter oldDelegate) {
+    // Compare detectors, selectedDetector, and detectorColors to determine if repaint is necessary
+    bool result = oldDelegate.selectedDetector != selectedDetector ||
+        !listEquals(oldDelegate.detectors, detectors) ||
+        !mapEquals(oldDelegate.detectorColors, detectorColors);
+    if (result == true) {
+      developer.log("FocalPlanePainter shouldRepaint is true");
+    }
+    return result;
   }
 }
