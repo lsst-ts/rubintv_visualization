@@ -64,21 +64,32 @@ void main() {
     // Verify that the widget renders detectors
     expect(find.byType(CustomPaint), findsOneWidget);
 
-    // Simulate key navigation
+    // Simulate left arrow key press
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pumpAndSettle();
 
-    // Verify that the correct event was dispatched to WorkspaceBloc
+    // Check that the workspace bloc was called with the correct event (select the detector to the right)
     verify(mockWorkspaceBloc.add(
       argThat(isA<SelectDetectorEvent>().having((e) => e.detector, 'detector', detectors[5])),
     )).called(1);
 
+    // Press the up arrow key
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pumpAndSettle();
 
+    // Check that the workspace bloc was called with the correct event (select the detector above)
     verify(mockWorkspaceBloc.add(
-      argThat(isA<SelectDetectorEvent>().having((e) => e.detector, 'detector', detectors[8])),
+      argThat(isA<SelectDetectorEvent>().having((e) => e.detector, 'detector', detectors[2])),
     )).called(1);
+
+    // Press up arrow key again
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+
+    // Check that no new event was dispatched
+    verifyNever(mockWorkspaceBloc.add(
+      argThat(isA<SelectDetectorEvent>()),
+    ));
   });
 }
 
