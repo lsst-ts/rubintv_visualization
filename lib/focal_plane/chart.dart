@@ -288,7 +288,10 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
 
     /// Subscribe to the selection controller to update the chart when points are selected.
     /// We use a timer so that we don't load data until the selection has stopped
-    ControlCenter().selectionController.subscribe((Set<Object> dataPoints) {
+    ControlCenter().selectionController.subscribe(state.id, (Object? origin, Set<Object> dataPoints) {
+      if (origin == state.id) {
+        return;
+      }
       _selectionTimer?.cancel();
       _selectionTimer = Timer(const Duration(milliseconds: 500), () {
         _updateSeries(dataPoints);

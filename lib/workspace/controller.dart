@@ -61,12 +61,12 @@ class ControlCenter {
   }
 
   /// Update the selection data points.
-  void updateSelection(Object? chartId, Set<Object> dataPoints) {
+  void updateSelection(Object chartId, Set<Object> dataPoints) {
     _selectionController.updateSelection(chartId, dataPoints);
   }
 
   /// Update the drill down data points.
-  void updateDrillDown(Object? chartId, Set<Object> dataPoints) {
+  void updateDrillDown(Object chartId, Set<Object> dataPoints) {
     _drillDownController.updateSelection(chartId, dataPoints);
   }
 

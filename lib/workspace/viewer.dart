@@ -85,19 +85,20 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   /// The current state of the workspace.
   WorkspaceState? info;
+  UniqueKey get id => UniqueKey();
 
   @override
   void initState() {
     developer.log("Initializing WorkspaceViewerState", name: "rubin_chart.workspace");
     super.initState();
 
-    ControlCenter().selectionController.subscribe(_onSelectionUpdate);
+    ControlCenter().selectionController.subscribe(id, _onSelectionUpdate);
   }
 
   /// Update the selection data points.
   /// This isn't used now, but can be used in the future if any plots cannot be
   /// matched to obs_date,seq_num data IDs.
-  void _onSelectionUpdate(Set<Object> dataPoints) {
+  void _onSelectionUpdate(Object? origin, Set<Object> dataPoints) {
     developer.log("Selection updated: ${dataPoints.length}", name: "rubin_chart.workspace");
   }
 
