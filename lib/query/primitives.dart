@@ -266,7 +266,7 @@ class ParentQuery extends Query {
 
   @override
   Map<String, dynamic> toJson(QueryExpression expression) {
-    List<Query> children = expression!.children[id]!.map((childId) => expression.nodes[childId]!).toList();
+    List<Query> children = expression.children[id]!.map((childId) => expression.nodes[childId]!).toList();
     return {
       'type': 'ParentQuery',
       'id': id.toSerializableString(),
