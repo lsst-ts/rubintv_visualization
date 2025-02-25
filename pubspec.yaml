@@ -44,7 +44,7 @@ dependencies:
   # Websocket connections in Flutter
   web_socket_channel: ^3.0.0
   # Display feedback to the user
-  fluttertoast: ^8.2.2
+  fluttertoast: ^8.2.8
   # Retrieve package info (eg. the version)
   package_info_plus: ^8.0.0
   # The rubin_charts plotting library
