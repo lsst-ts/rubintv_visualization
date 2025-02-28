@@ -29,6 +29,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:rubintv_visualization/app.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
+import 'package:rubintv_visualization/error.dart';
 
 /// A function to get the current version of the application.
 Future<AppVersion> getAppVersion() async {
@@ -45,24 +46,35 @@ Future<AppVersion> getAppVersion() async {
 
 /// The main function for the application.
 Future main() async {
-  DataCenter dataCenter = DataCenter();
-  dataCenter.initialize();
-  await dotenv.load(fileName: ".env");
+  FlutterError.onError = (FlutterErrorDetails details) {
+    // Very general error handling
+    reportError(details.exceptionAsString());
+    // FlutterError.dumpErrorToConsole(details);
+  };
 
-  String host = web.window.location.hostname;
-  String protocol = web.window.location.protocol == "https:" ? "wss" : "ws";
-  String address = dotenv.get("ADDRESS", fallback: "");
-  int? port = int.tryParse(dotenv.get("PORT", fallback: ""));
+  runZonedGuarded(() async {
+    DataCenter dataCenter = DataCenter();
+    dataCenter.initialize();
+    await dotenv.load(fileName: ".env");
 
-  developer.log(
-    "${web.window.location.protocol}, host is $host, "
-    "address is $address, port is $port, protocol is $protocol",
-    name: 'rubinTV.visualization.main',
-  );
+    String host = web.window.location.hostname;
+    String protocol = web.window.location.protocol == "https:" ? "wss" : "ws";
+    String address = dotenv.get("ADDRESS", fallback: "");
+    int? port = int.tryParse(dotenv.get("PORT", fallback: ""));
 
-  Uri websocketUrl = Uri(scheme: protocol, host: host, pathSegments: [address, 'client'], port: port);
+    developer.log(
+      "${web.window.location.protocol}, host is $host, "
+      "address is $address, port is $port, protocol is $protocol",
+      name: 'rubinTV.visualization.main',
+    );
 
-  AppVersion version = await getAppVersion();
-
-  runApp(MainApp(websocketUri: websocketUrl, version: version));
+    Uri websocketUrl = Uri(scheme: protocol, host: host, pathSegments: [address, 'client'], port: port);
+    AppVersion version = await getAppVersion();
+    // Run the application in a zone to catch async errors
+    runApp(MainApp(websocketUri: websocketUrl, version: version));
+  }, (error, stackTrace) {
+    reportError("Error in async runtime: $error");
+    developer.log("Error in main: $error", name: 'rubinTV.visualization.main');
+    developer.log("Stack Trace: $stackTrace", name: 'rubinTV.visualization.main');
+  });
 }
