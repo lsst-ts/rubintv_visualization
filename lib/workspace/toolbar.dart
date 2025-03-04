@@ -246,7 +246,20 @@ class ToolbarState extends State<Toolbar> {
                   ),
                 ],
                 onChanged: (String? value) {
-                  if (value != null) {
+                  if (value == null || workspace.instrument?.name == value) {
+                    return;
+                  }
+                  if (workspace.instrument != null && workspace.windows.isNotEmpty) {
+                    // Show dialog to confirm changing instrument
+                    // that lets the user know that the current workspace will be cleared
+                    WorkspaceBloc bloc = context.read<WorkspaceBloc>();
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return changeInstrumentDialog(context, bloc, webSocketManager, value);
+                      },
+                    );
+                  } else {
                     webSocketManager.sendMessage(LoadInstrumentAction(instrument: value).toJson());
                   }
                 },
@@ -488,6 +501,30 @@ class ToolbarState extends State<Toolbar> {
           ),
         ],
       ),
+    );
+  }
+
+  AlertDialog changeInstrumentDialog(
+      BuildContext context, WorkspaceBloc bloc, WebSocketManager webSocketManager, String value) {
+    return AlertDialog(
+      title: const Text("Change Instrument"),
+      content: const Text("Changing the instrument will clear the current workspace."),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          child: const Text("CANCEL"),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context);
+            bloc.add(ClearWorkspaceEvent());
+            webSocketManager.sendMessage(LoadInstrumentAction(instrument: value).toJson());
+          },
+          child: const Text("CHANGE"),
+        ),
+      ],
     );
   }
 }
