@@ -29,6 +29,7 @@ import 'package:rubintv_visualization/chart/binned.dart';
 import 'package:rubintv_visualization/chart/scatter.dart';
 import 'package:rubintv_visualization/editors/axis.dart';
 import 'package:rubintv_visualization/editors/series.dart';
+import 'package:rubintv_visualization/error.dart';
 import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/io.dart';
 import 'package:rubintv_visualization/query/primitives.dart';
@@ -503,19 +504,24 @@ class ChartBloc extends WindowBloc<ChartState> {
 
   /// Create a new empty Series for this [ChartLoadedState].
   SeriesInfo nextSeries() {
-    SeriesId sid = SeriesId(windowId: state.id, id: nextSeriesId);
-    DatabaseSchema database = DataCenter().databases.values.first;
-    TableSchema table = database.tables.values.first;
-    Map<AxisId, SchemaField> fields = {};
-    for (int i = 0; i < state.axisInfo.length; i++) {
-      fields[state.axisInfo[i].axisId] = table.fields.values.toList()[i];
+    try {
+      SeriesId sid = SeriesId(windowId: state.id, id: nextSeriesId);
+      DatabaseSchema database = DataCenter().databases.values.first;
+      TableSchema table = database.tables.values.first;
+      Map<AxisId, SchemaField> fields = {};
+      for (int i = 0; i < state.axisInfo.length; i++) {
+        fields[state.axisInfo[i].axisId] = table.fields.values.toList()[i];
+      }
+      return SeriesInfo(
+        id: sid,
+        name: "Series-${state.id.id}",
+        axes: state.axisInfo.map((ChartAxisInfo? info) => info!.axisId).toList(),
+        fields: fields,
+      );
+    } catch (e) {
+      reportError("Error creating new series: $e");
+      rethrow;
     }
-    return SeriesInfo(
-      id: sid,
-      name: "Series-${state.id.id}",
-      axes: state.axisInfo.map((ChartAxisInfo? info) => info!.axisId).toList(),
-      fields: fields,
-    );
   }
 
   /// Get the maximum number of axes for this chart.
@@ -535,6 +541,9 @@ class ChartBloc extends WindowBloc<ChartState> {
   /// Open the [SeriesEditor] dialog to edit a series.
   Future<void> _editSeries(BuildContext context, SeriesInfo series) async {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
+    if (workspace.info?.instrument?.schema == null) {
+      throw ArgumentError("The chosen instrument has no schema");
+    }
     developer.log("New series fields: ${series.fields}", name: "rubin_chart.core.chart.dart");
     return showDialog(
       context: context,
@@ -553,12 +562,16 @@ class ChartBloc extends WindowBloc<ChartState> {
   /// The action to perform when a [Series] entry in a chart [Legend] is selected.
   /// This will open the [SeriesEditor] dialog to edit the series.
   void onLegendSelect({required Series series, required BuildContext context}) {
+    bool found = false;
     for (SeriesId seriesId in state.series.keys) {
       if (seriesId == series.id) {
         _editSeries(context, state.series[seriesId]!);
+        found = true;
       }
     }
-    throw ArgumentError("Series ${series.id} not found in chart with series ${state.series.keys}");
+    if (!found) {
+      throw ArgumentError("Series ${series.id} not found in chart with series ${state.series.keys}");
+    }
   }
 
   /// The action to perform when an [Axis] entry in a chart [Legend] is selected.
