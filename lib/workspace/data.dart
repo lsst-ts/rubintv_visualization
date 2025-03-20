@@ -367,14 +367,15 @@ class DataCenter {
       }
 
       // Create the DatabaseSchema
-      DatabaseSchema database = DatabaseSchema(
-          name: schemaDict["name"],
-          description: schemaDict["description"],
-          tables: tables);
+      DatabaseSchema database =
+          DatabaseSchema(name: schemaDict["name"], description: schemaDict["description"], tables: tables);
+      // Only keep the latest loaded database
+      if (_databaseSchemas.isNotEmpty) {
+        _databaseSchemas.clear();
+      }
       _databaseSchemas[database.name] = database;
     } catch (e, s) {
-      developer.log("error: $e",
-          name: "rubinTV.workspace.data", error: e, stackTrace: s);
+      developer.log("error: $e", name: "rubinTV.workspace.data", error: e, stackTrace: s);
       reportError("Could not initialize database");
     }
   }
