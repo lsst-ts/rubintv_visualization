@@ -66,6 +66,7 @@ class WebSocketManager {
         }
       }, onError: (error) {
         developer.log("Error in WebSocket: $error", name: 'rubinTV.visualization.websocket');
+        reportError("Failed to connect to $uri: $error");
         // Handle errors or attempt to reconnect
       }, onDone: () {
         developer.log("WebSocket connection closed", name: 'rubinTV.visualization.websocket');

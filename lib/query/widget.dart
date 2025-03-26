@@ -642,7 +642,7 @@ class QueryWidget extends StatelessWidget {
         width: kMinInteractiveDimension,
         height: kMinInteractiveDimension,
         decoration: BoxDecoration(
-          color: theme.themeData.colorScheme.secondary.withOpacity(0.5),
+          color: theme.themeData.colorScheme.secondary.withValues(alpha: 0.5),
           shape: BoxShape.circle,
         ),
       ),

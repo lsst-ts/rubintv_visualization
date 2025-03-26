@@ -517,7 +517,7 @@ class FileDialogContentState extends State<FileDialogContent> {
   /// Build the action buttons
   /// (create directory, delete, duplicate, save, load, cancel).
   Widget _buildActionButtons(BuildContext context, FileDialogState state) {
-    return ButtonBar(
+    return OverflowBar(
       alignment: MainAxisAlignment.center,
       children: [
         ElevatedButton(

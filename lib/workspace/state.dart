@@ -316,7 +316,7 @@ class ClearWorkspaceEvent extends WorkspaceEvent {
 /// Update the workspace in the [WorkspaceBloc].
 /// This should usually occur after a [ClearWorkspaceEvent]
 /// to ensure that all data from the current workspace is cleared
-/// and that all listener subscriptions ahve been closed.
+/// and that all listener subscriptions have been closed.
 class UpdateWorkspaceEvent extends WorkspaceEvent {
   final WorkspaceState state;
 
@@ -489,7 +489,7 @@ class WorkspaceState extends WorkspaceStateBase {
       errorMessage: errorMessage,
       pendingJson: pendingJson);
 
-  /// Becayse the dayObs can be null, we need a special copy method.
+  /// Because the dayObs can be null, we need a special copy method.
   WorkspaceState updateObsDate(DateTime? dayObs) => WorkspaceState(
         status: status,
         version: version,
@@ -642,6 +642,9 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       } else if (event.message["type"] == "file content") {
         // Load the workspace from the file content
         add(LoadWorkspaceFromTextEvent(event.message["content"]["content"]));
+      } else if (event.message["type"] == "error") {
+        // Display the error message
+        developer.log("Received error message: ${event.message["content"]}", name: "rubin_chart.workspace");
       }
     });
 
