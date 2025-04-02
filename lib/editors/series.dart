@@ -319,6 +319,9 @@ class ColumnEditor extends StatefulWidget {
 class ColumnEditorState extends State<ColumnEditor> {
   AppTheme get theme => widget.theme;
 
+  /// GlobalKey to access the RenderBox of the input field
+  final GlobalKey _fieldKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -401,6 +404,7 @@ class ColumnEditorState extends State<ColumnEditor> {
             });
 
             return TextField(
+              key: _fieldKey, // Assign the GlobalKey to the TextField
               controller: textEditingController,
               focusNode: focusNode,
               onSubmitted: (_) {
@@ -420,6 +424,143 @@ class ColumnEditorState extends State<ColumnEditor> {
             return columnNames.where((String columnName) {
               return columnName.toLowerCase().contains(textEditingValue.text.toLowerCase());
             });
+          },
+          optionsViewBuilder:
+              (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
+            // Use the GlobalKey to get the width of the input field
+            final RenderBox renderBox = _fieldKey.currentContext!.findRenderObject() as RenderBox;
+            final double width = renderBox.size.width;
+
+            // Create a ScrollController to manage scrolling
+            final ScrollController scrollController = ScrollController();
+
+            // Define the height of a single item
+            const double itemHeight = 48.0;
+            const int middleIndex = 2; // The index just above the middle of the viewport
+
+            const maxvisibleItemsCount = 6; // Maximum number of items to show at a time
+            int visibleItemCount = maxvisibleItemsCount;
+            if (options.length < visibleItemCount) {
+              visibleItemCount = options.length; // Adjust to show all items if less than 6
+            }
+            developer.log("Options length is ${options.length}", name: "debug");
+
+            return Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 4.0,
+                child: SizedBox(
+                  width: width, // Match the width of the input field
+                  height: itemHeight * visibleItemCount, // Limit the height to show 6 items at a time
+                  child: StatefulBuilder(
+                    builder: (BuildContext context, StateSetter setState) {
+                      int highlightedIndex = AutocompleteHighlightedOption.of(context);
+                      int prevHighlightedIndex = highlightedIndex; // Track the previous highlighted index
+
+                      return ListView.builder(
+                        controller: scrollController, // Attach the ScrollController
+                        padding: EdgeInsets.zero,
+                        itemCount: options.length, // Show all options
+                        itemBuilder: (BuildContext context, int index) {
+                          final String option = options.elementAt(index);
+
+                          // Scroll to the highlighted option only if necessary
+                          if (highlightedIndex == index) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              // Get the RenderBox of the ListView
+                              final RenderBox listViewRenderBox =
+                                  scrollController.position.context.storageContext.findRenderObject()
+                                      as RenderBox;
+
+                              // Get the position of the ListView relative to the screen
+                              final Offset listViewOffset = listViewRenderBox.localToGlobal(Offset.zero);
+
+                              // Calculate the position of the item relative to the ListView
+                              final double itemOffset = index * itemHeight;
+                              final double viewportStart = listViewOffset.dy;
+                              final double viewportEnd = viewportStart + listViewRenderBox.size.height;
+
+                              // Calculate the middle of the viewport
+                              final double middleOffset = viewportStart + (middleIndex * itemHeight);
+
+                              developer.log(
+                                "index: $index, itemOffset: $itemOffset, viewportStart: $viewportStart, viewportEnd: $viewportEnd, middleOffset: $middleOffset",
+                                name: "debug",
+                              );
+
+                              // Scroll only if the highlighted option is beyond the middle or out of view
+                              if (itemOffset < viewportStart || itemOffset + itemHeight > viewportEnd) {
+                                double targetOffset;
+
+                                // If the highlighted option is beyond the middle, scroll to keep it just above the middle
+                                if (itemOffset > middleOffset) {
+                                  targetOffset = itemOffset - (middleIndex * itemHeight);
+                                } else {
+                                  // Otherwise, scroll to bring it into view
+                                  targetOffset = itemOffset;
+                                }
+
+                                // Ensure the target offset doesn't exceed the maximum scroll extent
+                                targetOffset = targetOffset.clamp(
+                                  0.0,
+                                  scrollController.position.maxScrollExtent,
+                                );
+
+                                scrollController.animateTo(
+                                  targetOffset,
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeInOut,
+                                );
+                              }
+
+                              // Handle circular scrolling
+                              if (options.length > maxvisibleItemsCount) {
+                                if (highlightedIndex == 0 && prevHighlightedIndex == options.length - 1) {
+                                  // User moved from the bottom to the top
+                                  developer.log("Wrapping to top", name: "debug");
+                                  setState(() {
+                                    highlightedIndex = 0;
+                                  });
+                                  scrollController.jumpTo(0);
+                                } else if (highlightedIndex == options.length - 1 &&
+                                    prevHighlightedIndex == 0) {
+                                  // User moved from the top to the bottom
+                                  developer.log("Wrapping to bottom", name: "debug");
+                                  setState(() {
+                                    highlightedIndex = options.length - 1;
+                                  });
+                                  scrollController.jumpTo(scrollController.position.maxScrollExtent);
+                                }
+                              }
+
+                              // Update the previous highlighted index
+                              prevHighlightedIndex = highlightedIndex;
+                            });
+                          }
+
+                          return GestureDetector(
+                            onTap: () {
+                              onSelected(option);
+                            },
+                            child: Container(
+                              color: (highlightedIndex == index)
+                                  ? Colors.grey[300]
+                                  : null, // Highlight focused item
+                              child: ListTile(
+                                title: Text(option),
+                                onTap: () {
+                                  onSelected(option);
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+            );
           },
           onSelected: (String selectedColumn) {
             setState(() {
