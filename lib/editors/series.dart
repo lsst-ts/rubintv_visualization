@@ -342,6 +342,8 @@ class ColumnEditorState extends State<ColumnEditor> {
   /// The current column field.
   SchemaField? _field;
 
+  bool _isInputValid = true;
+
   @override
   Widget build(BuildContext context) {
     if (_field != null) {
@@ -401,6 +403,13 @@ class ColumnEditorState extends State<ColumnEditor> {
                   extentOffset: textEditingController.text.length,
                 );
               }
+              if (!focusNode.hasFocus) {
+                // Validate the input when the field loses focus
+                final isValid = columnNames.contains(textEditingController.text);
+                setState(() {
+                  _isInputValid = isValid; // Update the validation state
+                });
+              }
             });
 
             return TextField(
@@ -410,10 +419,16 @@ class ColumnEditorState extends State<ColumnEditor> {
               onSubmitted: (_) {
                 onFieldSubmitted(); // Notify Autocomplete about the submission
               },
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: "Column",
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(
+                    color:
+                        _isInputValid ? Colors.grey : Colors.red, // Change border color based on validation
+                  ),
+                ),
                 floatingLabelBehavior: FloatingLabelBehavior.always,
+                errorText: _isInputValid ? null : "Invalid column name", // Show error message if invalid
               ),
             );
           },
@@ -482,11 +497,6 @@ class ColumnEditorState extends State<ColumnEditor> {
 
                               // Calculate the middle of the viewport
                               final double middleOffset = viewportStart + (middleIndex * itemHeight);
-
-                              developer.log(
-                                "index: $index, itemOffset: $itemOffset, viewportStart: $viewportStart, viewportEnd: $viewportEnd, middleOffset: $middleOffset",
-                                name: "debug",
-                              );
 
                               // Scroll only if the highlighted option is beyond the middle or out of view
                               if (itemOffset < viewportStart || itemOffset + itemHeight > viewportEnd) {
@@ -565,6 +575,7 @@ class ColumnEditorState extends State<ColumnEditor> {
           onSelected: (String selectedColumn) {
             setState(() {
               _field = allColumns.firstWhere((field) => field.name == selectedColumn);
+              _isInputValid = true; // Mark input as valid when a valid option is selected
             });
             widget.onChanged(_field);
           },
