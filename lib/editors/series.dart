@@ -314,8 +314,6 @@ class ColumnEditor extends StatefulWidget {
 }
 
 /// The [State] object for the [ColumnEditor] widget.
-/// TODO: Fix width of Column options and include validation for names
-/// See SITCOM-1779
 class ColumnEditorState extends State<ColumnEditor> {
   AppTheme get theme => widget.theme;
 
@@ -527,7 +525,6 @@ class ColumnEditorState extends State<ColumnEditor> {
                               if (options.length > maxvisibleItemsCount) {
                                 if (highlightedIndex == 0 && prevHighlightedIndex == options.length - 1) {
                                   // User moved from the bottom to the top
-                                  developer.log("Wrapping to top", name: "debug");
                                   setState(() {
                                     highlightedIndex = 0;
                                   });
@@ -535,7 +532,6 @@ class ColumnEditorState extends State<ColumnEditor> {
                                 } else if (highlightedIndex == options.length - 1 &&
                                     prevHighlightedIndex == 0) {
                                   // User moved from the top to the bottom
-                                  developer.log("Wrapping to bottom", name: "debug");
                                   setState(() {
                                     highlightedIndex = options.length - 1;
                                   });
