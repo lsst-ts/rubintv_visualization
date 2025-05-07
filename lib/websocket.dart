@@ -27,6 +27,9 @@ import 'dart:developer' as developer;
 
 /// A singleton class to manage the WebSocket connection.
 class WebSocketManager {
+  static const int _pingInterval = 5; // seconds
+  static const int _pongTimeout = 20; // seconds
+
   /// Make the WebSocketManager a singleton.
   static final WebSocketManager _singleton = WebSocketManager._internal();
 
@@ -89,11 +92,11 @@ class WebSocketManager {
 
   void _startPingTimer() {
     _pingTimer?.cancel();
-    _pingTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    _pingTimer = Timer.periodic(const Duration(seconds: _pingInterval), (timer) {
       if (_channel != null) {
         sendMessage(jsonEncode({'type': 'ping'}));
         if (_lastPongTime != null &&
-            DateTime.now().difference(_lastPongTime!) > const Duration(seconds: 20)) {
+            DateTime.now().difference(_lastPongTime!) > const Duration(seconds: _pongTimeout)) {
           developer.log("No pong received within timeout. Connection might be lost.",
               name: 'rubinTV.visualization.websocket');
           // Notify the user about the connection issue
