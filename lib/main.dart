@@ -47,9 +47,20 @@ Future<AppVersion> getAppVersion() async {
 /// The main function for the application.
 Future main() async {
   FlutterError.onError = (FlutterErrorDetails details) {
+    if (details.exception is FlutterError) {
+      // Handle Flutter errors
+      FlutterError.presentError(details);
+      return;
+    }
     // Very general error handling
     reportError(details.exceptionAsString());
-    // FlutterError.dumpErrorToConsole(details);
+    // Log the error to the console
+    developer.log(
+      details.exceptionAsString(),
+      name: 'rubinTV.visualization.main',
+      error: details.exception,
+      stackTrace: details.stack,
+    );
   };
 
   runZonedGuarded(() async {
