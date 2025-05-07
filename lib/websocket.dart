@@ -27,6 +27,9 @@ import 'dart:developer' as developer;
 
 /// A singleton class to manage the WebSocket connection.
 class WebSocketManager {
+  static const int _pingInterval = 5; // seconds
+  static const int _pongTimeout = 20; // seconds
+
   /// Make the WebSocketManager a singleton.
   static final WebSocketManager _singleton = WebSocketManager._internal();
 
@@ -47,35 +50,65 @@ class WebSocketManager {
   /// The private WebSocketManager constructor.
   WebSocketManager._internal();
 
+  Timer? _pingTimer;
+  DateTime? _lastPongTime;
+
   Future<void> connect(Uri uri) async {
     try {
       if (_channel != null) {
         await _channel!.sink.close();
       }
       developer.log("Connecting to websocket at $uri", name: "rubinTV.visualization.websocket");
-      _channel =
-          WebSocketChannel.connect(uri); // Use WebSocketChannel.connect for a platform-agnostic approach
+      _channel = WebSocketChannel.connect(uri);
+
+      _lastPongTime = DateTime.now();
+      _startPingTimer();
 
       _channel!.stream.listen((data) {
         if (data is String) {
           Map<String, dynamic> message = jsonDecode(data);
-          _controller.add(message);
+          if (message['type'] == 'pong') {
+            _lastPongTime = DateTime.now();
+          } else {
+            _controller.add(message);
+          }
         } else {
           developer.log("Received non-string data from the WebSocket",
-              name: 'gpt_tutor.io.message.WebSocketManager');
+              name: 'rubinTV.visualization.websocket');
         }
       }, onError: (error) {
         developer.log("Error in WebSocket: $error", name: 'rubinTV.visualization.websocket');
         reportError("Failed to connect to $uri: $error");
-        // Handle errors or attempt to reconnect
+        _stopPingTimer();
       }, onDone: () {
         developer.log("WebSocket connection closed", name: 'rubinTV.visualization.websocket');
-        // Handle the connection being closed
+        _stopPingTimer();
       });
     } catch (e) {
       developer.log('Failed to connect to $uri: $e', name: 'rubinTV.visualization.websocket');
       reportError("Failed to connect to $uri: $e");
     }
+  }
+
+  void _startPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = Timer.periodic(const Duration(seconds: _pingInterval), (timer) {
+      if (_channel != null) {
+        sendMessage(jsonEncode({'type': 'ping'}));
+        if (_lastPongTime != null &&
+            DateTime.now().difference(_lastPongTime!) > const Duration(seconds: _pongTimeout)) {
+          developer.log("No pong received within timeout. Connection might be lost.",
+              name: 'rubinTV.visualization.websocket');
+          // Notify the user about the connection issue
+          reportError("Connection issue detected. No response from server.");
+        }
+      }
+    });
+  }
+
+  void _stopPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = null;
   }
 
   /// Send a message if the socket is connected.
@@ -89,6 +122,7 @@ class WebSocketManager {
   }
 
   Future<void> close() async {
+    _stopPingTimer();
     if (_channel != null) {
       await _channel!.sink.close();
       _channel = null;
