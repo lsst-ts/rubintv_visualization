@@ -54,6 +54,9 @@ class WebSocketManager {
   DateTime? _lastPongTime;
 
   Future<void> connect(Uri uri) async {
+    // Prevent multiple timers from running at the same time when hot reloading.
+    _stopPingTimer();
+
     try {
       if (_channel != null) {
         await _channel!.sink.close();
