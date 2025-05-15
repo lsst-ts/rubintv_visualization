@@ -19,6 +19,14 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
+  
+  <!-- Performance optimizations -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-control" content="public">
+  
+  <!-- PWA optimizations -->
+  <meta name="theme-color" content="#0175C2">
+  <meta name="mobile-web-app-capable" content="yes">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -34,7 +42,64 @@
 </head>
 <body>
   <script>
-    {{flutter_bootstrap_js}}
+    // Get the base URL for the app
+    const baseUrl = document.querySelector('base').getAttribute('href') || '/';
+    
+    // Register service worker with a custom timeout and error handling
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        // Use the correct path based on base href
+        const swUrl = new URL('flutter_service_worker.js?v=' + Date.now(), baseUrl).href;
+        var sw = navigator.serviceWorker.register(swUrl);
+        
+        // Add a custom timeout for service worker registration
+        Promise.race([
+          sw,
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('SW registration timeout')), 3000)
+          )
+        ]).then(() => {
+          console.log('Service worker registered successfully');
+          initFlutterApp();
+        }).catch(error => {
+          console.warn('Service worker registration failed:', error);
+          // Continue loading the app even if service worker fails
+          initFlutterApp();
+        });
+      });
+    } else {
+      // Initialize the app immediately if no service worker support
+      window.addEventListener('load', function() {
+        initFlutterApp();
+      });
+    }
+
+    function initFlutterApp() {
+      {{flutter_bootstrap_js}}
+    }
+  </script>
+
+  <!-- Preload critical assets with dynamic base URL -->
+  <script>
+    // Add preload links dynamically to ensure they use the correct base URL
+    function addPreloadLink(href, as) {
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.href = new URL(href, baseUrl).href;
+      link.as = as;
+      document.head.appendChild(link);
+    }
+    
+    // Add preload links after base href is processed
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        addPreloadLink('main.dart.js', 'script');
+        addPreloadLink('flutter.js', 'script');
+      });
+    } else {
+      addPreloadLink('main.dart.js', 'script');
+      addPreloadLink('flutter.js', 'script');
+    }
   </script>
 </body>
 </html>
