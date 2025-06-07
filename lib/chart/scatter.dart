@@ -29,6 +29,7 @@ import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/workspace/controller.dart';
 import 'package:rubintv_visualization/workspace/viewer.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
+import 'package:rubintv_visualization/dialog/row_count_confirmation.dart';
 
 /// An event used to initialize a scatter plot chart.
 class InitializeScatterPlotEvent extends ChartEvent {
@@ -67,7 +68,7 @@ class ScatterPlotWidget extends StatelessWidget {
       child: BlocListener<ChartBloc, ChartState>(
         listener: (context, state) {
           if (state.pendingRowCountDialog != null) {
-            _showRowCountConfirmationDialog(context, state.pendingRowCountDialog!);
+            showRowCountConfirmationDialog(context, state.pendingRowCountDialog!);
           }
         },
         child: BlocBuilder<ChartBloc, ChartState>(
@@ -139,39 +140,6 @@ class ScatterPlotWidget extends StatelessWidget {
           },
         ),
       ),
-    );
-  }
-
-  void _showRowCountConfirmationDialog(BuildContext context, RowCountDialogInfo dialogInfo) {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Large Dataset Warning'),
-          content: Text(
-            'This query will return ${dialogInfo.rowCount.toStringAsFixed(0)} rows, which exceeds the recommended limit of 100,000 rows. '
-            'This may cause performance issues or slow rendering.\n\n'
-            'Do you want to continue?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.read<ChartBloc>().add(CancelRowCountEvent());
-              },
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.read<ChartBloc>().add(ConfirmRowCountEvent());
-              },
-              child: const Text('Continue'),
-            ),
-          ],
-        );
-      },
     );
   }
 }
