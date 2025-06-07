@@ -166,6 +166,46 @@ class ProceedWithSeriesEvent extends ChartEvent {
   });
 }
 
+/// Event to show row count confirmation dialog
+class ShowRowCountConfirmationEvent extends ChartEvent {
+  final int rowCount;
+  final SeriesInfo series;
+  final String? dayObs;
+  final QueryExpression? globalQuery;
+
+  ShowRowCountConfirmationEvent({
+    required this.rowCount,
+    required this.series,
+    required this.dayObs,
+    required this.globalQuery,
+  });
+}
+
+/// Information about a pending row count confirmation dialog
+class RowCountDialogInfo {
+  final int rowCount;
+  final SeriesInfo series;
+  final String? dayObs;
+  final QueryExpression? globalQuery;
+
+  RowCountDialogInfo({
+    required this.rowCount,
+    required this.series,
+    required this.dayObs,
+    required this.globalQuery,
+  });
+}
+
+/// Event when user confirms the row count dialog
+class ConfirmRowCountEvent extends ChartEvent {
+  ConfirmRowCountEvent();
+}
+
+/// Event when user cancels the row count dialog
+class CancelRowCountEvent extends ChartEvent {
+  CancelRowCountEvent();
+}
+
 /// Persistable information to generate a chart
 class ChartState extends WindowState {
   /// The series that are plotted on the chart.
@@ -192,6 +232,9 @@ class ChartState extends WindowState {
   /// Whether or not this chart needs a reset.
   bool needsReset;
 
+  /// Information about a pending row count confirmation dialog, if any.
+  final RowCountDialogInfo? pendingRowCountDialog;
+
   ChartState({
     required super.id,
     required super.windowType,
@@ -202,6 +245,7 @@ class ChartState extends WindowState {
     required this.tool,
     required this.resetController,
     this.needsReset = false,
+    this.pendingRowCountDialog,
   })  : _series = Map<SeriesId, SeriesInfo>.unmodifiable(series),
         _axisInfo = List<ChartAxisInfo>.unmodifiable(axisInfo);
 
@@ -228,6 +272,7 @@ class ChartState extends WindowState {
     MultiSelectionTool? tool,
     StreamController<ResetChartAction>? resetController,
     bool? needsReset,
+    RowCountDialogInfo? pendingRowCountDialog,
   }) =>
       ChartState(
         id: id ?? this.id,
@@ -239,6 +284,7 @@ class ChartState extends WindowState {
         tool: tool ?? this.tool,
         resetController: resetController ?? this.resetController,
         needsReset: needsReset ?? false,
+        pendingRowCountDialog: pendingRowCountDialog,
       );
 
   /// Whether or not at least one [PlotAxis] has been set.
@@ -372,9 +418,10 @@ class ChartBloc extends WindowBloc<ChartState> {
           developer.log("Row count callback triggered for series ${event.series.id} with count $rowCount",
               name: "rubin_chart.workspace");
 
-          if (rowCount > 10000) {
-            // For now, we'll proceed directly. In the future, this could trigger UI confirmation
-            add(ProceedWithSeriesEvent(
+          if (rowCount > 100000) {
+            // Emit event to show confirmation dialog
+            add(ShowRowCountConfirmationEvent(
+              rowCount: rowCount,
               series: seriesInfo,
               dayObs: dayObs,
               globalQuery: globalQuery,
@@ -592,6 +639,52 @@ class ChartBloc extends WindowBloc<ChartState> {
         globalQuery: event.globalQuery,
         dayObs: event.dayObs,
       );
+    });
+
+    /// Show row count confirmation dialog
+    on<ShowRowCountConfirmationEvent>((event, emit) {
+      developer.log("Showing row count confirmation dialog for ${event.rowCount} rows",
+          name: "rubin_chart.workspace");
+
+      // Set the dialog info in the state
+      emit(state.copyWith(
+        pendingRowCountDialog: RowCountDialogInfo(
+          rowCount: event.rowCount,
+          series: event.series,
+          dayObs: event.dayObs,
+          globalQuery: event.globalQuery,
+        ),
+      ));
+    });
+
+    /// Handle user confirming the row count dialog
+    on<ConfirmRowCountEvent>((event, emit) {
+      if (state.pendingRowCountDialog != null) {
+        developer.log("User confirmed row count dialog, proceeding with series",
+            name: "rubin_chart.workspace");
+
+        final dialogInfo = state.pendingRowCountDialog!;
+
+        // Clear the dialog
+        emit(state.copyWith(pendingRowCountDialog: null));
+
+        // Proceed with adding the series
+        add(ProceedWithSeriesEvent(
+          series: dialogInfo.series,
+          dayObs: dialogInfo.dayObs,
+          globalQuery: dialogInfo.globalQuery,
+        ));
+      }
+    });
+
+    /// Handle user canceling the row count dialog
+    on<CancelRowCountEvent>((event, emit) {
+      if (state.pendingRowCountDialog != null) {
+        developer.log("User canceled row count dialog", name: "rubin_chart.workspace");
+
+        // Simply clear the dialog without proceeding
+        emit(state.copyWith(pendingRowCountDialog: null));
+      }
     });
   }
 
