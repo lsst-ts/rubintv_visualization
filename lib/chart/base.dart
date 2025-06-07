@@ -141,6 +141,31 @@ class DeleteSeriesEvent extends ChartEvent {
   DeleteSeriesEvent(this.seriesId);
 }
 
+// Add new events for row count checking
+class CheckRowCountEvent extends ChartEvent {
+  final SeriesInfo series;
+  final String? dayObs;
+  final QueryExpression? globalQuery;
+
+  CheckRowCountEvent({
+    required this.series,
+    required this.dayObs,
+    required this.globalQuery,
+  });
+}
+
+class ProceedWithSeriesEvent extends ChartEvent {
+  final SeriesInfo series;
+  final String? dayObs;
+  final QueryExpression? globalQuery;
+
+  ProceedWithSeriesEvent({
+    required this.series,
+    required this.dayObs,
+    required this.globalQuery,
+  });
+}
+
 /// Persistable information to generate a chart
 class ChartState extends WindowState {
   /// The series that are plotted on the chart.
@@ -265,6 +290,19 @@ class ChartState extends WindowState {
   }
 }
 
+// Helper class to store pending series info
+class _PendingSeriesInfo {
+  final SeriesInfo series;
+  final String? dayObs;
+  final QueryExpression? globalQuery;
+
+  _PendingSeriesInfo({
+    required this.series,
+    required this.dayObs,
+    required this.globalQuery,
+  });
+}
+
 /// The base class for all chart blocs.
 class ChartBloc extends WindowBloc<ChartState> {
   /// Subscription to the websocket.
@@ -272,6 +310,23 @@ class ChartBloc extends WindowBloc<ChartState> {
 
   /// Subscription to changes in the global query or global dayObs values.
   late StreamSubscription _globalQuerySubscription;
+
+  // Add a map to track pending row count checks with callback
+  final Map<SeriesId, _PendingSeriesInfo> _pendingRowCountChecks = {};
+
+  // Static callback map for row count confirmations
+  static final Map<SeriesId, Function(int, SeriesInfo, String?, QueryExpression?)> _rowCountCallbacks = {};
+
+  /// Register a callback for row count confirmation for a specific series
+  static void registerRowCountCallback(
+      SeriesId seriesId, Function(int, SeriesInfo, String?, QueryExpression?) callback) {
+    _rowCountCallbacks[seriesId] = callback;
+  }
+
+  /// Unregister a callback for row count confirmation
+  static void unregisterRowCountCallback(SeriesId seriesId) {
+    _rowCountCallbacks.remove(seriesId);
+  }
 
   ChartBloc(super.initialState) {
     /// Listen for messages from the websocket.
@@ -290,10 +345,93 @@ class ChartBloc extends WindowBloc<ChartState> {
       }
     });
 
+    /// Change the selection tool.
+    on<UpdateMultiSelect>((event, emit) {
+      emit(state.copyWith(tool: event.tool));
+    });
+
+    /// Toggle the use of the global query in this Chart.
+    on<UpdateChartGlobalQueryEvent>((event, emit) {
+      emit(state.copyWith(useGlobalQuery: event.useGlobalQuery));
+      for (SeriesInfo series in state._series.values) {
+        _fetchSeriesData(
+          series: series,
+          dayObs: event.dayObs,
+          globalQuery: event.globalQuery,
+        );
+      }
+    });
+
+    /// A Series in the chart is updated. This will trigger a row count check first.
+    on<UpdateSeriesEvent>((event, emit) async {
+      if (event.groupByColumn != null) {
+        throw UnimplementedError("Group by column not yet implemented");
+      } else {
+        // Register a callback that will handle the row count check for this specific series
+        registerRowCountCallback(event.series.id, (rowCount, seriesInfo, dayObs, globalQuery) {
+          developer.log("Row count callback triggered for series ${event.series.id} with count $rowCount",
+              name: "rubin_chart.workspace");
+
+          if (rowCount > 10000) {
+            // For now, we'll proceed directly. In the future, this could trigger UI confirmation
+            add(ProceedWithSeriesEvent(
+              series: seriesInfo,
+              dayObs: dayObs,
+              globalQuery: globalQuery,
+            ));
+          } else {
+            // Row count is acceptable, proceed directly
+            add(ProceedWithSeriesEvent(
+              series: seriesInfo,
+              dayObs: dayObs,
+              globalQuery: globalQuery,
+            ));
+          }
+        });
+
+        // First check the row count
+        add(CheckRowCountEvent(
+          series: event.series,
+          dayObs: event.dayObs,
+          globalQuery: event.globalQuery,
+        ));
+      }
+    });
+
+    /// Check row count for a series
+    on<CheckRowCountEvent>((event, emit) {
+      WebSocketManager websocket = WebSocketManager();
+      if (!websocket.isConnected) {
+        // If websocket is not connected, proceed directly
+        add(ProceedWithSeriesEvent(
+          series: event.series,
+          dayObs: event.dayObs,
+          globalQuery: event.globalQuery,
+        ));
+        return;
+      }
+
+      // Store the pending series information
+      _pendingRowCountChecks[event.series.id] = _PendingSeriesInfo(
+        series: event.series,
+        dayObs: event.dayObs,
+        globalQuery: event.globalQuery,
+      );
+
+      // Send the count command
+      websocket.sendMessage(CountRowsCommand.build(
+        fields: event.series.fields.values.toList(),
+        windowId: state.id,
+        seriesId: event.series.id,
+        useGlobalQuery: state.useGlobalQuery,
+        query: event.series.query,
+        globalQuery: event.globalQuery,
+        dayObs: event.dayObs,
+      ).toJson());
+    });
+
     /// A message is received from the websocket.
     on<ChartReceiveMessageEvent>((event, emit) {
-      //developer.log("received message: ${event.message.keys}, requestId: ${event.message['requestId']}",
-      //    name: "rubin_chart.workspace");
       List<String>? splitId = event.message["requestId"]?.split(",");
       if (splitId == null || splitId.length != 2) {
         return;
@@ -315,6 +453,44 @@ class ChartBloc extends WindowBloc<ChartState> {
           data: Map<String, List<dynamic>>.from(
               event.message["content"]["data"].map((key, value) => MapEntry(key, List<dynamic>.from(value)))),
         );
+      } else if (event.message["type"] == "count" && windowId == state.id) {
+        // Process the results of a CountRowsCommand
+        developer.log("Raw count message: ${event.message}", name: "rubin_chart.workspace");
+
+        try {
+          int rowCount = event.message["content"]["data"].values.first as int;
+          developer.log("Extracted rowCount: $rowCount for series $seriesId", name: "rubin_chart.workspace");
+
+          // Look for the series in pending checks
+          _PendingSeriesInfo? pendingInfo = _pendingRowCountChecks[seriesId];
+          if (pendingInfo != null) {
+            developer.log("Found pending series $seriesId, calling row count callback",
+                name: "rubin_chart.workspace");
+
+            // Remove from pending checks
+            _pendingRowCountChecks.remove(seriesId);
+
+            // Call the registered callback directly
+            final callback = _rowCountCallbacks[seriesId];
+            if (callback != null) {
+              callback(rowCount, pendingInfo.series, pendingInfo.dayObs, pendingInfo.globalQuery);
+              _rowCountCallbacks.remove(seriesId); // Clean up after use
+            } else {
+              // No callback registered, proceed directly
+              add(ProceedWithSeriesEvent(
+                series: pendingInfo.series,
+                dayObs: pendingInfo.dayObs,
+                globalQuery: pendingInfo.globalQuery,
+              ));
+            }
+          } else {
+            developer.log("Could not find pending series $seriesId", name: "rubin_chart.workspace");
+            developer.log("Pending series: ${_pendingRowCountChecks.keys}", name: "rubin_chart.workspace");
+          }
+        } catch (e) {
+          developer.log("Error processing count message: $e", name: "rubin_chart.workspace");
+          developer.log("Message content: ${event.message["content"]}", name: "rubin_chart.workspace");
+        }
       }
       emit(state.copyWith());
     });
@@ -346,51 +522,6 @@ class ChartBloc extends WindowBloc<ChartState> {
         nBins: 20,
         resetController: StreamController<ResetChartAction>.broadcast(),
       ));
-    });
-
-    /// Change the selection tool.
-    on<UpdateMultiSelect>((event, emit) {
-      emit(state.copyWith(tool: event.tool));
-    });
-
-    /// Toggle the use of the global query in this Chart.
-    on<UpdateChartGlobalQueryEvent>((event, emit) {
-      emit(state.copyWith(useGlobalQuery: event.useGlobalQuery));
-      for (SeriesInfo series in state._series.values) {
-        _fetchSeriesData(
-          series: series,
-          dayObs: event.dayObs,
-          globalQuery: event.globalQuery,
-        );
-      }
-    });
-
-    /// A Series in the chart is updated. This will trigger a reload of the data from the remote server.
-    on<UpdateSeriesEvent>((event, emit) {
-      if (event.groupByColumn != null) {
-        throw UnimplementedError("Group by column not yet implemented");
-      } else {
-        // Update the series
-        Map<SeriesId, SeriesInfo> newSeries = {...state._series};
-        newSeries[event.series.id] = event.series;
-
-        // Update the axis labels, if necessary
-        List<ChartAxisInfo> axesInfo = state.axisInfo;
-        for (int i = 0; i < axesInfo.length; i++) {
-          ChartAxisInfo axisInfo = axesInfo[i];
-          // Axis labels are surrounded by <> to indicate that they have not been set yet.
-          if ((axisInfo.label.startsWith("<") && axisInfo.label.endsWith(">")) || state._series.length == 1) {
-            axesInfo[i] = axisInfo.copyWith(label: event.series.fields.values.toList()[i].name);
-          }
-        }
-        emit(state.copyWith(series: newSeries, axisInfo: axesInfo));
-      }
-      // Load the data from the server.
-      _fetchSeriesData(
-        series: event.series,
-        globalQuery: event.globalQuery,
-        dayObs: event.dayObs,
-      );
     });
 
     /// Update the number of bins for a binned chart.
@@ -434,6 +565,33 @@ class ChartBloc extends WindowBloc<ChartState> {
       newSeries.remove(event.seriesId);
       DataCenter().removeSeriesData(event.seriesId);
       emit(state.copyWith(series: newSeries));
+    });
+
+    /// Proceed with adding the series (after confirmation if needed)
+    on<ProceedWithSeriesEvent>((event, emit) {
+      developer.log("Proceeding with series ${event.series.id}", name: "rubin_chart.workspace");
+
+      // Update the series
+      Map<SeriesId, SeriesInfo> newSeries = {...state._series};
+      newSeries[event.series.id] = event.series;
+
+      // Update the axis labels, if necessary
+      List<ChartAxisInfo> axesInfo = state.axisInfo;
+      for (int i = 0; i < axesInfo.length; i++) {
+        ChartAxisInfo axisInfo = axesInfo[i];
+        // Axis labels are surrounded by <> to indicate that they have not been set yet.
+        if ((axisInfo.label.startsWith("<") && axisInfo.label.endsWith(">")) || state._series.length == 1) {
+          axesInfo[i] = axisInfo.copyWith(label: event.series.fields.values.toList()[i].name);
+        }
+      }
+      emit(state.copyWith(series: newSeries, axisInfo: axesInfo));
+
+      // Load the data from the server.
+      _fetchSeriesData(
+        series: event.series,
+        globalQuery: event.globalQuery,
+        dayObs: event.dayObs,
+      );
     });
   }
 
@@ -548,12 +706,15 @@ class ChartBloc extends WindowBloc<ChartState> {
     return showDialog(
       context: context,
       builder: (BuildContext context) => Dialog(
-        child: SeriesEditor(
-          theme: workspace.theme,
-          series: series,
-          workspace: workspace,
-          chartBloc: this,
-          databaseSchema: DataCenter().databases[workspace.info!.instrument!.schema]!,
+        child: BlocProvider.value(
+          value: this, // Provide the current ChartBloc instance
+          child: SeriesEditor(
+            theme: workspace.theme,
+            series: series,
+            workspace: workspace,
+            chartBloc: this,
+            databaseSchema: DataCenter().databases[workspace.info!.instrument!.schema]!,
+          ),
         ),
       ),
     );
