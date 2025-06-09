@@ -415,9 +415,6 @@ class ChartBloc extends WindowBloc<ChartState> {
       } else {
         // Register a callback that will handle the row count check for this specific series
         registerRowCountCallback(event.series.id, (rowCount, seriesInfo, dayObs, globalQuery) {
-          developer.log("Row count callback triggered for series ${event.series.id} with count $rowCount",
-              name: "rubin_chart.workspace");
-
           if (rowCount > 100000) {
             // Emit event to show confirmation dialog
             add(ShowRowCountConfirmationEvent(
@@ -502,18 +499,11 @@ class ChartBloc extends WindowBloc<ChartState> {
         );
       } else if (event.message["type"] == "count" && windowId == state.id) {
         // Process the results of a CountRowsCommand
-        developer.log("Raw count message: ${event.message}", name: "rubin_chart.workspace");
-
         try {
           int rowCount = event.message["content"]["data"].values.first as int;
-          developer.log("Extracted rowCount: $rowCount for series $seriesId", name: "rubin_chart.workspace");
-
           // Look for the series in pending checks
           _PendingSeriesInfo? pendingInfo = _pendingRowCountChecks[seriesId];
           if (pendingInfo != null) {
-            developer.log("Found pending series $seriesId, calling row count callback",
-                name: "rubin_chart.workspace");
-
             // Remove from pending checks
             _pendingRowCountChecks.remove(seriesId);
 
@@ -616,8 +606,6 @@ class ChartBloc extends WindowBloc<ChartState> {
 
     /// Proceed with adding the series (after confirmation if needed)
     on<ProceedWithSeriesEvent>((event, emit) {
-      developer.log("Proceeding with series ${event.series.id}", name: "rubin_chart.workspace");
-
       // Update the series
       Map<SeriesId, SeriesInfo> newSeries = {...state._series};
       newSeries[event.series.id] = event.series;
@@ -643,10 +631,6 @@ class ChartBloc extends WindowBloc<ChartState> {
 
     /// Show row count confirmation dialog
     on<ShowRowCountConfirmationEvent>((event, emit) {
-      developer.log("Showing row count confirmation dialog for ${event.rowCount} rows",
-          name: "rubin_chart.workspace");
-
-      // Set the dialog info in the state
       emit(state.copyWith(
         pendingRowCountDialog: RowCountDialogInfo(
           rowCount: event.rowCount,

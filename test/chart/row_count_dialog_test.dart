@@ -164,5 +164,130 @@ void main() {
         ]),
       );
     });
+
+    test('ConfirmRowCountEvent should trigger ProceedWithSeriesEvent', () async {
+      final seriesId = SeriesId(id: BigInt.one, windowId: UniqueId.next());
+      final seriesInfo = SeriesInfo(
+        id: seriesId,
+        name: 'test',
+        axes: const [],
+        fields: const {},
+      );
+
+      // Set up the dialog first
+      chartBloc.add(ShowRowCountConfirmationEvent(
+        rowCount: 150000,
+        series: seriesInfo,
+        dayObs: '2024-01-01',
+        globalQuery: null,
+      ));
+
+      // Wait for dialog to be set
+      await expectLater(
+        chartBloc.stream,
+        emits(predicate<ChartState>((state) => state.pendingRowCountDialog != null)),
+      );
+
+      // Now confirm and check that series is added to state
+      chartBloc.add(ConfirmRowCountEvent());
+
+      await expectLater(
+        chartBloc.stream,
+        emitsInOrder([
+          // Dialog should be cleared
+          predicate<ChartState>((state) => state.pendingRowCountDialog == null),
+          // Series should be added to the chart
+          predicate<ChartState>((state) => state.series.containsKey(seriesId)),
+        ]),
+      );
+    });
+
+    test('CancelRowCountEvent should not add series to chart', () async {
+      final seriesId = SeriesId(id: BigInt.one, windowId: UniqueId.next());
+      final seriesInfo = SeriesInfo(
+        id: seriesId,
+        name: 'test',
+        axes: const [],
+        fields: const {},
+      );
+
+      // Set up the dialog first
+      chartBloc.add(ShowRowCountConfirmationEvent(
+        rowCount: 150000,
+        series: seriesInfo,
+        dayObs: '2024-01-01',
+        globalQuery: null,
+      ));
+
+      // Wait for dialog to be set
+      await expectLater(
+        chartBloc.stream,
+        emits(predicate<ChartState>((state) => state.pendingRowCountDialog != null)),
+      );
+
+      // Now cancel
+      chartBloc.add(CancelRowCountEvent());
+
+      await expectLater(
+        chartBloc.stream,
+        emits(predicate<ChartState>(
+            (state) => state.pendingRowCountDialog == null && !state.series.containsKey(seriesId))),
+      );
+    });
+
+    test('Multiple dialog events should work correctly', () async {
+      final seriesId1 = SeriesId(id: BigInt.one, windowId: UniqueId.next());
+      final seriesInfo1 = SeriesInfo(
+        id: seriesId1,
+        name: 'test1',
+        axes: const [],
+        fields: const {},
+      );
+
+      final seriesId2 = SeriesId(id: BigInt.two, windowId: UniqueId.next());
+      final seriesInfo2 = SeriesInfo(
+        id: seriesId2,
+        name: 'test2',
+        axes: const [],
+        fields: const {},
+      );
+
+      // Show first dialog and cancel
+      chartBloc.add(ShowRowCountConfirmationEvent(
+        rowCount: 150000,
+        series: seriesInfo1,
+        dayObs: '2024-01-01',
+        globalQuery: null,
+      ));
+
+      chartBloc.add(CancelRowCountEvent());
+
+      // Show second dialog and confirm
+      chartBloc.add(ShowRowCountConfirmationEvent(
+        rowCount: 200000,
+        series: seriesInfo2,
+        dayObs: '2024-01-01',
+        globalQuery: null,
+      ));
+
+      chartBloc.add(ConfirmRowCountEvent());
+
+      await expectLater(
+        chartBloc.stream,
+        emitsInOrder([
+          // First dialog shown
+          predicate<ChartState>((state) => state.pendingRowCountDialog?.series.name == 'test1'),
+          // First dialog canceled
+          predicate<ChartState>((state) => state.pendingRowCountDialog == null),
+          // Second dialog shown
+          predicate<ChartState>((state) => state.pendingRowCountDialog?.series.name == 'test2'),
+          // Second dialog cleared
+          predicate<ChartState>((state) => state.pendingRowCountDialog == null),
+          // Only second series added
+          predicate<ChartState>(
+              (state) => !state.series.containsKey(seriesId1) && state.series.containsKey(seriesId2)),
+        ]),
+      );
+    });
   });
 }
