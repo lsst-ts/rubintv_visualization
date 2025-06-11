@@ -140,16 +140,17 @@ class CountRowsCommand extends ServiceCommand {
     QueryExpression? globalQuery,
     String? dayObs,
   }) : super(
-          name: "aggregate",
+          name: "load columns",
           requestId: "${windowId.id},${seriesId.shortString}",
           parameters: {
+            "aggregator": "count",
             "database": database,
             "columns": columns,
             "query": query?.toCommand(),
             "global_query": globalQuery?.toCommand(),
-            "query_type": "count",
             "data_ids": dataIds?.map((e) => [e.dayObs, e.seqNum]).toList(),
             "day_obs": dayObs,
+            "response_type": "count",
           },
         );
 

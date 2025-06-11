@@ -32,6 +32,7 @@ import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/chart/series.dart';
 import 'package:rubintv_visualization/workspace/viewer.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
+import 'package:rubintv_visualization/dialog/row_count_confirmation.dart';
 
 /// An event used to initialize a binned chart.
 class InitializeBinnedEvent extends ChartEvent {
@@ -67,6 +68,7 @@ class BinnedState extends ChartState {
     required this.nBins,
     required super.resetController,
     super.needsReset,
+    super.pendingRowCountDialog,
   });
 
   @override
@@ -82,6 +84,7 @@ class BinnedState extends ChartState {
     int? nBins,
     StreamController<ResetChartAction>? resetController,
     bool? needsReset,
+    RowCountDialogInfo? pendingRowCountDialog,
   }) =>
       BinnedState(
         id: id ?? this.id,
@@ -94,6 +97,7 @@ class BinnedState extends ChartState {
         nBins: nBins ?? this.nBins,
         resetController: resetController ?? this.resetController,
         needsReset: needsReset ?? false,
+        pendingRowCountDialog: pendingRowCountDialog,
       );
 
   @override
@@ -151,100 +155,108 @@ class BinnedChartWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider<ChartBloc>.value(
       value: bloc,
-      child: BlocBuilder<ChartBloc, WindowState>(
-        builder: (context, state) {
-          if (state is! BinnedState) {
-            /// Display an empty window while the chart is loading
+      child: BlocListener<ChartBloc, ChartState>(
+        listener: (context, state) {
+          if (state.pendingRowCountDialog != null) {
+            showRowCountConfirmationDialog(context, state.pendingRowCountDialog!);
+          }
+        },
+        child: BlocBuilder<ChartBloc, ChartState>(
+          builder: (context, state) {
+            if (state is! BinnedState) {
+              /// Display an empty window while the chart is loading
+              return ResizableWindow(
+                  info: window,
+                  title: "loading...",
+                  toolbar: Row(children: [...context.read<ChartBloc>().getDefaultTools(context)]),
+                  child: const Center(
+                    child: CircularProgressIndicator(),
+                  ));
+            }
+            if (state.needsReset) {
+              context.read<ChartBloc>().add(ResetChartEvent(ChartResetTypes.full));
+            }
+
+            WorkspaceViewerState workspace = WorkspaceViewer.of(context);
+            SelectionController? selectionController;
+            SelectionController? drillDownController;
+            if (state.useDrillDownController) {
+              drillDownController = ControlCenter().drillDownController;
+            }
+            if (state.useSelectionController) {
+              selectionController = ControlCenter().selectionController;
+            }
+            _binController.text = state.nBins.toString();
+
             return ResizableWindow(
-                info: window,
-                title: "loading...",
-                toolbar: Row(children: [...context.read<ChartBloc>().getDefaultTools(context)]),
-                child: const Center(
-                  child: CircularProgressIndicator(),
-                ));
-          }
-          if (state.needsReset) {
-            context.read<ChartBloc>().add(ResetChartEvent(ChartResetTypes.full));
-          }
-
-          WorkspaceViewerState workspace = WorkspaceViewer.of(context);
-          SelectionController? selectionController;
-          SelectionController? drillDownController;
-          if (state.useDrillDownController) {
-            drillDownController = ControlCenter().drillDownController;
-          }
-          if (state.useSelectionController) {
-            selectionController = ControlCenter().selectionController;
-          }
-          _binController.text = state.nBins.toString();
-
-          return ResizableWindow(
-            info: window,
-            toolbar: Row(children: [
-              Tooltip(
-                message: "Change number of bins",
-                child: SizedBox(
-                  width: 50,
-                  child: TextField(
-                    controller: _binController,
-                    decoration: const InputDecoration(
-                      labelText: "bins",
+              info: window,
+              toolbar: Row(children: [
+                Tooltip(
+                  message: "Change number of bins",
+                  child: SizedBox(
+                    width: 50,
+                    child: TextField(
+                      controller: _binController,
+                      decoration: const InputDecoration(
+                        labelText: "bins",
+                      ),
+                      onSubmitted: (String value) {
+                        int? nBins = int.tryParse(value);
+                        if (nBins != null && nBins > 0) {
+                          context.read<ChartBloc>().add(UpdateBinsEvent(nBins));
+                        }
+                      },
                     ),
-                    onSubmitted: (String value) {
-                      int? nBins = int.tryParse(value);
-                      if (nBins != null && nBins > 0) {
-                        context.read<ChartBloc>().add(UpdateBinsEvent(nBins));
-                      }
-                    },
                   ),
                 ),
-              ),
-              SegmentedButton<MultiSelectionTool>(
-                selected: {state.tool},
-                segments: [
-                  ButtonSegment(
-                    value: MultiSelectionTool.select,
-                    icon: Icon(MultiSelectionTool.select.icon, color: workspace.theme.themeData.primaryColor),
-                  ),
-                  ButtonSegment(
-                    value: MultiSelectionTool.drillDown,
-                    icon: Icon(MultiSelectionTool.drillDown.icon,
-                        color: workspace.theme.themeData.primaryColor),
-                  ),
-                ],
-                onSelectionChanged: (Set<MultiSelectionTool> selection) {
-                  MultiSelectionTool tool = selection.first;
-                  developer.log("selected tool: $tool", name: "rubinTV.visualization.chart.binned");
-                  context.read<ChartBloc>().add(UpdateMultiSelect(selection.first));
-                },
-              ),
-              ...context.read<ChartBloc>().getDefaultTools(context)
-            ]),
-            title: null,
-            child: RubinChart(
-              info: window.windowType == WindowTypes.histogram
-                  ? HistogramInfo(
-                      id: window.id,
-                      allSeries: state.allSeries,
-                      legend: state.legend,
-                      axisInfo: state.axisInfo,
-                      nBins: state.nBins,
-                    )
-                  : BoxChartInfo(
-                      id: window.id,
-                      allSeries: state.allSeries,
-                      legend: state.legend,
-                      axisInfo: state.axisInfo,
-                      nBins: state.nBins,
+                SegmentedButton<MultiSelectionTool>(
+                  selected: {state.tool},
+                  segments: [
+                    ButtonSegment(
+                      value: MultiSelectionTool.select,
+                      icon:
+                          Icon(MultiSelectionTool.select.icon, color: workspace.theme.themeData.primaryColor),
                     ),
-              selectionController: selectionController,
-              drillDownController: drillDownController,
-              resetController: resetController,
-              legendSelectionCallback: context.read<ChartBloc>().onLegendSelect,
-              onTapAxis: context.read<ChartBloc>().onAxisTap,
-            ),
-          );
-        },
+                    ButtonSegment(
+                      value: MultiSelectionTool.drillDown,
+                      icon: Icon(MultiSelectionTool.drillDown.icon,
+                          color: workspace.theme.themeData.primaryColor),
+                    ),
+                  ],
+                  onSelectionChanged: (Set<MultiSelectionTool> selection) {
+                    MultiSelectionTool tool = selection.first;
+                    developer.log("selected tool: $tool", name: "rubinTV.visualization.chart.binned");
+                    context.read<ChartBloc>().add(UpdateMultiSelect(selection.first));
+                  },
+                ),
+                ...context.read<ChartBloc>().getDefaultTools(context)
+              ]),
+              title: null,
+              child: RubinChart(
+                info: window.windowType == WindowTypes.histogram
+                    ? HistogramInfo(
+                        id: window.id,
+                        allSeries: state.allSeries,
+                        legend: state.legend,
+                        axisInfo: state.axisInfo,
+                        nBins: state.nBins,
+                      )
+                    : BoxChartInfo(
+                        id: window.id,
+                        allSeries: state.allSeries,
+                        legend: state.legend,
+                        axisInfo: state.axisInfo,
+                        nBins: state.nBins,
+                      ),
+                selectionController: selectionController,
+                drillDownController: drillDownController,
+                resetController: resetController,
+                legendSelectionCallback: context.read<ChartBloc>().onLegendSelect,
+                onTapAxis: context.read<ChartBloc>().onAxisTap,
+              ),
+            );
+          },
+        ),
       ),
     );
   }

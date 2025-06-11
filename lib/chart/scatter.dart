@@ -29,6 +29,7 @@ import 'package:rubintv_visualization/id.dart';
 import 'package:rubintv_visualization/workspace/controller.dart';
 import 'package:rubintv_visualization/workspace/viewer.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
+import 'package:rubintv_visualization/dialog/row_count_confirmation.dart';
 
 /// An event used to initialize a scatter plot chart.
 class InitializeScatterPlotEvent extends ChartEvent {
@@ -64,73 +65,80 @@ class ScatterPlotWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider<ChartBloc>.value(
       value: bloc,
-      child: BlocBuilder<ChartBloc, ChartState>(
-        builder: (context, state) {
-          if (state.needsReset) {
-            context.read<ChartBloc>().add(ResetChartEvent(ChartResetTypes.full));
+      child: BlocListener<ChartBloc, ChartState>(
+        listener: (context, state) {
+          if (state.pendingRowCountDialog != null) {
+            showRowCountConfirmationDialog(context, state.pendingRowCountDialog!);
           }
+        },
+        child: BlocBuilder<ChartBloc, ChartState>(
+          builder: (context, state) {
+            if (state.needsReset) {
+              context.read<ChartBloc>().add(ResetChartEvent(ChartResetTypes.full));
+            }
 
-          WorkspaceViewerState workspace = WorkspaceViewer.of(context);
-          SelectionController selectionController = ControlCenter().selectionController;
-          SelectionController drillDownController = ControlCenter().drillDownController;
+            WorkspaceViewerState workspace = WorkspaceViewer.of(context);
+            SelectionController selectionController = ControlCenter().selectionController;
+            SelectionController drillDownController = ControlCenter().drillDownController;
 
-          return ResizableWindow(
-            info: window,
-            toolbar: Row(
-              children: [
-                SegmentedButton<MultiSelectionTool>(
-                  selected: {state.tool},
-                  segments: [
-                    ButtonSegment(
-                      value: MultiSelectionTool.select,
-                      icon:
-                          Icon(MultiSelectionTool.select.icon, color: workspace.theme.themeData.primaryColor),
-                    ),
-                    ButtonSegment(
-                      value: MultiSelectionTool.drillDown,
-                      icon: Icon(MultiSelectionTool.drillDown.icon,
-                          color: workspace.theme.themeData.primaryColor),
-                    ),
-                    /*ButtonSegment(
+            return ResizableWindow(
+              info: window,
+              toolbar: Row(
+                children: [
+                  SegmentedButton<MultiSelectionTool>(
+                    selected: {state.tool},
+                    segments: [
+                      ButtonSegment(
+                        value: MultiSelectionTool.select,
+                        icon: Icon(MultiSelectionTool.select.icon,
+                            color: workspace.theme.themeData.primaryColor),
+                      ),
+                      ButtonSegment(
+                        value: MultiSelectionTool.drillDown,
+                        icon: Icon(MultiSelectionTool.drillDown.icon,
+                            color: workspace.theme.themeData.primaryColor),
+                      ),
+                      /*ButtonSegment(
                       value: MultiSelectionTool.dateTimeSelect,
                       icon: Icon(MultiSelectionTool.dateTimeSelect.icon,
                           color: workspace.theme.themeData.primaryColor),
                     ),*/
-                  ],
-                  onSelectionChanged: (Set<MultiSelectionTool> selection) {
-                    MultiSelectionTool tool = selection.first;
-                    developer.log("selected tool: $tool", name: "rubinTV.visualization.chart.scatter");
-                    context.read<ChartBloc>().add(UpdateMultiSelect(selection.first));
-                  },
-                ),
-                ...context.read<ChartBloc>().getDefaultTools(context),
-              ],
-            ),
-            title: null,
-            child: RubinChart(
-              info: window.windowType == WindowTypes.cartesianScatter
-                  ? CartesianScatterPlotInfo(
-                      id: window.id,
-                      allSeries: state.allSeries,
-                      legend: state.legend,
-                      axisInfo: state.axisInfo,
-                      cursorAction: state.tool.cursorAction,
-                    )
-                  : PolarScatterPlotInfo(
-                      id: window.id,
-                      allSeries: state.allSeries,
-                      legend: state.legend,
-                      axisInfo: state.axisInfo,
-                      cursorAction: state.tool.cursorAction,
-                    ),
-              selectionController: selectionController,
-              drillDownController: drillDownController,
-              resetController: state.resetController,
-              legendSelectionCallback: context.read<ChartBloc>().onLegendSelect,
-              onTapAxis: context.read<ChartBloc>().onAxisTap,
-            ),
-          );
-        },
+                    ],
+                    onSelectionChanged: (Set<MultiSelectionTool> selection) {
+                      MultiSelectionTool tool = selection.first;
+                      developer.log("selected tool: $tool", name: "rubinTV.visualization.chart.scatter");
+                      context.read<ChartBloc>().add(UpdateMultiSelect(selection.first));
+                    },
+                  ),
+                  ...context.read<ChartBloc>().getDefaultTools(context),
+                ],
+              ),
+              title: null,
+              child: RubinChart(
+                info: window.windowType == WindowTypes.cartesianScatter
+                    ? CartesianScatterPlotInfo(
+                        id: window.id,
+                        allSeries: state.allSeries,
+                        legend: state.legend,
+                        axisInfo: state.axisInfo,
+                        cursorAction: state.tool.cursorAction,
+                      )
+                    : PolarScatterPlotInfo(
+                        id: window.id,
+                        allSeries: state.allSeries,
+                        legend: state.legend,
+                        axisInfo: state.axisInfo,
+                        cursorAction: state.tool.cursorAction,
+                      ),
+                selectionController: selectionController,
+                drillDownController: drillDownController,
+                resetController: state.resetController,
+                legendSelectionCallback: context.read<ChartBloc>().onLegendSelect,
+                onTapAxis: context.read<ChartBloc>().onAxisTap,
+              ),
+            );
+          },
+        ),
       ),
     );
   }
