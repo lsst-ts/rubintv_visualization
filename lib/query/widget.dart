@@ -232,15 +232,15 @@ class EqualityQueryWidget extends StatelessWidget {
   Widget _buildOperatorWidget(
       BuildContext context, EqualityOperator? operator, bool isLeft, EqualityQuery query) {
     Set<EqualityOperator> availableOperators = isLeft
-        ? const {EqualityOperator.lt, EqualityOperator.lte, EqualityOperator.blank}
+        ? const {EqualityOperator.lt, EqualityOperator.le, EqualityOperator.blank}
         : const {
             EqualityOperator.eq,
-            EqualityOperator.neq,
+            EqualityOperator.ne,
             EqualityOperator.lt,
-            EqualityOperator.lte,
+            EqualityOperator.le,
             EqualityOperator.blank,
-            EqualityOperator.startsWith,
-            EqualityOperator.endsWith,
+            EqualityOperator.startswith,
+            EqualityOperator.endswith,
             EqualityOperator.contains,
           };
 
