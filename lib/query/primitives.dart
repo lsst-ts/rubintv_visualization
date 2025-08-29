@@ -27,12 +27,12 @@ import 'package:rubintv_visualization/workspace/data.dart';
 /// [EqualityQueryWidget] is designed such that it doesn't need them.
 enum EqualityOperator {
   eq("=", "eq", "eq"),
-  neq("\u2260", "neq", "neq"),
+  ne("\u2260", "ne", "ne"),
   lt("<", "gt", "lt"),
-  lte("\u2264", "gte", "lte"),
+  le("\u2264", "ge", "le"),
   blank(" ", " ", " "),
-  startsWith("starts with", null, "starts with"),
-  endsWith("ends with", null, "ends with"),
+  startswith("starts with", null, "starts with"),
+  endswith("ends with", null, "ends with"),
   contains("contains", null, "contains");
 
   const EqualityOperator(this.symbol, this.queryLeft, this.queryRight);
