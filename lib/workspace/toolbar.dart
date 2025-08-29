@@ -23,6 +23,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/foundation.dart';
 import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/dialog/widget.dart';
 import 'package:rubintv_visualization/io.dart';
@@ -318,6 +319,32 @@ class ToolbarState extends State<Toolbar> {
                   },
                   child: const Text("From file"),
                 ),
+                if (kDebugMode) ...[
+                  const MenuItemButton(
+                    onPressed: null,
+                    child: Divider(),
+                  ),
+                  MenuItemButton(
+                    onPressed: () => _sendTestError(),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.bug_report, size: 16),
+                        SizedBox(width: 8),
+                        Text("Test Error"),
+                      ],
+                    ),
+                  ),
+                  MenuItemButton(
+                    onPressed: () => _sendTestImportError(),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.error, size: 16),
+                        SizedBox(width: 8),
+                        Text("Test Import Error"),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -526,5 +553,23 @@ class ToolbarState extends State<Toolbar> {
         ),
       ],
     );
+  }
+
+  void _sendTestError() {
+    ServiceCommand testCommand = ServiceCommand(name: "test error", parameters: {
+      "error_type": "General Test Error",
+      "error_message": "Testing general error reporting",
+      "include_traceback": false
+    });
+    WebSocketManager().sendMessage(testCommand.toJson());
+  }
+
+  void _sendTestImportError() {
+    ServiceCommand testCommand = ServiceCommand(name: "test error", parameters: {
+      "error_type": "Import Error",
+      "error_message": "cannot import name 'TestClass' from 'test.module'",
+      "include_traceback": true
+    });
+    WebSocketManager().sendMessage(testCommand.toJson());
   }
 }

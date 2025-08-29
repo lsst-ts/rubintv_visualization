@@ -40,6 +40,7 @@ import 'package:rubintv_visualization/workspace/controller.dart';
 import 'package:rubintv_visualization/chart/series.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
+import 'package:rubintv_visualization/error.dart';
 
 /// Create an empty [ChartAxis].
 /// This is required for the color map slider, and is just a dummy axis.
@@ -645,6 +646,24 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       } else if (event.message["type"] == "error") {
         // Display the error message
         developer.log("Received error message: ${event.message["content"]}", name: "rubin_chart.workspace");
+
+        // Extract error details
+        Map<String, dynamic> errorContent = event.message["content"];
+        String errorType = errorContent["error"] ?? "Unknown Error";
+        String description = errorContent["description"] ?? "No description provided";
+        String? traceback = errorContent["traceback"];
+
+        // Create user-friendly error message
+        String userMessage = "$errorType: $description";
+        if (traceback != null && traceback.isNotEmpty) {
+          // Show a simplified version of the traceback
+          List<String> traceLines = traceback.split('\\n');
+          String lastError = traceLines.where((line) => line.trim().isNotEmpty).last;
+          userMessage += "\nDetails: $lastError";
+        }
+
+        // Report the error to the UI
+        reportError(userMessage);
       }
     });
 
