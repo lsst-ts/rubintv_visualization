@@ -490,12 +490,33 @@ class ChartBloc extends WindowBloc<ChartState> {
         developer.log(
             "received $columns columns and $rows rows for ${event.message["requestId"]} in series $seriesId",
             name: "rubin_chart.workspace");
+
+        // Add validation to ensure series exists and data is not empty
+        final seriesInfo = state.series[seriesId];
+        if (seriesInfo == null) {
+          developer.log("Series $seriesId not found in state", name: "rubin_chart.workspace");
+          return;
+        }
+
+        final data = event.message["content"]["data"] as Map<String, dynamic>?;
+        if (data == null || data.isEmpty) {
+          developer.log("Received empty data for series $seriesId", name: "rubin_chart.workspace");
+          return;
+        }
+
+        // Validate that all expected columns are present
+        final plotColumns = List<String>.from(event.message["content"]["columns"].map((e) => e));
+        if (plotColumns.isEmpty) {
+          developer.log("No plot columns received for series $seriesId", name: "rubin_chart.workspace");
+          return;
+        }
+
         DataCenter().updateSeriesData(
-          series: state.series[seriesId]!,
+          series: seriesInfo,
           dataSourceName: event.message["content"]["schema"],
-          plotColumns: List<String>.from(event.message["content"]["columns"].map((e) => e)),
+          plotColumns: plotColumns,
           data: Map<String, List<dynamic>>.from(
-              event.message["content"]["data"].map((key, value) => MapEntry(key, List<dynamic>.from(value)))),
+              data.map((key, value) => MapEntry(key, List<dynamic>.from(value)))),
         );
       } else if (event.message["type"] == "count" && windowId == state.id) {
         // Process the results of a CountRowsCommand
@@ -621,11 +642,13 @@ class ChartBloc extends WindowBloc<ChartState> {
       }
       emit(state.copyWith(series: newSeries, axisInfo: axesInfo));
 
+      developer.log("State at this point: ${state.toJson()}", name: "rubintv.chart.base.dart");
       // Load the data from the server.
       _fetchSeriesData(
         series: event.series,
         globalQuery: event.globalQuery,
         dayObs: event.dayObs,
+        isNewPlot: true,
       );
     });
 
@@ -677,7 +700,9 @@ class ChartBloc extends WindowBloc<ChartState> {
     required SeriesInfo series,
     required String? dayObs,
     required QueryExpression? globalQuery,
+    bool? isNewPlot = false,
   }) {
+    // Auto-detect if not specified
     WebSocketManager websocket = WebSocketManager();
     if (websocket.isConnected) {
       websocket.sendMessage(LoadColumnsCommand.build(
@@ -688,6 +713,7 @@ class ChartBloc extends WindowBloc<ChartState> {
         useGlobalQuery: state.useGlobalQuery,
         dayObs: dayObs,
         windowId: state.id,
+        isNewPlot: isNewPlot,
       ).toJson());
     }
   }

@@ -91,6 +91,7 @@ class LoadColumnsCommand extends ServiceCommand {
     QueryExpression? query,
     QueryExpression? globalQuery,
     String? dayObs,
+    bool? isNewPlot,
   }) : super(
           name: "load columns",
           requestId: "${windowId.id},${seriesId.shortString}",
@@ -101,6 +102,7 @@ class LoadColumnsCommand extends ServiceCommand {
             "global_query": globalQuery?.toCommand(),
             "data_ids": dataIds?.map((e) => [e.dayObs, e.seqNum]).toList(),
             "day_obs": dayObs,
+            "is_new_plot": isNewPlot,
           },
         );
 
@@ -114,6 +116,7 @@ class LoadColumnsCommand extends ServiceCommand {
     QueryExpression? globalQuery,
     String? dayObs,
     Set<DataId>? dataIds,
+    bool? isNewPlot = false,
   }) {
     return LoadColumnsCommand(
       windowId: windowId,
@@ -124,6 +127,7 @@ class LoadColumnsCommand extends ServiceCommand {
       globalQuery: useGlobalQuery ? globalQuery : null,
       dayObs: dayObs,
       dataIds: dataIds,
+      isNewPlot: isNewPlot,
     );
   }
 }
