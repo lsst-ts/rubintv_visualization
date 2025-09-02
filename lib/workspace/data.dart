@@ -99,8 +99,7 @@ ColumnDataType? dataTypeFromString(String dataType) {
 DateTime convertRubinDate(String date) {
   List<String> dateSplit = date.split("-");
   if (dateSplit.length == 1) {
-    date =
-        "${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6)}";
+    date = "${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6)}";
   }
   return dateFromString(date);
 }
@@ -175,8 +174,8 @@ class SchemaField {
   /// that is already loaded by the [DataCenter].
   static SchemaField fromJson(Map<String, dynamic> json) {
     DataCenter dataCenter = DataCenter();
-    TableSchema schema = dataCenter.databases[json["database"]]!.tables.values
-        .firstWhere((e) => e.name == json["schema"]);
+    TableSchema schema =
+        dataCenter.databases[json["database"]]!.tables.values.firstWhere((e) => e.name == json["schema"]);
     return schema.fields[json["name"]]!;
   }
 }
@@ -195,8 +194,7 @@ class TableSchema {
   /// The database that contains the [TableSchema].
   late final DatabaseSchema database;
 
-  TableSchema(
-      {required this.name, required this.indexKey, required this.fields}) {
+  TableSchema({required this.name, required this.indexKey, required this.fields}) {
     for (SchemaField field in fields.values) {
       field.schema = this;
     }
@@ -300,12 +298,9 @@ class DataCenter {
 
   /// Subscribe to the [WebSocketManager] messages.
   void initialize() {
-    _subscription =
-        WebSocketManager().messages.listen((Map<String, dynamic> message) {
-      developer.log("DataCenter received message: ${message['type']}",
-          name: "rubinTV.workspace.data");
-      if (message['type'] == 'instrument info' &&
-          message['content'].containsKey('schema')) {
+    _subscription = WebSocketManager().messages.listen((Map<String, dynamic> message) {
+      developer.log("DataCenter received message: ${message['type']}", name: "rubinTV.workspace.data");
+      if (message['type'] == 'instrument info' && message['content'].containsKey('schema')) {
         addDatabaseSchema(message['content']['schema']);
       }
     });
@@ -387,13 +382,42 @@ class DataCenter {
     required List<String> plotColumns,
     required Map<String, List<dynamic>> data,
   }) {
+    // Extensive validation
+    if (data.isEmpty) {
+      reportError("No data found for the selected columns.");
+      return;
+    }
+
+    // Check if any data lists are empty
+    if (data.values.any((list) => list.isEmpty)) {
+      reportError("One or more columns contain no data.");
+      return;
+    }
+
     int rows = data.values.first.length;
     if (rows == 0) {
       reportError("No non-null data found for the selected columns.");
       return;
     }
 
-    DataSource dataSource = _databaseSchemas[dataSourceName]!;
+    // Validate all columns have the same length
+    if (!data.values.every((list) => list.length == rows)) {
+      reportError("Data columns have inconsistent lengths.");
+      return;
+    }
+
+    // Validate required columns exist
+    if (!data.containsKey('seq_num') || !data.containsKey('day_obs')) {
+      reportError("Missing required columns: seq_num or day_obs.");
+      return;
+    }
+
+    // Validate data source exists
+    DataSource? dataSource = _databaseSchemas[dataSourceName];
+    if (dataSource == null) {
+      reportError("Data source '$dataSourceName' not found.");
+      return;
+    }
 
     if (dataSource is DatabaseSchema) {
       Map<SchemaField, List<dynamic>> columns = {};
@@ -402,32 +426,64 @@ class DataCenter {
       // Add the series data for each column in the plot
       for (int i = 0; i < plotColumns.length; i++) {
         String plotColumn = plotColumns[i];
+
+        // Validate plot column exists in data
+        if (!data.containsKey(plotColumn)) {
+          reportError("Plot column '$plotColumn' not found in received data.");
+          return;
+        }
+
         List<String> split = plotColumn.split(".");
+        if (split.length != 2) {
+          reportError("Invalid plot column format: '$plotColumn'. Expected 'table.column'.");
+          return;
+        }
+
         String tableName = split[0];
         String columnName = split[1];
+
+        // Validate table exists
+        if (!dataSource.tables.containsKey(tableName)) {
+          reportError("Table '$tableName' not found in schema.");
+          return;
+        }
+
+        // Validate field exists
+        if (!dataSource.tables[tableName]!.fields.containsKey(columnName)) {
+          reportError("Column '$columnName' not found in table '$tableName'.");
+          return;
+        }
 
         SchemaField field = dataSource.tables[tableName]!.fields[columnName]!;
         if (series.fields.containsValue(field)) {
           if (field.isString) {
             columns[field] = List<String>.from(data[plotColumn]!.map((e) => e));
           } else if (field.isNumerical) {
-            columns[field] =
-                List<double>.from(data[plotColumn]!.map((e) => e.toDouble()));
+            columns[field] = List<double>.from(data[plotColumn]!.map((e) => e.toDouble()));
           } else if (field.isDateTime) {
-            columns[field] = List<DateTime>.from(
-                data[plotColumn]!.map((e) => convertRubinDate(e)));
+            columns[field] = List<DateTime>.from(data[plotColumn]!.map((e) => convertRubinDate(e)));
           }
 
           // Add the column to the series columns
-          AxisId axisId =
-              series.axes[series.fields.values.toList().indexOf(field)];
+          AxisId axisId = series.axes[series.fields.values.toList().indexOf(field)];
           seriesColumns[axisId] = field;
         }
       }
+
+      // Final validation: ensure we have at least one column of data
+      if (columns.isEmpty) {
+        reportError("No matching columns found for series after processing.");
+        return;
+      }
+
+      // Ensure seriesColumns is not empty (this is what causes the .first error)
+      if (seriesColumns.isEmpty) {
+        reportError("No series columns mapped after processing plot columns.");
+        return;
+      }
+
       List<DataId> dataIds = List.generate(
-          data['seq_num']!.length,
-          (i) =>
-              DataId(seqNum: data['seq_num']![i], dayObs: data['day_obs']![i]));
+          data['seq_num']!.length, (i) => DataId(seqNum: data['seq_num']![i], dayObs: data['day_obs']![i]));
 
       SeriesData seriesData = SeriesData.fromData(
         data: columns,
@@ -442,8 +498,7 @@ class DataCenter {
   }
 
   /// Check if two [SchemaField]s are compatible
-  bool isFieldCompatible(SchemaField field1, SchemaField field2) =>
-      throw UnimplementedError();
+  bool isFieldCompatible(SchemaField field1, SchemaField field2) => throw UnimplementedError();
 
   @override
   String toString() => "DataCenter:[${databases.keys}]";
@@ -472,8 +527,7 @@ class DataId {
   const DataId({required this.seqNum, required this.dayObs});
 
   @override
-  bool operator ==(Object other) =>
-      other is DataId && other.seqNum == seqNum && other.dayObs == dayObs;
+  bool operator ==(Object other) => other is DataId && other.seqNum == seqNum && other.dayObs == dayObs;
 
   @override
   int get hashCode => seqNum.hashCode ^ dayObs.hashCode;

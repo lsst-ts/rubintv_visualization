@@ -295,12 +295,24 @@ class ChartState extends WindowState {
 
   /// Get a list of all of the [Series] in the chart.
   List<Series> get allSeries {
-    List<Series> allSeries = [];
+    List<Series> result = [];
     for (SeriesInfo seriesInfo in _series.values) {
-      Series series = seriesInfo.toSeries();
-      allSeries.add(series);
+      try {
+        Series series = seriesInfo.toSeries();
+        result.add(series);
+      } catch (e) {
+        if (e is DataConversionException) {
+          developer.log("Failed to convert series '${seriesInfo.name}': ${e.message}",
+              name: "rubin_chart.workspace");
+          reportError("Chart rendering error: ${e.message}");
+        } else {
+          developer.log("Unexpected error converting series '${seriesInfo.name}': $e",
+              name: "rubin_chart.workspace", error: e);
+        }
+        // Skip this series and continue with others
+      }
     }
-    return allSeries;
+    return result;
   }
 
   /// Convert the [ChartState] to a JSON object.

@@ -129,24 +129,27 @@ class SeriesInfo {
   @override
   String toString() => "Series<$id:$name>";
 
-  /// Convert this [SeriesInfo] to a [Series].
+  /// Convert the [SeriesInfo] to a [Series].
   Series toSeries() {
-    SeriesData? seriesData = DataCenter().getSeriesData(id);
-    if (seriesData == null) {
-      List<SchemaField> plotColumns = fields.values.toList();
-      seriesData = SeriesData(
-        data: Map.fromEntries(fields.entries.map((entry) => MapEntry(entry.value, <Object, dynamic>{}))),
-        plotColumns: fields,
-        columnTypes: {for (SchemaField e in plotColumns) e: e.dataType},
+    try {
+      SeriesData? seriesData = DataCenter().getSeriesData(id);
+      if (seriesData == null) {
+        throw DataConversionException("No data found for series $id");
+      }
+
+      return Series(
+        id: id,
+        name: name,
+        data: seriesData,
+        marker: marker,
       );
+    } catch (e) {
+      // Re-throw with more context
+      if (e is DataConversionException) {
+        throw DataConversionException("Failed to convert series '$name': ${e.message}");
+      }
+      rethrow;
     }
-    return Series(
-      id: id,
-      name: name,
-      marker: marker,
-      errorBars: errorBars,
-      data: seriesData,
-    );
   }
 
   /// Convert this [SeriesInfo] to a JSON object.
