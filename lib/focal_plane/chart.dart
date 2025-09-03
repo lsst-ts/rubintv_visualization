@@ -369,10 +369,12 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
 
       developer.log("Selected data points: ${event.selected}", name: "rubin_chart.focal_plane.chart.dart");
 
+      bool isNewPlot = state.data.isEmpty;
+
       if (event.selected.isNotEmpty) {
-        _fetchSeriesData(series: newSeries, selected: event.selected);
+        _fetchSeriesData(series: newSeries, selected: event.selected, isNewPlot: isNewPlot);
       } else if (event.dayObs != null) {
-        _fetchSeriesData(series: newSeries, dayObs: event.dayObs);
+        _fetchSeriesData(series: newSeries, dayObs: event.dayObs, isNewPlot: isNewPlot);
       }
 
       emit(state.copyWith(series: newSeries));
@@ -523,6 +525,7 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
     Set<DataId>? selected,
     QueryExpression? query,
     String? dayObs,
+    bool isNewPlot = false,
   }) {
     WebSocketManager websocket = WebSocketManager();
     if (websocket.isConnected) {
@@ -534,6 +537,7 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
         dayObs: dayObs,
         windowId: state.id,
         dataIds: selected,
+        isNewPlot: isNewPlot,
       ).toJson());
     }
   }
