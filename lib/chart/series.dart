@@ -131,12 +131,13 @@ class SeriesInfo {
 
   /// Convert the [SeriesInfo] to a [Series].
   Series toSeries() {
-    try {
-      SeriesData? seriesData = DataCenter().getSeriesData(id);
-      if (seriesData == null) {
-        throw DataConversionException("No data found for series $id");
-      }
+    SeriesData? seriesData = DataCenter().getSeriesData(id);
+    if (seriesData == null) {
+      // Don't throw an exception - this is expected when data is still loading
+      throw StateError("Data not available for series $id");
+    }
 
+    try {
       return Series(
         id: id,
         name: name,
@@ -144,7 +145,7 @@ class SeriesInfo {
         marker: marker,
       );
     } catch (e) {
-      // Re-throw with more context
+      // Re-throw with more context for actual conversion errors
       if (e is DataConversionException) {
         throw DataConversionException("Failed to convert series '$name': ${e.message}");
       }

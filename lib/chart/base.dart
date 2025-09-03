@@ -298,6 +298,14 @@ class ChartState extends WindowState {
     List<Series> result = [];
     for (SeriesInfo seriesInfo in _series.values) {
       try {
+        // Check if data exists before trying to convert
+        SeriesData? seriesData = DataCenter().getSeriesData(seriesInfo.id);
+        if (seriesData == null) {
+          // Data not loaded yet, skip this series silently
+          developer.log("Data not yet loaded for series '${seriesInfo.name}'", name: "rubin_chart.workspace");
+          continue;
+        }
+
         Series series = seriesInfo.toSeries();
         result.add(series);
       } catch (e) {
@@ -618,6 +626,24 @@ class ChartBloc extends WindowBloc<ChartState> {
 
     /// Proceed with adding the series (after confirmation if needed)
     on<ProceedWithSeriesEvent>((event, emit) {
+      // Validate series compatibility before adding
+      List<AxisId>? incompatibleAxes = canAddSeries(
+        series: event.series,
+        dataCenter: DataCenter(),
+      );
+
+      if (incompatibleAxes == null) {
+        // Series is completely incompatible
+        reportError("Cannot add series '${event.series.name}' - incompatible with chart type");
+        return;
+      }
+
+      if (incompatibleAxes.isNotEmpty) {
+        reportError(
+            "Cannot add series '${event.series.name}' - incompatible data types on axes: $incompatibleAxes");
+        return;
+      }
+
       // Update the series
       Map<SeriesId, SeriesInfo> newSeries = {...state._series};
       newSeries[event.series.id] = event.series;
@@ -711,11 +737,24 @@ class ChartBloc extends WindowBloc<ChartState> {
     required DataCenter dataCenter,
   }) {
     final List<AxisId> mismatched = [];
+
     // Check that the series has the correct number of columns and axes
     if (series.fields.length != state.axisInfo.length) {
       developer.log("bad axes", name: "rubin_chart.core.chart.dart");
       return null;
     }
+
+    // Check if histogram chart is trying to use string data
+    if (state.windowType == WindowTypes.histogram) {
+      for (SchemaField field in series.fields.values) {
+        if (field.isString) {
+          reportError(
+              "Histogram charts cannot display string data. Column '${field.name}' is a string type.");
+          return null;
+        }
+      }
+    }
+
     for (AxisId sid in series.fields.keys) {
       SchemaField field = series.fields[sid]!;
       for (SeriesInfo otherSeries in state._series.values) {
