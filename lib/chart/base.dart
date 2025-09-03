@@ -642,7 +642,6 @@ class ChartBloc extends WindowBloc<ChartState> {
       }
       emit(state.copyWith(series: newSeries, axisInfo: axesInfo));
 
-      developer.log("State at this point: ${state.toJson()}", name: "rubintv.chart.base.dart");
       // Load the data from the server.
       _fetchSeriesData(
         series: event.series,
