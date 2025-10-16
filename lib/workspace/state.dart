@@ -577,13 +577,11 @@ String? getFormattedDate(DateTime? dayObs) {
 /// Load data for all series in a given chart
 void updateAllSeriesData(WorkspaceState workspace, {ChartState? chart}) {
   String? dayObs = getFormattedDate(workspace.dayObs);
-
   late final List<ChartState> charts;
   if (chart != null) {
     charts = [chart];
   } else {
     charts = workspace.windows.values.whereType<ChartState>().toList();
-    developer.log("Updating all series data for ${charts.length} charts", name: "rubin_chart.workspace");
   }
   // Request the data from the server.
   if (WebSocketManager().isConnected) {
@@ -630,7 +628,16 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
         // Update the workspace to use the new instrument
         WorkspaceState state = this.state as WorkspaceState;
         Instrument instrument = Instrument.fromJson(event.message["content"]);
+
+        // If we're already in a ready state and don't have pending JSON,
+        // just update the instrument and don't trigger a full workspace reload
+        if (state.status == WorkspaceStatus.ready && state.pendingJson == null) {
+          emit(state.copyWith(instrument: instrument));
+          return;
+        }
+
         emit(state.copyWith(instrument: instrument));
+
         if (state.status == WorkspaceStatus.loadingInstrument && state.pendingJson != null) {
           // Build new workspace from JSON
           WorkspaceState newState = WorkspaceState.fromJson(
@@ -856,21 +863,6 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
 
     /// Update the workspace state with a new state.
     on<UpdateWorkspaceEvent>((event, emit) {
-      // Sync data for all windows
-      WorkspaceState state = event.state;
-      for (var window in state.windows.values) {
-        if (window.bloc is ChartBloc) {
-          (window.bloc as ChartBloc).add(SynchDataEvent(
-            dayObs: getFormattedDate(state.dayObs),
-            globalQuery: state.globalQuery,
-          ));
-        } else if (window.bloc is FocalPlaneChartBloc) {
-          (window.bloc as FocalPlaneChartBloc).add(SynchDataEvent(
-            dayObs: getFormattedDate(state.dayObs),
-            globalQuery: state.globalQuery,
-          ));
-        }
-      }
       emit(event.state);
     });
   }
@@ -906,19 +898,69 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
   /// Build a workspace from a JSON object.
   void _applyWorkspaceJson(Emitter<WorkspaceStateBase> emit, WorkspaceState newState) async {
     WorkspaceState state = this.state as WorkspaceState;
-    // Clear current workspace
-    await _clearWorkspace(state);
-    add(UpdateWorkspaceEvent(newState));
+
+    // Skip calling ControlCenter().reset() which would broadcast a null global query
+    // Instead, we'll explicitly close old windows and reset controllers but avoid unnecessary global query updates
+    await _clearWorkspace(state, skipGlobalQueryReset: true);
+
+    // First emit the new state so it's available everywhere
+    emit(newState);
+
+    String? dayObs = getFormattedDate(newState.dayObs);
+
+    // Use a flag to track whether the global query update was made, to avoid duplicate updates
+    bool globalQueryUpdated = false;
+
+    // Then sync data for all windows, but we don't need to trigger the global query stream
+    // as the charts will get their data directly
+    for (var window in newState.windows.values) {
+      if (window.bloc is ChartBloc) {
+        developer.log("Syncing data for window ${window.id} with dayObs=$dayObs",
+            name: "rubin_chart.workspace");
+
+        // Send direct SynchData event instead of going through global query stream
+        (window.bloc as ChartBloc).add(SynchDataEvent(
+          dayObs: dayObs,
+          globalQuery: newState.globalQuery,
+          skipGlobalUpdate: true, // Indicate this is a direct update without triggering global query
+        ));
+
+        if (!globalQueryUpdated) {
+          // Update global query only once, after the first window is processed
+          ControlCenter().updateGlobalQuery(newState.getGlobalQuery());
+          globalQueryUpdated = true;
+        }
+      } else if (window.bloc is FocalPlaneChartBloc) {
+        (window.bloc as FocalPlaneChartBloc).add(SynchDataEvent(
+          dayObs: dayObs,
+          globalQuery: newState.globalQuery,
+        ));
+
+        if (!globalQueryUpdated) {
+          // Update global query only once, after the first window is processed
+          ControlCenter().updateGlobalQuery(newState.getGlobalQuery());
+          globalQueryUpdated = true;
+        }
+      }
+    }
   }
 
   /// Clear the workspace and the DataCenter.
-  Future<void> _clearWorkspace(WorkspaceState state) async {
+  Future<void> _clearWorkspace(WorkspaceState state, {bool skipGlobalQueryReset = false}) async {
     // Close all of the windows and cancel their subscriptions.
     for (WindowMetaData window in state.windows.values) {
       await window.bloc.close();
     }
-    // Clear the Streams for updating controllers.
-    ControlCenter().reset();
+
+    if (skipGlobalQueryReset) {
+      // Only reset selection controllers without affecting global query
+      ControlCenter().selectionController.reset();
+      ControlCenter().drillDownController.reset();
+    } else {
+      // Full reset of all controllers including global query stream
+      ControlCenter().reset();
+    }
+
     // Clear the DataCenter Series Data.
     DataCenter().clearSeriesData();
   }

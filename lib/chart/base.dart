@@ -129,9 +129,13 @@ class SynchDataEvent extends ChartEvent {
   final String? dayObs;
   final QueryExpression? globalQuery;
 
+  /// When true, skip updating the global query stream to avoid duplicate updates
+  final bool skipGlobalUpdate;
+
   SynchDataEvent({
     required this.dayObs,
     required this.globalQuery,
+    this.skipGlobalUpdate = false,
   });
 }
 
@@ -627,6 +631,17 @@ class ChartBloc extends WindowBloc<ChartState> {
 
     /// Reload all of the data from the server.
     on<SynchDataEvent>((event, emit) {
+      // When loading from a file, we don't want to trigger the global query update unnecessarily
+      if (!event.skipGlobalUpdate && event.globalQuery != null) {
+        // Update the global query in the control center which will notify all charts
+        ControlCenter().updateGlobalQuery(GlobalQuery(
+          query: event.globalQuery,
+          dayObs: event.dayObs,
+          instrument: null,
+          detector: null,
+        ));
+      }
+
       for (SeriesInfo series in state._series.values) {
         developer.log("Synching data for series ${series.id}", name: "rubintv.chart.base.dart");
         _fetchSeriesData(
@@ -780,7 +795,6 @@ class ChartBloc extends WindowBloc<ChartState> {
         if (field.isString) {
           reportError(
               "Histogram charts cannot display string data. Column '${field.name}' is a string type.");
-          // Histograms cannot display string data
           return null;
         }
       }
