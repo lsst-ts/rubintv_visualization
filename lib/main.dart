@@ -30,6 +30,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:rubintv_visualization/app.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/error.dart';
+import 'package:rubintv_visualization/utils/browser_logger.dart';
 
 /// A function to get the current version of the application.
 Future<AppVersion> getAppVersion() async {
@@ -38,14 +39,18 @@ Future<AppVersion> getAppVersion() async {
   String version = packageInfo.version;
   String buildNumber = packageInfo.buildNumber;
 
-  developer.log('App Version: $version', name: 'rubinTV.visualization.main');
-  developer.log('Build Number: $buildNumber', name: 'rubinTV.visualization.main');
+  // Log to both console and file
+  await logWithFile('App Version: $version', name: 'rubinTV.visualization.main');
+  await logWithFile('Build Number: $buildNumber', name: 'rubinTV.visualization.main');
 
   return AppVersion.fromString(version, buildNumber);
 }
 
 /// The main function for the application.
 Future main() async {
+  // Initialize browser-based logging
+  developer.log('Starting application with browser-based logging', name: 'rubinTV.visualization.main');
+
   FlutterError.onError = (FlutterErrorDetails details) {
     if (details.exception is FlutterError) {
       // Handle Flutter errors
@@ -54,10 +59,12 @@ Future main() async {
     }
     // Very general error handling
     reportError(details.exceptionAsString());
-    // Log the error to the console
-    developer.log(
+
+    // Log the error to both console and file
+    logWithFile(
       details.exceptionAsString(),
       name: 'rubinTV.visualization.main',
+      level: 3, // ERROR level
       error: details.exception,
       stackTrace: details.stack,
     );
@@ -73,7 +80,7 @@ Future main() async {
     String address = dotenv.get("ADDRESS", fallback: "");
     int? port = int.tryParse(dotenv.get("PORT", fallback: ""));
 
-    developer.log(
+    await logWithFile(
       "${web.window.location.protocol}, host is $host, "
       "address is $address, port is $port, protocol is $protocol",
       name: 'rubinTV.visualization.main',
@@ -85,7 +92,14 @@ Future main() async {
     runApp(MainApp(websocketUri: websocketUrl, version: version));
   }, (error, stackTrace) {
     reportError("Error in async runtime: $error");
-    developer.log("Error in main: $error", name: 'rubinTV.visualization.main');
-    developer.log("Stack Trace: $stackTrace", name: 'rubinTV.visualization.main');
+
+    // Log both to console and file
+    logWithFile(
+      "Error in async runtime: $error",
+      name: 'rubinTV.visualization.main',
+      level: 3, // ERROR level
+      error: error,
+      stackTrace: stackTrace,
+    );
   });
 }
