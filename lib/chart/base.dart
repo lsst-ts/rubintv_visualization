@@ -129,9 +129,13 @@ class SynchDataEvent extends ChartEvent {
   final String? dayObs;
   final QueryExpression? globalQuery;
 
+  /// When true, skip updating the global query stream to avoid duplicate updates
+  final bool skipGlobalUpdate;
+
   SynchDataEvent({
     required this.dayObs,
     required this.globalQuery,
+    this.skipGlobalUpdate = false,
   });
 }
 
@@ -627,6 +631,17 @@ class ChartBloc extends WindowBloc<ChartState> {
 
     /// Reload all of the data from the server.
     on<SynchDataEvent>((event, emit) {
+      // When loading from a file, we don't want to trigger the global query update unnecessarily
+      if (!event.skipGlobalUpdate && event.globalQuery != null) {
+        // Update the global query in the control center which will notify all charts
+        ControlCenter().updateGlobalQuery(GlobalQuery(
+          query: event.globalQuery,
+          dayObs: event.dayObs,
+          instrument: null,
+          detector: null,
+        ));
+      }
+
       for (SeriesInfo series in state._series.values) {
         developer.log("Synching data for series ${series.id}", name: "rubintv.chart.base.dart");
         _fetchSeriesData(
@@ -648,7 +663,7 @@ class ChartBloc extends WindowBloc<ChartState> {
     /// Proceed with adding the series (after confirmation if needed)
     on<ProceedWithSeriesEvent>((event, emit) {
       // Validate series compatibility before adding
-      List<AxisId>? incompatibleAxes = canAddSeries(
+      List<MapEntry<AxisId, SchemaField>>? incompatibleAxes = canAddSeries(
         series: event.series,
         dataCenter: DataCenter(),
       );
@@ -660,8 +675,13 @@ class ChartBloc extends WindowBloc<ChartState> {
       }
 
       if (incompatibleAxes.isNotEmpty) {
+        // Report which axes are incompatible together with their types
+        List<String> axisNames = incompatibleAxes
+            .map((entry) => state.axisInfo.firstWhere((axis) => axis.axisId == entry.key).label)
+            .toList();
+        List<String> axisTypes = incompatibleAxes.map((entry) => entry.value.dataType.toString()).toList();
         reportError(
-            "Cannot add series '${event.series.name}' - incompatible data types on axes: $incompatibleAxes");
+            "Cannot add series '${event.series.name}' - incompatible data types on axes: $axisNames ($axisTypes)");
         return;
       }
 
@@ -757,11 +777,11 @@ class ChartBloc extends WindowBloc<ChartState> {
 
   /// Check if a series is compatible with this chart.
   /// Any mismatched columns have their indices returned.
-  List<AxisId>? canAddSeries({
+  List<MapEntry<AxisId, SchemaField>>? canAddSeries({
     required SeriesInfo series,
     required DataCenter dataCenter,
   }) {
-    final List<AxisId> mismatched = [];
+    final List<MapEntry<AxisId, SchemaField>> mismatched = [];
 
     // Check that the series has the correct number of columns and axes
     if (series.fields.length != state.axisInfo.length) {
@@ -780,22 +800,23 @@ class ChartBloc extends WindowBloc<ChartState> {
       }
     }
 
+    // If there are no existing series, we don't need to check compatibility
+    if (state._series.isEmpty) {
+      return mismatched;
+    }
+
     for (AxisId sid in series.fields.keys) {
       SchemaField field = series.fields[sid]!;
       for (SeriesInfo otherSeries in state._series.values) {
-        SchemaField? otherField = otherSeries.fields[sid];
-        if (otherField == null) {
-          developer.log("missing field $sid", name: "rubin_chart.core.chart.dart");
-          mismatched.add(sid);
-        } else {
-          // Check that the new series is compatible with the existing series
-          if (!dataCenter.isFieldCompatible(field, otherField)) {
-            developer.log(
-              "Incompatible fields $otherField and $field",
-              name: "rubin_chart.core.chart.dart",
-            );
-            mismatched.add(sid);
-          }
+        // Skip the check if we're editing a series (replacing it with itself)
+        if (otherSeries.id == series.id) {
+          continue;
+        }
+
+        if (!otherSeries.fields.containsKey(sid)) {
+          mismatched.add(MapEntry(sid, field));
+        } else if (!dataCenter.isFieldCompatible(field, otherSeries.fields[sid]!)) {
+          mismatched.add(MapEntry(sid, field));
         }
       }
     }

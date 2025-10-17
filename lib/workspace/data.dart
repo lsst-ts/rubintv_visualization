@@ -498,7 +498,10 @@ class DataCenter {
   }
 
   /// Check if two [SchemaField]s are compatible
-  bool isFieldCompatible(SchemaField field1, SchemaField field2) => throw UnimplementedError();
+  bool isFieldCompatible(SchemaField field1, SchemaField field2) => {
+        field1.dataType == field2.dataType,
+        field1.unit == field2.unit,
+      }.every((e) => e);
 
   @override
   String toString() => "DataCenter:[${databases.keys}]";
