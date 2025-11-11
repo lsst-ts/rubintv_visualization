@@ -36,6 +36,7 @@ import 'package:rubintv_visualization/workspace/state.dart';
 import 'package:rubintv_visualization/websocket.dart';
 import 'package:rubintv_visualization/workspace/viewer.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
+import 'package:rubintv_visualization/utils/log_export_button.dart';
 
 /// A [Widget] used to display a toolbar at the top of the workspace.
 class DatePickerWidget extends StatefulWidget {
@@ -525,6 +526,14 @@ class ToolbarState extends State<Toolbar> {
                 context.read<WorkspaceBloc>().add(ClearWorkspaceEvent());
               },
             ),
+          ),
+          const SizedBox(width: 10),
+          // Uncomment the following line to disable the log export button
+          // in production builds.
+          // if (kDebugMode)
+          const Tooltip(
+            message: "Export debug logs",
+            child: LogExportButton(),
           ),
         ],
       ),
