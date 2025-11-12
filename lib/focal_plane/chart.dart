@@ -579,6 +579,8 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
   WindowMetaData get window => widget.window;
   WorkspaceState get workspace => widget.workspace;
 
+  late final void Function(ColorbarState) _colorbarSubscription;
+
   /// We use a special editor for the series in a focal plane chart.
   Future<void> _editSeries(BuildContext context, SeriesInfo series) async {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
@@ -610,9 +612,19 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
   @override
   void initState() {
     super.initState();
-    widget.bloc.state.colorbarController.subscribe((ColorbarState state) {
-      setState(() {});
-    });
+    _colorbarSubscription = (ColorbarState state) {
+      if (mounted) {
+        setState(() {});
+      }
+    };
+    widget.bloc.state.colorbarController.subscribe(_colorbarSubscription);
+  }
+
+  @override
+  void dispose() {
+    // Unsubscribe from the colorbar controller
+    widget.bloc.state.colorbarController.unsubscribe(_colorbarSubscription);
+    super.dispose();
   }
 
   @override

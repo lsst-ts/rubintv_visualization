@@ -229,6 +229,15 @@ class BinnedChartWidget extends StatelessWidget {
                     context.read<ChartBloc>().add(UpdateMultiSelect(selection.first));
                   },
                 ),
+                Tooltip(
+                  message: "Reset the chart axes",
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.green),
+                    onPressed: () {
+                      state.resetController.add(ResetChartAction(ChartResetTypes.full));
+                    },
+                  ),
+                ),
                 ...context.read<ChartBloc>().getDefaultTools(context)
               ]),
               title: null,
@@ -250,7 +259,7 @@ class BinnedChartWidget extends StatelessWidget {
                       ),
                 selectionController: selectionController,
                 drillDownController: drillDownController,
-                resetController: resetController,
+                resetController: state.resetController,
                 legendSelectionCallback: context.read<ChartBloc>().onLegendSelect,
                 onTapAxis: context.read<ChartBloc>().onAxisTap,
               ),
