@@ -455,18 +455,37 @@ class DataCenter {
         }
 
         SchemaField field = dataSource.tables[tableName]!.fields[columnName]!;
-        if (series.fields.containsValue(field)) {
+
+        // Find matching field by name and table instead of object reference
+        SchemaField? matchingSeriesField;
+        AxisId? matchingAxisId;
+
+        for (MapEntry<AxisId, SchemaField> entry in series.fields.entries) {
+          SchemaField seriesField = entry.value;
+          if (seriesField.name == field.name &&
+              seriesField.schema.name == field.schema.name &&
+              seriesField.database.name == field.database.name) {
+            matchingSeriesField = field;
+            matchingAxisId = entry.key;
+            break;
+          }
+        }
+
+        if (matchingSeriesField != null && matchingAxisId != null) {
           if (field.isString) {
-            columns[field] = List<String>.from(data[plotColumn]!.map((e) => e));
+            columns[matchingSeriesField] = List<String>.from(data[plotColumn]!.map((e) => e));
           } else if (field.isNumerical) {
-            columns[field] = List<double>.from(data[plotColumn]!.map((e) => e.toDouble()));
+            columns[matchingSeriesField] = List<double>.from(data[plotColumn]!.map((e) => e.toDouble()));
           } else if (field.isDateTime) {
-            columns[field] = List<DateTime>.from(data[plotColumn]!.map((e) => convertRubinDate(e)));
+            columns[matchingSeriesField] =
+                List<DateTime>.from(data[plotColumn]!.map((e) => convertRubinDate(e)));
           }
 
           // Add the column to the series columns
-          AxisId axisId = series.axes[series.fields.values.toList().indexOf(field)];
-          seriesColumns[axisId] = field;
+          seriesColumns[matchingAxisId] = matchingSeriesField;
+        } else {
+          reportError("Plot column '$plotColumn' does not match any series fields.");
+          return;
         }
       }
 
