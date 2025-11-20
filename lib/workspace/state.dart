@@ -432,7 +432,7 @@ class WorkspaceState extends WorkspaceStateBase {
     AppVersion fileVersion = AppVersion.fromJson(json["version"]);
     if (fileVersion != version) {
       developer.log("File version $fileVersion does not match current version $version. ",
-          name: "rubin_chart.workspace");
+          name: "rubintv.workspace");
       json = convertWorkspace(json, theme, version);
     }
 
@@ -623,7 +623,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
 
     /// A message is received from the websocket.
     on<ReceiveMessageEvent>((event, emit) {
-      developer.log("Workspace Received message: ${event.message["type"]}", name: "rubin_chart.workspace");
+      developer.log("Workspace Received message: ${event.message["type"]}", name: "rubintv.workspace");
       if (event.message["type"] == "instrument info") {
         // Update the workspace to use the new instrument
         WorkspaceState state = this.state as WorkspaceState;
@@ -640,19 +640,14 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
 
         if (state.status == WorkspaceStatus.loadingInstrument && state.pendingJson != null) {
           // Build new workspace from JSON
-          WorkspaceState newState = WorkspaceState.fromJson(
-            state.pendingJson!,
-            (this.state as WorkspaceState).theme,
-            state.version,
-          );
-          _applyWorkspaceJson(emit, newState);
+          _applyWorkspaceJsonWithClear(emit, state.pendingJson!, state);
         }
       } else if (event.message["type"] == "file content") {
         // Load the workspace from the file content
         add(LoadWorkspaceFromTextEvent(event.message["content"]["content"]));
       } else if (event.message["type"] == "error") {
         // Display the error message
-        developer.log("Received error message: ${event.message["content"]}", name: "rubin_chart.workspace");
+        developer.log("Received error message: ${event.message["content"]}", name: "rubintv.workspace");
 
         // Extract error details
         Map<String, dynamic> errorContent = event.message["content"];
@@ -684,7 +679,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
 
     /// Update the global observation date.
     on<UpdateGlobalObsDateEvent>((event, emit) {
-      developer.log("updating date to ${event.dayObs}!", name: "rubin_chart.workspace");
+      developer.log("updating date to ${event.dayObs}!", name: "rubintv.workspace");
       WorkspaceState state = this.state as WorkspaceState;
       state = state.updateObsDate(event.dayObs);
       ControlCenter().updateGlobalQuery(state.getGlobalQuery());
@@ -723,7 +718,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
       Map<UniqueId, WindowMetaData> windows = {...state.windows};
       windows[newWindow.id] = newWindow;
 
-      developer.log("Added new focal plane window: $newWindow", name: "rubin_chart.workspace");
+      developer.log("Added new focal plane window: $newWindow", name: "rubintv.workspace");
 
       emit(state.copyWith(windows: windows));
     });
@@ -742,7 +737,16 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
     on<RemoveWindowEvent>((event, emit) {
       WorkspaceState state = this.state as WorkspaceState;
       Map<UniqueId, WindowMetaData> windows = {...state.windows};
-      windows.remove(event.windowId);
+      WindowMetaData? windowToRemove = windows[event.windowId];
+      if (windowToRemove != null) {
+        // Close the bloc to cancel all its subscriptions
+        windowToRemove.bloc.close();
+
+        // Remove the window from the map
+        windows.remove(event.windowId);
+
+        developer.log("Window ${event.windowId} removed and bloc closed", name: "rubintv.workspace.state");
+      }
       emit(state.copyWith(windows: windows));
     });
 
@@ -871,42 +875,70 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
   void _onLoadWorkspaceFromText(LoadWorkspaceFromTextEvent event, Emitter<WorkspaceStateBase> emit) {
     WorkspaceState state = this.state as WorkspaceState;
 
+    developer.log("=== WORKSPACE LOAD START ===", name: "rubintv.workspace.load");
+    developer.log("Current state: windows=${state.windows.length}, instrument=${state.instrument?.name}",
+        name: "rubintv.workspace.load");
+
     try {
       Map<String, dynamic> json = jsonDecode(event.text);
+      developer.log("JSON parsed successfully", name: "rubintv.workspace.load");
+
       Instrument newInstrument = Instrument.fromJson(json["instrument"]);
+      developer.log("New instrument: ${newInstrument.name}, current: ${state.instrument?.name}",
+          name: "rubintv.workspace.load");
 
       if (state.instrument?.name != newInstrument.name) {
+        developer.log("Instrument mismatch - waiting for instrument load", name: "rubintv.workspace.load");
         emit(state.copyWith(
           status: WorkspaceStatus.loadingInstrument,
           pendingJson: json,
         ));
         WebSocketManager().sendMessage(LoadInstrumentAction(instrument: newInstrument.name).toJson());
       } else {
+        developer.log("Instrument matches - building workspace directly", name: "rubintv.workspace.load");
         // Build new workspace from JSON
-        WorkspaceState newState = WorkspaceState.fromJson(
-          json,
-          (this.state as WorkspaceState).theme,
-          state.version,
-        );
-        _applyWorkspaceJson(emit, newState);
+        _applyWorkspaceJsonWithClear(emit, json, state);
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      developer.log("Error loading workspace: $e",
+          name: "rubintv.workspace.load", error: e, stackTrace: stackTrace);
       emit(state.copyWith(status: WorkspaceStatus.error, errorMessage: "Failed to load workspace: $e"));
     }
   }
 
+  Future<void> _applyWorkspaceJsonWithClear(
+      Emitter<WorkspaceStateBase> emit, Map<String, dynamic> json, WorkspaceState currentState) async {
+    developer.log("=== CLEARING BEFORE JSON LOAD ===", name: "rubintv.workspace.load");
+
+    // 1. Clear the old workspace FIRST
+    await _clearWorkspace(currentState, skipGlobalQueryReset: true);
+    developer.log("Workspace cleared, now building from JSON", name: "rubintv.workspace.load");
+
+    // 2. Build new workspace from JSON AFTER clearing
+    WorkspaceState newState = WorkspaceState.fromJson(
+      json,
+      currentState.theme,
+      currentState.version,
+    );
+
+    // 3. Continue with the rest of the application logic
+    _applyWorkspaceJson(emit, newState);
+  }
+
   /// Build a workspace from a JSON object.
   void _applyWorkspaceJson(Emitter<WorkspaceStateBase> emit, WorkspaceState newState) async {
-    WorkspaceState state = this.state as WorkspaceState;
-
-    // Skip calling ControlCenter().reset() which would broadcast a null global query
-    // Instead, we'll explicitly close old windows and reset controllers but avoid unnecessary global query updates
-    await _clearWorkspace(state, skipGlobalQueryReset: true);
+    developer.log("=== APPLYING JSON WORKSPACE ===", name: "rubintv.workspace.load");
+    developer.log("New state: windows=${newState.windows.length}, instrument=${newState.instrument?.name}",
+        name: "rubintv.workspace.load");
 
     // First emit the new state so it's available everywhere
-    emit(newState);
+    if (!emit.isDone) {
+      emit(newState);
+      developer.log("New workspace state emitted", name: "rubintv.workspace.load");
+    }
 
     String? dayObs = getFormattedDate(newState.dayObs);
+    developer.log("DayObs for sync: $dayObs", name: "rubintv.workspace.load");
 
     // Use a flag to track whether the global query update was made, to avoid duplicate updates
     bool globalQueryUpdated = false;
@@ -914,9 +946,12 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
     // Then sync data for all windows, but we don't need to trigger the global query stream
     // as the charts will get their data directly
     for (var window in newState.windows.values) {
+      developer.log("Processing window ${window.id} of type ${window.windowType}",
+          name: "rubintv.workspace.load");
+
       if (window.bloc is ChartBloc) {
-        developer.log("Syncing data for window ${window.id} with dayObs=$dayObs",
-            name: "rubin_chart.workspace");
+        developer.log("Syncing ChartBloc data for window ${window.id} with dayObs=$dayObs",
+            name: "rubintv.workspace.load");
 
         // Send direct SynchData event instead of going through global query stream
         (window.bloc as ChartBloc).add(SynchDataEvent(
@@ -926,43 +961,60 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceStateBase> {
         ));
 
         if (!globalQueryUpdated) {
+          developer.log("Updating global query (first time)", name: "rubintv.workspace.load");
           // Update global query only once, after the first window is processed
           ControlCenter().updateGlobalQuery(newState.getGlobalQuery());
           globalQueryUpdated = true;
         }
       } else if (window.bloc is FocalPlaneChartBloc) {
+        developer.log("Syncing FocalPlaneChartBloc data for window ${window.id}",
+            name: "rubintv.workspace.load");
         (window.bloc as FocalPlaneChartBloc).add(SynchDataEvent(
           dayObs: dayObs,
           globalQuery: newState.globalQuery,
         ));
 
         if (!globalQueryUpdated) {
+          developer.log("Updating global query (first time - focal plane)", name: "rubintv.workspace.load");
           // Update global query only once, after the first window is processed
           ControlCenter().updateGlobalQuery(newState.getGlobalQuery());
           globalQueryUpdated = true;
         }
       }
     }
+
+    developer.log("=== WORKSPACE LOAD COMPLETE ===", name: "rubintv.workspace.load");
   }
 
   /// Clear the workspace and the DataCenter.
   Future<void> _clearWorkspace(WorkspaceState state, {bool skipGlobalQueryReset = false}) async {
+    developer.log("=== CLEARING WORKSPACE ===", name: "rubintv.workspace.clear");
+    developer.log("Windows to close: ${state.windows.length}, skipGlobalQueryReset: $skipGlobalQueryReset",
+        name: "rubintv.workspace.clear");
+
     // Close all of the windows and cancel their subscriptions.
     for (WindowMetaData window in state.windows.values) {
-      await window.bloc.close();
+      if (window.windowType.isChart || window.windowType == WindowTypes.focalPlane) {
+        developer.log("Closing window ${window.id} of type ${window.windowType}",
+            name: "rubintv.workspace.clear");
+        await window.bloc.close();
+      }
     }
+    developer.log("All window blocs closed", name: "rubintv.workspace.clear");
 
     if (skipGlobalQueryReset) {
-      // Only reset selection controllers without affecting global query
+      developer.log("Resetting selection controllers only", name: "rubintv.workspace.clear");
       ControlCenter().selectionController.reset();
       ControlCenter().drillDownController.reset();
     } else {
-      // Full reset of all controllers including global query stream
+      developer.log("Full ControlCenter reset", name: "rubintv.workspace.clear");
       ControlCenter().reset();
     }
 
     // Clear the DataCenter Series Data.
     DataCenter().clearSeriesData();
+    developer.log("DataCenter series data cleared", name: "rubintv.workspace.clear");
+    developer.log("=== WORKSPACE CLEAR COMPLETE ===", name: "rubintv.workspace.clear");
   }
 
   /// Cancel the subscription to the websocket.

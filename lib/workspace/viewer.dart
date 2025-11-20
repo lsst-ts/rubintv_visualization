@@ -89,7 +89,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   @override
   void initState() {
-    developer.log("Initializing WorkspaceViewerState", name: "rubin_chart.workspace");
+    developer.log("=== INITIALIZING WORKSPACE VIEWER ===", name: "rubintv.workspace.viewer");
     super.initState();
 
     ControlCenter().selectionController.subscribe(id, _onSelectionUpdate);
@@ -99,7 +99,8 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
   /// This isn't used now, but can be used in the future if any plots cannot be
   /// matched to obs_date,seq_num data IDs.
   void _onSelectionUpdate(Object? origin, Set<Object> dataPoints) {
-    developer.log("Selection updated: ${dataPoints.length}", name: "rubin_chart.workspace");
+    developer.log("Workspace viewer received selection update from $origin: ${dataPoints.length} points",
+        name: "rubintv.workspace.viewer");
   }
 
   @override
@@ -108,14 +109,21 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
       create: (context) => WorkspaceBloc()..add(InitializeWorkspaceEvent(theme, version)),
       child: BlocBuilder<WorkspaceBloc, WorkspaceStateBase>(
         builder: (context, state) {
+          developer.log("=== BUILDING WORKSPACE ===", name: "rubintv.workspace.viewer");
+          developer.log("State type: ${state.runtimeType}", name: "rubintv.workspace.viewer");
+
           if (state is WorkspaceStateInitial) {
+            developer.log("Workspace state is initial - showing progress indicator",
+                name: "rubintv.workspace.viewer");
             return const Center(
               child: CircularProgressIndicator(),
             );
           }
-
+          info = state as WorkspaceState?;
           if (state is WorkspaceState) {
-            info = state;
+            developer.log(
+                "Workspace state loaded: ${state.windows.length} windows, instrument=${state.instrument?.name}",
+                name: "rubintv.workspace.viewer");
             return Column(children: [
               Toolbar(workspace: state),
               SizedBox(
@@ -124,13 +132,16 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
                 child: Builder(
                   builder: (BuildContext context) {
                     List<Widget> children = [];
-                    for (WindowMetaData window in info!.windows.values) {
+                    for (WindowMetaData window in state.windows.values) {
+                      developer.log("Building window ${window.id} of type ${window.windowType}",
+                          name: "rubintv.workspace.viewer");
                       children.add(Positioned(
                         left: window.offset.dx,
                         top: window.offset.dy,
                         child: buildWindow(window, state),
                       ));
                     }
+                    developer.log("Built ${children.length} windows", name: "rubintv.workspace.viewer");
 
                     return Stack(
                       children: children,
@@ -149,6 +160,9 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   /// Build a window widget based on the type of the window.
   Widget buildWindow(WindowMetaData window, WorkspaceState workspace) {
+    developer.log("Building window widget for ${window.id} type ${window.windowType}",
+        name: "rubintv.workspace.viewer");
+
     if (window.windowType == WindowTypes.cartesianScatter || window.windowType == WindowTypes.polarScatter) {
       return ScatterPlotWidget(window: window, bloc: window.bloc as ChartBloc);
     }

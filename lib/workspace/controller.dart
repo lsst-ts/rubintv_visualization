@@ -20,6 +20,7 @@
 /// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:rubin_chart/rubin_chart.dart';
 import 'package:rubintv_visualization/workspace/state.dart';
@@ -57,21 +58,30 @@ class ControlCenter {
 
   /// Update the global query.
   void updateGlobalQuery(GlobalQuery? query) {
+    developer.log("=== UPDATING GLOBAL QUERY ===", name: "rubintv.workspace.controller");
+    developer.log(
+        "New query: ${query?.query?.toJson()}, dayObs: ${query?.dayObs}, instrument: ${query?.instrument?.name}",
+        name: "rubintv.workspace.controller");
     _globalQueryController.add(query);
   }
 
   /// Update the selection data points.
   void updateSelection(Object chartId, Set<Object> dataPoints) {
+    developer.log("Updating selection from $chartId: ${dataPoints.length} points",
+        name: "rubintv.workspace.controller");
     _selectionController.updateSelection(chartId, dataPoints);
   }
 
   /// Update the drill down data points.
   void updateDrillDown(Object chartId, Set<Object> dataPoints) {
+    developer.log("Updating drill down from $chartId: ${dataPoints.length} points",
+        name: "rubintv.workspace.controller");
     _drillDownController.updateSelection(chartId, dataPoints);
   }
 
   /// Dispose of the stream controllers.
   void dispose() {
+    developer.log("Disposing ControlCenter", name: "rubintv.workspace.controller");
     _globalQueryController.close();
     _selectionController.dispose();
     _drillDownController.dispose();
@@ -79,8 +89,10 @@ class ControlCenter {
 
   /// Reset the stream controllers.
   void reset() {
+    developer.log("=== RESETTING CONTROL CENTER ===", name: "rubintv.workspace.controller");
     _globalQueryController.add(null);
     _selectionController.reset();
     _drillDownController.reset();
+    developer.log("ControlCenter reset complete", name: "rubintv.workspace.controller");
   }
 }

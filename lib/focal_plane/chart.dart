@@ -282,6 +282,9 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
   }
 
   FocalPlaneChartBloc(super.initialState) {
+    developer.log("=== CREATING FOCAL PLANE CHART BLOC ===", name: "rubintv.focal_plane.chart");
+    developer.log("Initial state: id=${state.id}", name: "rubintv.focal_plane.chart");
+
     _websocketSubscription = WebSocketManager().messages.listen((message) {
       add(FocalPlaneReceiveMessageEvent(message));
     });
@@ -289,6 +292,9 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
     /// Subscribe to the selection controller to update the chart when points are selected.
     /// We use a timer so that we don't load data until the selection has stopped
     ControlCenter().selectionController.subscribe(state.id, (Object? origin, Set<Object> dataPoints) {
+      developer.log(
+          "Focal plane ${state.id} received selection update from $origin: ${dataPoints.length} points",
+          name: "rubintv.focal_plane.chart");
       if (origin == state.id) {
         return;
       }
@@ -300,6 +306,8 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
 
     /// Subscribe to the global query stream to update the chart when the query changes.
     _globalQuerySubscription = ControlCenter().globalQueryStream.listen((GlobalQuery? query) {
+      developer.log("Focal plane ${state.id} received global query update: dayObs=${query?.dayObs}",
+          name: "rubintv.focal_plane.chart");
       Set<DataId>? selected =
           ControlCenter().selectionController.selectedDataPoints.map((e) => e as DataId).toSet();
       if (selected.isEmpty) {
@@ -310,6 +318,8 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
       }
       _fetchSeriesData(series: state.series, query: query?.query, dayObs: query?.dayObs, selected: selected);
     });
+
+    developer.log("Focal plane chart bloc created and subscribed", name: "rubintv.focal_plane.chart");
 
     /// Initialize the chart.
     on<InitializeFocalPlaneChartEvent>((event, emit) {
@@ -367,7 +377,7 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
         },
       );
 
-      developer.log("Selected data points: ${event.selected}", name: "rubin_chart.focal_plane.chart.dart");
+      developer.log("Selected data points: ${event.selected}", name: "rubintv.focal_plane.chart.dart");
 
       bool isNewPlot = state.data.isEmpty;
 
@@ -436,6 +446,8 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
 
     /// Reload all of the data from the server.
     on<SynchDataEvent>((event, emit) {
+      developer.log("=== SYNCHING FOCAL PLANE DATA ===", name: "rubintv.focal_plane.chart");
+      developer.log("Focal plane ${state.id}: dayObs=${event.dayObs}", name: "rubintv.focal_plane.chart");
       _updateSeries();
     });
   }
@@ -455,7 +467,7 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
     int rows = event.message["content"]["data"].values.first.length;
     int columns = event.message["content"]["data"].length;
     developer.log("received $columns columns and $rows rows for ${event.message["requestId"]}",
-        name: "rubin_chart.workspace");
+        name: "rubintv.workspace");
 
     if (rows > 0) {
       // Extract the data from the message
@@ -545,8 +557,11 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
   /// Close the bloc.
   @override
   Future<void> close() {
+    developer.log("=== CLOSING FOCAL PLANE CHART BLOC ===", name: "rubintv.focal_plane.chart");
+    developer.log("Focal plane ${state.id} being closed", name: "rubintv.focal_plane.chart");
     _websocketSubscription.cancel();
     _globalQuerySubscription.cancel();
+    developer.log("Focal plane chart bloc closed", name: "rubintv.focal_plane.chart");
     return super.close();
   }
 }
@@ -584,7 +599,7 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
   /// We use a special editor for the series in a focal plane chart.
   Future<void> _editSeries(BuildContext context, SeriesInfo series) async {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
-    developer.log("New series fields: ${series.fields}", name: "rubin_chart.core.chart.dart");
+    developer.log("New series fields: ${series.fields}", name: "rubintv.core.chart.dart");
     DatabaseSchema schema = DataCenter().databases[workspace.info!.instrument!.schema]!;
     SchemaField field;
     if (series.fields.isNotEmpty) {

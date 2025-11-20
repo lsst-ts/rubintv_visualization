@@ -165,18 +165,31 @@ class WindowMetaData {
     Offset offset = Offset(json["offset"]["dx"], json["offset"]["dy"]);
     Size size = Size(json["size"]["width"], json["size"]["height"]);
     String? title = json["title"] == "" ? null : json["title"];
+
+    developer.log("=== DESERIALIZING WINDOW ===", name: "rubintv_visualization.workspace.window");
+    developer.log("Window ID: ${state.id}, Type: ${state.windowType}",
+        name: "rubintv_visualization.workspace.window");
+
     late WindowBloc bloc;
     if (state.windowType == WindowTypes.detectorSelector) {
+      developer.log("Creating detector selector bloc from JSON",
+          name: "rubintv_visualization.workspace.window");
       bloc = WindowBloc(state);
     } else if (state.windowType.isBinned) {
+      developer.log("Creating binned bloc from JSON", name: "rubintv_visualization.workspace.window");
       bloc = ChartBloc(state as BinnedState);
     } else if (state.windowType.isScatter) {
+      developer.log("Creating scatter bloc from JSON", name: "rubintv_visualization.workspace.window");
       bloc = ChartBloc(state as ChartState);
     } else if (state.windowType == WindowTypes.focalPlane) {
+      developer.log("Creating focal plane bloc from JSON", name: "rubintv_visualization.workspace.window");
       bloc = FocalPlaneChartBloc(state as FocalPlaneChartState);
     } else {
       throw ArgumentError("Unrecognized window type ${state.windowType}");
     }
+
+    developer.log("Window bloc created from JSON successfully",
+        name: "rubintv_visualization.workspace.window");
     return WindowMetaData(offset: offset, size: size, title: title, bloc: bloc);
   }
 }

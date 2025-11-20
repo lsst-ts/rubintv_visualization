@@ -382,20 +382,34 @@ class DataCenter {
     required List<String> plotColumns,
     required Map<String, List<dynamic>> data,
   }) {
+    developer.log("=== UPDATING SERIES DATA ===", name: "rubintv_visualization.workspace.data");
+    developer.log("Series: ${series.id}, DataSource: $dataSourceName, Columns: ${plotColumns.length}",
+        name: "rubintv_visualization.workspace.data");
+
     // Extensive validation
     if (data.isEmpty) {
+      developer.log("No data found for series ${series.id}", name: "rubintv_visualization.workspace.data");
       reportError("No data found for the selected columns.");
       return;
     }
 
     // Check if any data lists are empty
     if (data.values.any((list) => list.isEmpty)) {
+      developer.log("Empty data lists found for series ${series.id}",
+          name: "rubintv_visualization.workspace.data");
+      developer.log(
+          "Data keys with empty lists: ${data.entries.where((e) => e.value.isEmpty).map((e) => e.key)}",
+          name: "rubintv_visualization.workspace.data");
       reportError("One or more columns contain no data.");
       return;
     }
 
     int rows = data.values.first.length;
+    developer.log("Data has $rows rows", name: "rubintv_visualization.workspace.data");
+
     if (rows == 0) {
+      developer.log("No non-null data found for series ${series.id}",
+          name: "rubintv_visualization.workspace.data");
       reportError("No non-null data found for the selected columns.");
       return;
     }
@@ -510,10 +524,27 @@ class DataCenter {
         dataIds: dataIds,
       );
 
+      developer.log("Series data updated successfully for ${series.id}",
+          name: "rubintv_visualization.workspace.data");
       _seriesData[series.id] = seriesData;
     } else {
       throw DataAccessException("Unknown data source: $dataSource");
     }
+  }
+
+  void removeSeriesData(SeriesId id) {
+    developer.log("Removing series data for $id", name: "rubintv_visualization.workspace.data");
+    _seriesData.remove(id);
+  }
+
+  void clearSeriesData() {
+    developer.log("=== CLEARING ALL SERIES DATA ===", name: "rubintv_visualization.workspace.data");
+    developer.log("Clearing ${_seriesData.length} series", name: "rubintv_visualization.workspace.data");
+    _seriesData.clear();
+  }
+
+  void dispose() {
+    _subscription.cancel();
   }
 
   /// Check if two [SchemaField]s are compatible
@@ -521,21 +552,6 @@ class DataCenter {
         field1.dataType == field2.dataType,
         field1.unit == field2.unit,
       }.every((e) => e);
-
-  @override
-  String toString() => "DataCenter:[${databases.keys}]";
-
-  void removeSeriesData(SeriesId id) {
-    _seriesData.remove(id);
-  }
-
-  void clearSeriesData() {
-    _seriesData.clear();
-  }
-
-  void dispose() {
-    _subscription.cancel();
-  }
 }
 
 /// DataId for an entry in the exposure or visit table
