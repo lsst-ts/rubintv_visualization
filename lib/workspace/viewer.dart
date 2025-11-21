@@ -33,6 +33,7 @@ import 'package:rubintv_visualization/workspace/controller.dart';
 import 'package:rubintv_visualization/workspace/state.dart';
 import 'package:rubintv_visualization/workspace/toolbar.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
+import 'package:rubintv_visualization/id.dart';
 
 /// A [Widget] used to display a set of re-sizable and translatable [WindowMetaData] widgets in a container.
 class WorkspaceViewer extends StatefulWidget {
@@ -108,6 +109,63 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
     return BlocProvider(
       create: (context) => WorkspaceBloc()..add(InitializeWorkspaceEvent(theme, version)),
       child: BlocBuilder<WorkspaceBloc, WorkspaceStateBase>(
+        buildWhen: (previous, current) {
+          developer.log("BlocBuilder buildWhen: ${previous.runtimeType} -> ${current.runtimeType}",
+              name: "rubintv.workspace.viewer");
+
+          // Always rebuild if state types are different
+          if (previous.runtimeType != current.runtimeType) {
+            developer.log("State type changed - rebuilding", name: "rubintv.workspace.viewer");
+            return true;
+          }
+
+          // Always rebuild if we're coming from or going to initial state
+          if (previous is WorkspaceStateInitial || current is WorkspaceStateInitial) {
+            developer.log("Initial state transition - rebuilding", name: "rubintv.workspace.viewer");
+            return true;
+          }
+
+          if (previous is WorkspaceState && current is WorkspaceState) {
+            developer.log("Windows: ${previous.windows.length} -> ${current.windows.length}",
+                name: "rubintv.workspace.viewer");
+
+            // Rebuild if window count changed
+            if (previous.windows.length != current.windows.length) {
+              developer.log("Window count changed - rebuilding", name: "rubintv.workspace.viewer");
+              return true;
+            }
+
+            // Rebuild if window IDs are different (indicating different windows)
+            Set<UniqueId> previousIds = previous.windows.keys.toSet();
+            Set<UniqueId> currentIds = current.windows.keys.toSet();
+            if (!previousIds.containsAll(currentIds) || !currentIds.containsAll(previousIds)) {
+              developer.log("Window IDs changed - rebuilding", name: "rubintv.workspace.viewer");
+              return true;
+            }
+
+            // Rebuild if instrument changed
+            if (previous.instrument != current.instrument) {
+              developer.log("Instrument changed - rebuilding", name: "rubintv.workspace.viewer");
+              return true;
+            }
+
+            // If we have the same windows but different references, rebuild
+            for (UniqueId id in currentIds) {
+              if (previous.windows[id] != current.windows[id]) {
+                developer.log("Window $id content changed - rebuilding", name: "rubintv.workspace.viewer");
+                return true;
+              }
+            }
+
+            developer.log("No significant changes detected - not rebuilding",
+                name: "rubintv.workspace.viewer");
+            return false;
+          }
+
+          // For any other case, rebuild to be safe
+          developer.log("Unhandled state combination - rebuilding", name: "rubintv.workspace.viewer");
+          return true;
+        },
         builder: (context, state) {
           developer.log("=== BUILDING WORKSPACE ===", name: "rubintv.workspace.viewer");
           developer.log("State type: ${state.runtimeType}", name: "rubintv.workspace.viewer");
