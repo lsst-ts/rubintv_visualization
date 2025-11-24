@@ -86,20 +86,34 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   /// The current state of the workspace.
   WorkspaceState? info;
-  UniqueKey get id => UniqueKey();
+
+  /// Use a stable ID for the workspace viewer's subscription
+  final Object _viewerId = Object();
 
   @override
   void initState() {
     developer.log("=== INITIALIZING WORKSPACE VIEWER ===", name: "rubintv.workspace.viewer");
     super.initState();
 
-    ControlCenter().selectionController.subscribe(id, _onSelectionUpdate);
+    developer.log("Subscribing workspace viewer to selection controller", name: "rubintv.workspace.viewer");
+    ControlCenter().selectionController.subscribe(_viewerId, _onSelectionUpdate);
+    developer.log("Workspace viewer subscription complete", name: "rubintv.workspace.viewer");
+  }
+
+  @override
+  void dispose() {
+    developer.log("=== DISPOSING WORKSPACE VIEWER ===", name: "rubintv.workspace.viewer");
+    developer.log("Unsubscribing workspace viewer from selection controller",
+        name: "rubintv.workspace.viewer");
+    ControlCenter().selectionController.unsubscribe(_viewerId);
+    super.dispose();
   }
 
   /// Update the selection data points.
   /// This isn't used now, but can be used in the future if any plots cannot be
   /// matched to obs_date,seq_num data IDs.
   void _onSelectionUpdate(Object? origin, Set<Object> dataPoints) {
+    developer.log("=== WORKSPACE VIEWER SELECTION UPDATE ===", name: "rubintv.workspace.viewer");
     developer.log("Workspace viewer received selection update from $origin: ${dataPoints.length} points",
         name: "rubintv.workspace.viewer");
   }
@@ -126,8 +140,11 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
           }
 
           if (previous is WorkspaceState && current is WorkspaceState) {
-            developer.log("Windows: ${previous.windows.length} -> ${current.windows.length}",
-                name: "rubintv.workspace.viewer");
+            // Always rebuild if instrument changed - this indicates a new workspace
+            if (previous.instrument != current.instrument) {
+              developer.log("Instrument changed - rebuilding", name: "rubintv.workspace.viewer");
+              return true;
+            }
 
             // Rebuild if window count changed
             if (previous.windows.length != current.windows.length) {
@@ -135,23 +152,10 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
               return true;
             }
 
-            // Rebuild if window IDs are different (indicating different windows)
-            Set<UniqueId> previousIds = previous.windows.keys.toSet();
-            Set<UniqueId> currentIds = current.windows.keys.toSet();
-            if (!previousIds.containsAll(currentIds) || !currentIds.containsAll(previousIds)) {
-              developer.log("Window IDs changed - rebuilding", name: "rubintv.workspace.viewer");
-              return true;
-            }
-
-            // Rebuild if instrument changed
-            if (previous.instrument != current.instrument) {
-              developer.log("Instrument changed - rebuilding", name: "rubintv.workspace.viewer");
-              return true;
-            }
-
             // If we have the same windows but different references, rebuild
-            for (UniqueId id in currentIds) {
-              if (previous.windows[id] != current.windows[id]) {
+            // This handles updates to individual windows
+            for (UniqueId id in current.windows.keys) {
+              if (previous.windows.containsKey(id) && previous.windows[id] != current.windows[id]) {
                 developer.log("Window $id content changed - rebuilding", name: "rubintv.workspace.viewer");
                 return true;
               }
@@ -194,6 +198,7 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
                       developer.log("Building window ${window.id} of type ${window.windowType}",
                           name: "rubintv.workspace.viewer");
                       children.add(Positioned(
+                        key: ValueKey(window.id), // Add unique key to force recreation
                         left: window.offset.dx,
                         top: window.offset.dy,
                         child: buildWindow(window, state),
@@ -222,19 +227,21 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
         name: "rubintv.workspace.viewer");
 
     if (window.windowType == WindowTypes.cartesianScatter || window.windowType == WindowTypes.polarScatter) {
-      return ScatterPlotWidget(window: window, bloc: window.bloc as ChartBloc);
+      return ScatterPlotWidget(key: ValueKey(window.id), window: window, bloc: window.bloc as ChartBloc);
     }
     if (window.windowType == WindowTypes.histogram || window.windowType == WindowTypes.box) {
-      return BinnedChartWidget(window: window, bloc: window.bloc as ChartBloc);
+      return BinnedChartWidget(key: ValueKey(window.id), window: window, bloc: window.bloc as ChartBloc);
     }
     if (window.windowType == WindowTypes.detectorSelector) {
       return DetectorSelector(
+        key: ValueKey(window.id),
         window: window,
         workspace: workspace,
       );
     }
     if (window.windowType == WindowTypes.focalPlane) {
       return FocalPlaneChartViewer(
+        key: ValueKey(window.id),
         window: window,
         workspace: workspace,
         bloc: window.bloc as FocalPlaneChartBloc,

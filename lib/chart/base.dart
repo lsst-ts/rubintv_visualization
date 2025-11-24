@@ -345,19 +345,47 @@ class ChartState extends WindowState {
   /// Create a [ChartState] from a JSON object.
   @override
   factory ChartState.fromJson(Map<String, dynamic> json) {
-    return ChartState(
-      id: UniqueId.fromString(json["id"]),
-      series: Map.fromEntries((json["series"] as List<dynamic>).map((e) {
+    developer.log("=== CHART STATE FROM JSON ===", name: "rubintv.chart.base");
+    developer.log("JSON keys: ${json.keys}", name: "rubintv.chart.base");
+    developer.log("ID: ${json['id']}", name: "rubintv.chart.base");
+    developer.log("Window type: ${json['windowType']}", name: "rubintv.chart.base");
+    developer.log("Series count: ${json['series']?.length}", name: "rubintv.chart.base");
+    developer.log("Axis info count: ${json['axisInfo']?.length}", name: "rubintv.chart.base");
+
+    if (json['series'] != null) {
+      for (int i = 0; i < (json['series'] as List).length; i++) {
+        var seriesJson = json['series'][i];
+        developer.log("Series $i: ${seriesJson.keys}", name: "rubintv.chart.base");
+        if (seriesJson is Map && seriesJson.containsKey('fields')) {
+          developer.log("Series $i fields: ${seriesJson['fields']}", name: "rubintv.chart.base");
+        }
+      }
+    }
+
+    try {
+      Map<SeriesId, SeriesInfo> series = Map.fromEntries((json["series"] as List<dynamic>).map((e) {
+        developer.log("Processing series JSON: ${e.keys}", name: "rubintv.chart.base");
         SeriesInfo seriesInfo = SeriesInfo.fromJson(e);
+        developer.log("Series info created: ${seriesInfo.id}", name: "rubintv.chart.base");
         return MapEntry(seriesInfo.id, seriesInfo);
-      })),
-      axisInfo: List<ChartAxisInfo>.from(json["axisInfo"].map((e) => ChartAxisInfo.fromJson(e))),
-      legend: json["legend"] == null ? null : Legend.fromJson(json["legend"]),
-      useGlobalQuery: json["useGlobalQuery"],
-      windowType: WindowTypes.fromString(json["windowType"]),
-      tool: MultiSelectionTool.fromString(json["tool"]),
-      resetController: StreamController<ResetChartAction>.broadcast(),
-    );
+      }));
+
+      return ChartState(
+        id: UniqueId.fromString(json["id"]),
+        series: series,
+        axisInfo: List<ChartAxisInfo>.from(json["axisInfo"].map((e) => ChartAxisInfo.fromJson(e))),
+        legend: json["legend"] == null ? null : Legend.fromJson(json["legend"]),
+        useGlobalQuery: json["useGlobalQuery"],
+        windowType: WindowTypes.fromString(json["windowType"]),
+        tool: MultiSelectionTool.fromString(json["tool"]),
+        resetController: StreamController<ResetChartAction>.broadcast(),
+      );
+    } catch (e, stackTrace) {
+      developer.log("Error in ChartState.fromJson: $e",
+          name: "rubintv.chart.base", error: e, stackTrace: stackTrace);
+      developer.log("Full JSON: $json", name: "rubintv.chart.base");
+      rethrow;
+    }
   }
 }
 
@@ -406,6 +434,34 @@ class ChartBloc extends WindowBloc<ChartState> {
     /// Listen for messages from the websocket.
     _subscription = WebSocketManager().messages.listen((message) {
       add(ChartReceiveMessageEvent(message));
+    });
+
+    /// Subscribe to selection controller to update when points are selected.
+    developer.log("Subscribing chart ${state.id} to selection controller", name: "rubintv.chart.base");
+    ControlCenter().selectionController.subscribe(state.id, (Object? origin, Set<Object> dataPoints) {
+      developer.log("=== CHART SELECTION UPDATE ===", name: "rubintv.chart.base");
+      developer.log("Chart ${state.id} received selection update from $origin: ${dataPoints.length} points",
+          name: "rubintv.chart.base");
+      if (origin == state.id) {
+        developer.log("Ignoring selection update from self", name: "rubintv.chart.base");
+        return;
+      }
+      developer.log("Processing selection update for chart ${state.id}", name: "rubintv.chart.base");
+      // TODO: Handle selection update in chart
+    });
+
+    /// Subscribe to drill down controller.
+    developer.log("Subscribing chart ${state.id} to drill down controller", name: "rubintv.chart.base");
+    ControlCenter().drillDownController.subscribe(state.id, (Object? origin, Set<Object> dataPoints) {
+      developer.log("=== CHART DRILL DOWN UPDATE ===", name: "rubintv.chart.base");
+      developer.log("Chart ${state.id} received drill down update from $origin: ${dataPoints.length} points",
+          name: "rubintv.chart.base");
+      if (origin == state.id) {
+        developer.log("Ignoring drill down update from self", name: "rubintv.chart.base");
+        return;
+      }
+      developer.log("Processing drill down update for chart ${state.id}", name: "rubintv.chart.base");
+      // TODO: Handle drill down update in chart
     });
 
     /// Reload the data if the global query or global dayObs changes.
@@ -1023,6 +1079,9 @@ class ChartBloc extends WindowBloc<ChartState> {
   Future<void> close() async {
     developer.log("=== CLOSING CHART BLOC ===", name: "rubintv.chart.base");
     developer.log("Chart ${state.id} being closed", name: "rubintv.chart.base");
+    developer.log("Unsubscribing chart ${state.id} from selection controllers", name: "rubintv.chart.base");
+    ControlCenter().selectionController.unsubscribe(state.id);
+    ControlCenter().drillDownController.unsubscribe(state.id);
     await _subscription.cancel();
     await _globalQuerySubscription.cancel();
     developer.log("Chart bloc closed", name: "rubintv.chart.base");

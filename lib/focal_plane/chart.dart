@@ -556,11 +556,15 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
 
   /// Close the bloc.
   @override
-  Future<void> close() {
+  Future<void> close() async {
     developer.log("=== CLOSING FOCAL PLANE CHART BLOC ===", name: "rubintv.focal_plane.chart");
     developer.log("Focal plane ${state.id} being closed", name: "rubintv.focal_plane.chart");
-    _websocketSubscription.cancel();
-    _globalQuerySubscription.cancel();
+
+    await _websocketSubscription.cancel();
+    await _globalQuerySubscription.cancel();
+    _playTimer?.cancel();
+    _selectionTimer?.cancel();
+
     developer.log("Focal plane chart bloc closed", name: "rubintv.focal_plane.chart");
     return super.close();
   }

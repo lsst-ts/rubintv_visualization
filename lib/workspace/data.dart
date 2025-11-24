@@ -173,10 +173,50 @@ class SchemaField {
   /// The [SchemaField] must be a child of a [TableSchema]
   /// that is already loaded by the [DataCenter].
   static SchemaField fromJson(Map<String, dynamic> json) {
+    developer.log("=== SCHEMA FIELD FROM JSON ===", name: "rubintv.workspace.data");
+    developer.log("JSON keys: ${json.keys}", name: "rubintv.workspace.data");
+    developer.log("Field name: ${json['name']}", name: "rubintv.workspace.data");
+    developer.log("Schema: ${json['schema']}", name: "rubintv.workspace.data");
+    developer.log("Database: ${json['database']}", name: "rubintv.workspace.data");
+
     DataCenter dataCenter = DataCenter();
-    TableSchema schema =
-        dataCenter.databases[json["database"]]!.tables.values.firstWhere((e) => e.name == json["schema"]);
-    return schema.fields[json["name"]]!;
+    developer.log("Available databases: ${dataCenter.databases.keys}", name: "rubintv.workspace.data");
+
+    if (!dataCenter.databases.containsKey(json["database"])) {
+      String errorMsg =
+          "Database '${json["database"]}' not found. Available databases: ${dataCenter.databases.keys.join(', ')}";
+      developer.log(errorMsg, name: "rubintv.workspace.data");
+      reportError("Workspace load error: $errorMsg");
+      throw ArgumentError(errorMsg);
+    }
+
+    DatabaseSchema database = dataCenter.databases[json["database"]]!;
+    developer.log("Available tables in database: ${database.tables.keys}", name: "rubintv.workspace.data");
+
+    TableSchema? schema;
+    try {
+      schema = database.tables.values.firstWhere((e) => e.name == json["schema"]);
+      developer.log("Found schema: ${schema.name}", name: "rubintv.workspace.data");
+    } catch (e) {
+      String errorMsg = "Table '${json["schema"]}' not found in database '${json["database"]}'. "
+          "Available tables: ${database.tables.keys.join(', ')}. "
+          "This workspace may have been saved with a different instrument schema.";
+      developer.log(errorMsg, name: "rubintv.workspace.data");
+      reportError("Workspace load error: $errorMsg");
+      throw ArgumentError(errorMsg);
+    }
+
+    if (!schema.fields.containsKey(json["name"])) {
+      String errorMsg = "Field '${json["name"]}' not found in table '${schema.name}'. "
+          "Available fields: ${schema.fields.keys.join(', ')}";
+      developer.log(errorMsg, name: "rubintv.workspace.data");
+      reportError("Workspace load error: $errorMsg");
+      throw ArgumentError(errorMsg);
+    }
+
+    SchemaField result = schema.fields[json["name"]]!;
+    developer.log("Schema field found successfully: ${result.name}", name: "rubintv.workspace.data");
+    return result;
   }
 }
 
@@ -199,6 +239,15 @@ class TableSchema {
       field.schema = this;
     }
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is TableSchema && other.name == name && other.database.name == database.name;
+  }
+
+  @override
+  int get hashCode => Object.hash(name, database.name);
 }
 
 /// A data source.

@@ -67,16 +67,24 @@ class ControlCenter {
 
   /// Update the selection data points.
   void updateSelection(Object chartId, Set<Object> dataPoints) {
+    developer.log("=== UPDATING SELECTION ===", name: "rubintv.workspace.controller");
     developer.log("Updating selection from $chartId: ${dataPoints.length} points",
         name: "rubintv.workspace.controller");
+    developer.log("Current subscribers: ${_selectionController.observers.keys}",
+        name: "rubintv.workspace.controller");
     _selectionController.updateSelection(chartId, dataPoints);
+    developer.log("Selection update complete", name: "rubintv.workspace.controller");
   }
 
   /// Update the drill down data points.
   void updateDrillDown(Object chartId, Set<Object> dataPoints) {
+    developer.log("=== UPDATING DRILL DOWN ===", name: "rubintv.workspace.controller");
     developer.log("Updating drill down from $chartId: ${dataPoints.length} points",
         name: "rubintv.workspace.controller");
+    developer.log("Current drill down subscribers: ${_drillDownController.observers.keys}",
+        name: "rubintv.workspace.controller");
     _drillDownController.updateSelection(chartId, dataPoints);
+    developer.log("Drill down update complete", name: "rubintv.workspace.controller");
   }
 
   /// Dispose of the stream controllers.
@@ -90,6 +98,10 @@ class ControlCenter {
   /// Reset the stream controllers.
   void reset() {
     developer.log("=== RESETTING CONTROL CENTER ===", name: "rubintv.workspace.controller");
+    developer.log("Selection subscribers before reset: ${_selectionController.observers.keys}",
+        name: "rubintv.workspace.controller");
+    developer.log("Drill down subscribers before reset: ${_drillDownController.observers.keys}",
+        name: "rubintv.workspace.controller");
     _globalQueryController.add(null);
     _selectionController.reset();
     _drillDownController.reset();
