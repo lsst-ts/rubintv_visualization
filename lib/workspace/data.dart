@@ -173,12 +173,6 @@ class SchemaField {
   /// The [SchemaField] must be a child of a [TableSchema]
   /// that is already loaded by the [DataCenter].
   static SchemaField fromJson(Map<String, dynamic> json) {
-    developer.log("=== SCHEMA FIELD FROM JSON ===", name: "rubintv.workspace.data");
-    developer.log("JSON keys: ${json.keys}", name: "rubintv.workspace.data");
-    developer.log("Field name: ${json['name']}", name: "rubintv.workspace.data");
-    developer.log("Schema: ${json['schema']}", name: "rubintv.workspace.data");
-    developer.log("Database: ${json['database']}", name: "rubintv.workspace.data");
-
     DataCenter dataCenter = DataCenter();
     developer.log("Available databases: ${dataCenter.databases.keys}", name: "rubintv.workspace.data");
 
@@ -431,10 +425,6 @@ class DataCenter {
     required List<String> plotColumns,
     required Map<String, List<dynamic>> data,
   }) {
-    developer.log("=== UPDATING SERIES DATA ===", name: "rubintv_visualization.workspace.data");
-    developer.log("Series: ${series.id}, DataSource: $dataSourceName, Columns: ${plotColumns.length}",
-        name: "rubintv_visualization.workspace.data");
-
     // Extensive validation
     if (data.isEmpty) {
       developer.log("No data found for series ${series.id}", name: "rubintv_visualization.workspace.data");
@@ -587,8 +577,6 @@ class DataCenter {
   }
 
   void clearSeriesData() {
-    developer.log("=== CLEARING ALL SERIES DATA ===", name: "rubintv_visualization.workspace.data");
-    developer.log("Clearing ${_seriesData.length} series", name: "rubintv_visualization.workspace.data");
     _seriesData.clear();
   }
 

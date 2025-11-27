@@ -92,19 +92,12 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   @override
   void initState() {
-    developer.log("=== INITIALIZING WORKSPACE VIEWER ===", name: "rubintv.workspace.viewer");
     super.initState();
-
-    developer.log("Subscribing workspace viewer to selection controller", name: "rubintv.workspace.viewer");
     ControlCenter().selectionController.subscribe(_viewerId, _onSelectionUpdate);
-    developer.log("Workspace viewer subscription complete", name: "rubintv.workspace.viewer");
   }
 
   @override
   void dispose() {
-    developer.log("=== DISPOSING WORKSPACE VIEWER ===", name: "rubintv.workspace.viewer");
-    developer.log("Unsubscribing workspace viewer from selection controller",
-        name: "rubintv.workspace.viewer");
     ControlCenter().selectionController.unsubscribe(_viewerId);
     super.dispose();
   }
@@ -124,9 +117,6 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
       create: (context) => WorkspaceBloc()..add(InitializeWorkspaceEvent(theme, version)),
       child: BlocBuilder<WorkspaceBloc, WorkspaceStateBase>(
         buildWhen: (previous, current) {
-          developer.log("BlocBuilder buildWhen: ${previous.runtimeType} -> ${current.runtimeType}",
-              name: "rubintv.workspace.viewer");
-
           // Always rebuild if state types are different
           if (previous.runtimeType != current.runtimeType) {
             developer.log("State type changed - rebuilding", name: "rubintv.workspace.viewer");
@@ -156,13 +146,10 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
             // This handles updates to individual windows
             for (UniqueId id in current.windows.keys) {
               if (previous.windows.containsKey(id) && previous.windows[id] != current.windows[id]) {
-                developer.log("Window $id content changed - rebuilding", name: "rubintv.workspace.viewer");
                 return true;
               }
             }
 
-            developer.log("No significant changes detected - not rebuilding",
-                name: "rubintv.workspace.viewer");
             return false;
           }
 
@@ -171,9 +158,6 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
           return true;
         },
         builder: (context, state) {
-          developer.log("=== BUILDING WORKSPACE ===", name: "rubintv.workspace.viewer");
-          developer.log("State type: ${state.runtimeType}", name: "rubintv.workspace.viewer");
-
           if (state is WorkspaceStateInitial) {
             developer.log("Workspace state is initial - showing progress indicator",
                 name: "rubintv.workspace.viewer");

@@ -345,28 +345,9 @@ class ChartState extends WindowState {
   /// Create a [ChartState] from a JSON object.
   @override
   factory ChartState.fromJson(Map<String, dynamic> json) {
-    developer.log("=== CHART STATE FROM JSON ===", name: "rubintv.chart.base");
-    developer.log("JSON keys: ${json.keys}", name: "rubintv.chart.base");
-    developer.log("ID: ${json['id']}", name: "rubintv.chart.base");
-    developer.log("Window type: ${json['windowType']}", name: "rubintv.chart.base");
-    developer.log("Series count: ${json['series']?.length}", name: "rubintv.chart.base");
-    developer.log("Axis info count: ${json['axisInfo']?.length}", name: "rubintv.chart.base");
-
-    if (json['series'] != null) {
-      for (int i = 0; i < (json['series'] as List).length; i++) {
-        var seriesJson = json['series'][i];
-        developer.log("Series $i: ${seriesJson.keys}", name: "rubintv.chart.base");
-        if (seriesJson is Map && seriesJson.containsKey('fields')) {
-          developer.log("Series $i fields: ${seriesJson['fields']}", name: "rubintv.chart.base");
-        }
-      }
-    }
-
     try {
       Map<SeriesId, SeriesInfo> series = Map.fromEntries((json["series"] as List<dynamic>).map((e) {
-        developer.log("Processing series JSON: ${e.keys}", name: "rubintv.chart.base");
         SeriesInfo seriesInfo = SeriesInfo.fromJson(e);
-        developer.log("Series info created: ${seriesInfo.id}", name: "rubintv.chart.base");
         return MapEntry(seriesInfo.id, seriesInfo);
       }));
 
@@ -428,9 +409,6 @@ class ChartBloc extends WindowBloc<ChartState> {
   }
 
   ChartBloc(super.initialState) {
-    developer.log("=== CREATING CHART BLOC ===", name: "rubintv.chart.base");
-    developer.log("Initial state: id=${state.id}, type=${state.windowType}", name: "rubintv.chart.base");
-
     /// Listen for messages from the websocket.
     _subscription = WebSocketManager().messages.listen((message) {
       add(ChartReceiveMessageEvent(message));
@@ -439,11 +417,7 @@ class ChartBloc extends WindowBloc<ChartState> {
     /// Subscribe to selection controller to update when points are selected.
     developer.log("Subscribing chart ${state.id} to selection controller", name: "rubintv.chart.base");
     ControlCenter().selectionController.subscribe(state.id, (Object? origin, Set<Object> dataPoints) {
-      developer.log("=== CHART SELECTION UPDATE ===", name: "rubintv.chart.base");
-      developer.log("Chart ${state.id} received selection update from $origin: ${dataPoints.length} points",
-          name: "rubintv.chart.base");
       if (origin == state.id) {
-        developer.log("Ignoring selection update from self", name: "rubintv.chart.base");
         return;
       }
       developer.log("Processing selection update for chart ${state.id}", name: "rubintv.chart.base");
@@ -453,11 +427,7 @@ class ChartBloc extends WindowBloc<ChartState> {
     /// Subscribe to drill down controller.
     developer.log("Subscribing chart ${state.id} to drill down controller", name: "rubintv.chart.base");
     ControlCenter().drillDownController.subscribe(state.id, (Object? origin, Set<Object> dataPoints) {
-      developer.log("=== CHART DRILL DOWN UPDATE ===", name: "rubintv.chart.base");
-      developer.log("Chart ${state.id} received drill down update from $origin: ${dataPoints.length} points",
-          name: "rubintv.chart.base");
       if (origin == state.id) {
-        developer.log("Ignoring drill down update from self", name: "rubintv.chart.base");
         return;
       }
       developer.log("Processing drill down update for chart ${state.id}", name: "rubintv.chart.base");
@@ -695,10 +665,6 @@ class ChartBloc extends WindowBloc<ChartState> {
 
     /// Reload all of the data from the server.
     on<SynchDataEvent>((event, emit) {
-      developer.log("=== SYNCHING DATA ===", name: "rubintv.chart.base");
-      developer.log("Chart ${state.id}: dayObs=${event.dayObs}, skipGlobalUpdate=${event.skipGlobalUpdate}",
-          name: "rubintv.chart.base");
-
       // When loading from a file, we don't want to trigger the global query update unnecessarily
       if (!event.skipGlobalUpdate && event.globalQuery != null) {
         developer.log("Updating global query in ControlCenter", name: "rubintv.chart.base");
@@ -1077,14 +1043,10 @@ class ChartBloc extends WindowBloc<ChartState> {
 
   @override
   Future<void> close() async {
-    developer.log("=== CLOSING CHART BLOC ===", name: "rubintv.chart.base");
-    developer.log("Chart ${state.id} being closed", name: "rubintv.chart.base");
-    developer.log("Unsubscribing chart ${state.id} from selection controllers", name: "rubintv.chart.base");
     ControlCenter().selectionController.unsubscribe(state.id);
     ControlCenter().drillDownController.unsubscribe(state.id);
     await _subscription.cancel();
     await _globalQuerySubscription.cancel();
-    developer.log("Chart bloc closed", name: "rubintv.chart.base");
     return super.close();
   }
 }

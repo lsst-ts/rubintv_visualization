@@ -84,7 +84,7 @@ String _getLevelString(int level) {
 // Helper to expose logs through the console
 void printLogsToConsole() {
   try {
-    final key = 'rubintv_visualization_log';
+    const key = 'rubintv_visualization_log';
     final logs = web.window.localStorage[key] ?? 'No logs found';
     developer.log('=== BEGIN LOGS ===');
     developer.log(logs);

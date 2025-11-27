@@ -282,9 +282,6 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
   }
 
   FocalPlaneChartBloc(super.initialState) {
-    developer.log("=== CREATING FOCAL PLANE CHART BLOC ===", name: "rubintv.focal_plane.chart");
-    developer.log("Initial state: id=${state.id}", name: "rubintv.focal_plane.chart");
-
     // Subscribe to selection updates
     ControlCenter().selectionController.subscribe(state.id, _onSelectionUpdate);
     developer.log("Focal plane chart bloc created and subscribed", name: "rubintv.focal_plane.chart");
