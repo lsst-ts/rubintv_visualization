@@ -345,7 +345,8 @@ class ColumnEditorState extends State<ColumnEditor> {
   @override
   Widget build(BuildContext context) {
     if (_field != null) {
-      _table = _field!.schema;
+      // Ensure we're using the table instance from the database, not a deserialized copy
+      _table = widget.databaseSchema.tables[_field!.schema.name];
     }
 
     List<DropdownMenuItem<TableSchema>> tableEntries = [];
@@ -376,7 +377,10 @@ class ColumnEditorState extends State<ColumnEditor> {
           onChanged: (TableSchema? newTable) {
             setState(() {
               _table = newTable;
-              _field = _table!.fields.values.first;
+              // Ensure we get the field from the new table instance
+              if (_table != null && _table!.fields.isNotEmpty) {
+                _field = _table!.fields.values.first;
+              }
             });
             widget.onChanged(_field);
           },

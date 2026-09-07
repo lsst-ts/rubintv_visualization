@@ -306,7 +306,8 @@ class ChartState extends WindowState {
         SeriesData? seriesData = DataCenter().getSeriesData(seriesInfo.id);
         if (seriesData == null) {
           // Data not loaded yet, skip this series silently
-          developer.log("Data not yet loaded for series '${seriesInfo.name}'", name: "rubin_chart.workspace");
+          developer.log("Data not yet loaded for series '${seriesInfo.name}'",
+              name: "rubintv.chart.workspace");
           continue;
         }
 
@@ -315,11 +316,11 @@ class ChartState extends WindowState {
       } catch (e) {
         if (e is DataConversionException) {
           developer.log("Failed to convert series '${seriesInfo.name}': ${e.message}",
-              name: "rubin_chart.workspace");
+              name: "rubintv.chart.workspace");
           reportError("Chart rendering error: ${e.message}");
         } else {
           developer.log("Unexpected error converting series '${seriesInfo.name}': $e",
-              name: "rubin_chart.workspace", error: e);
+              name: "rubintv.chart.workspace", error: e);
         }
         // Skip this series and continue with others
       }
@@ -344,19 +345,28 @@ class ChartState extends WindowState {
   /// Create a [ChartState] from a JSON object.
   @override
   factory ChartState.fromJson(Map<String, dynamic> json) {
-    return ChartState(
-      id: UniqueId.fromString(json["id"]),
-      series: Map.fromEntries((json["series"] as List<dynamic>).map((e) {
+    try {
+      Map<SeriesId, SeriesInfo> series = Map.fromEntries((json["series"] as List<dynamic>).map((e) {
         SeriesInfo seriesInfo = SeriesInfo.fromJson(e);
         return MapEntry(seriesInfo.id, seriesInfo);
-      })),
-      axisInfo: List<ChartAxisInfo>.from(json["axisInfo"].map((e) => ChartAxisInfo.fromJson(e))),
-      legend: json["legend"] == null ? null : Legend.fromJson(json["legend"]),
-      useGlobalQuery: json["useGlobalQuery"],
-      windowType: WindowTypes.fromString(json["windowType"]),
-      tool: MultiSelectionTool.fromString(json["tool"]),
-      resetController: StreamController<ResetChartAction>.broadcast(),
-    );
+      }));
+
+      return ChartState(
+        id: UniqueId.fromString(json["id"]),
+        series: series,
+        axisInfo: List<ChartAxisInfo>.from(json["axisInfo"].map((e) => ChartAxisInfo.fromJson(e))),
+        legend: json["legend"] == null ? null : Legend.fromJson(json["legend"]),
+        useGlobalQuery: json["useGlobalQuery"],
+        windowType: WindowTypes.fromString(json["windowType"]),
+        tool: MultiSelectionTool.fromString(json["tool"]),
+        resetController: StreamController<ResetChartAction>.broadcast(),
+      );
+    } catch (e, stackTrace) {
+      developer.log("Error in ChartState.fromJson: $e",
+          name: "rubintv.chart.base", error: e, stackTrace: stackTrace);
+      developer.log("Full JSON: $json", name: "rubintv.chart.base");
+      rethrow;
+    }
   }
 }
 
@@ -404,8 +414,30 @@ class ChartBloc extends WindowBloc<ChartState> {
       add(ChartReceiveMessageEvent(message));
     });
 
+    /// Subscribe to selection controller to update when points are selected.
+    developer.log("Subscribing chart ${state.id} to selection controller", name: "rubintv.chart.base");
+    ControlCenter().selectionController.subscribe(state.id, (Object? origin, Set<Object> dataPoints) {
+      if (origin == state.id) {
+        return;
+      }
+      developer.log("Processing selection update for chart ${state.id}", name: "rubintv.chart.base");
+      // TODO: Handle selection update in chart
+    });
+
+    /// Subscribe to drill down controller.
+    developer.log("Subscribing chart ${state.id} to drill down controller", name: "rubintv.chart.base");
+    ControlCenter().drillDownController.subscribe(state.id, (Object? origin, Set<Object> dataPoints) {
+      if (origin == state.id) {
+        return;
+      }
+      developer.log("Processing drill down update for chart ${state.id}", name: "rubintv.chart.base");
+      // TODO: Handle drill down update in chart
+    });
+
     /// Reload the data if the global query or global dayObs changes.
     _globalQuerySubscription = ControlCenter().globalQueryStream.listen((GlobalQuery? query) {
+      developer.log("Chart ${state.id} received global query update: dayObs=${query?.dayObs}",
+          name: "rubintv.chart.base");
       for (SeriesInfo series in state._series.values) {
         add(UpdateSeriesEvent(
           series: series,
@@ -414,6 +446,8 @@ class ChartBloc extends WindowBloc<ChartState> {
         ));
       }
     });
+
+    developer.log("Chart bloc created and subscribed to streams", name: "rubintv.chart.base");
 
     /// Change the selection tool.
     on<UpdateMultiSelect>((event, emit) {
@@ -513,25 +547,25 @@ class ChartBloc extends WindowBloc<ChartState> {
         int columns = event.message["content"]["data"].length;
         developer.log(
             "received $columns columns and $rows rows for ${event.message["requestId"]} in series $seriesId",
-            name: "rubin_chart.workspace");
+            name: "rubintv.chart.workspace");
 
         // Add validation to ensure series exists and data is not empty
         final seriesInfo = state.series[seriesId];
         if (seriesInfo == null) {
-          developer.log("Series $seriesId not found in state", name: "rubin_chart.workspace");
+          developer.log("Series $seriesId not found in state", name: "rubintv.chart.workspace");
           return;
         }
 
         final data = event.message["content"]["data"] as Map<String, dynamic>?;
         if (data == null || data.isEmpty) {
-          developer.log("Received empty data for series $seriesId", name: "rubin_chart.workspace");
+          developer.log("Received empty data for series $seriesId", name: "rubintv.chart.workspace");
           return;
         }
 
         // Validate that all expected columns are present
         final plotColumns = List<String>.from(event.message["content"]["columns"].map((e) => e));
         if (plotColumns.isEmpty) {
-          developer.log("No plot columns received for series $seriesId", name: "rubin_chart.workspace");
+          developer.log("No plot columns received for series $seriesId", name: "rubintv.chart.workspace");
           return;
         }
 
@@ -566,12 +600,12 @@ class ChartBloc extends WindowBloc<ChartState> {
               ));
             }
           } else {
-            developer.log("Could not find pending series $seriesId", name: "rubin_chart.workspace");
-            developer.log("Pending series: ${_pendingRowCountChecks.keys}", name: "rubin_chart.workspace");
+            developer.log("Could not find pending series $seriesId", name: "rubintv.chart.workspace");
+            developer.log("Pending series: ${_pendingRowCountChecks.keys}", name: "rubintv.chart.workspace");
           }
         } catch (e) {
-          developer.log("Error processing count message: $e", name: "rubin_chart.workspace");
-          developer.log("Message content: ${event.message["content"]}", name: "rubin_chart.workspace");
+          developer.log("Error processing count message: $e", name: "rubintv.chart.workspace");
+          developer.log("Message content: ${event.message["content"]}", name: "rubintv.chart.workspace");
         }
       }
       emit(state.copyWith());
@@ -633,6 +667,7 @@ class ChartBloc extends WindowBloc<ChartState> {
     on<SynchDataEvent>((event, emit) {
       // When loading from a file, we don't want to trigger the global query update unnecessarily
       if (!event.skipGlobalUpdate && event.globalQuery != null) {
+        developer.log("Updating global query in ControlCenter", name: "rubintv.chart.base");
         // Update the global query in the control center which will notify all charts
         ControlCenter().updateGlobalQuery(GlobalQuery(
           query: event.globalQuery,
@@ -643,14 +678,14 @@ class ChartBloc extends WindowBloc<ChartState> {
       }
 
       for (SeriesInfo series in state._series.values) {
-        developer.log("Synching data for series ${series.id}", name: "rubintv.chart.base.dart");
+        developer.log("Synching data for series ${series.id}", name: "rubintv.chart.base");
         _fetchSeriesData(
           series: series,
           globalQuery: event.globalQuery,
           dayObs: event.dayObs,
         );
-        developer.log("synch request sent", name: "rubintv.chart.base.dart");
       }
+      developer.log("Data sync requests sent for ${state._series.length} series", name: "rubintv.chart.base");
     });
 
     on<DeleteSeriesEvent>((event, emit) {
@@ -725,7 +760,7 @@ class ChartBloc extends WindowBloc<ChartState> {
     on<ConfirmRowCountEvent>((event, emit) {
       if (state.pendingRowCountDialog != null) {
         developer.log("User confirmed row count dialog, proceeding with series",
-            name: "rubin_chart.workspace");
+            name: "rubintv.chart.workspace");
 
         final dialogInfo = state.pendingRowCountDialog!;
 
@@ -744,7 +779,7 @@ class ChartBloc extends WindowBloc<ChartState> {
     /// Handle user canceling the row count dialog
     on<CancelRowCountEvent>((event, emit) {
       if (state.pendingRowCountDialog != null) {
-        developer.log("User canceled row count dialog", name: "rubin_chart.workspace");
+        developer.log("User canceled row count dialog", name: "rubintv.chart.workspace");
 
         // Simply clear the dialog without proceeding
         emit(state.copyWith(pendingRowCountDialog: null));
@@ -785,7 +820,7 @@ class ChartBloc extends WindowBloc<ChartState> {
 
     // Check that the series has the correct number of columns and axes
     if (series.fields.length != state.axisInfo.length) {
-      developer.log("bad axes", name: "rubin_chart.core.chart.dart");
+      developer.log("bad axes", name: "rubintv.core.chart.dart");
       return null;
     }
 
@@ -876,7 +911,7 @@ class ChartBloc extends WindowBloc<ChartState> {
     if (workspace.info?.instrument?.schema == null) {
       throw ArgumentError("The chosen instrument has no schema");
     }
-    developer.log("New series fields: ${series.fields}", name: "rubin_chart.core.chart.dart");
+    developer.log("New series fields: ${series.fields}", name: "rubintv.core.chart.dart");
     return showDialog(
       context: context,
       builder: (BuildContext context) => Dialog(
@@ -1008,6 +1043,8 @@ class ChartBloc extends WindowBloc<ChartState> {
 
   @override
   Future<void> close() async {
+    ControlCenter().selectionController.unsubscribe(state.id);
+    ControlCenter().drillDownController.unsubscribe(state.id);
     await _subscription.cancel();
     await _globalQuerySubscription.cancel();
     return super.close();

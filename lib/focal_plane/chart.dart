@@ -282,36 +282,11 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
   }
 
   FocalPlaneChartBloc(super.initialState) {
-    _websocketSubscription = WebSocketManager().messages.listen((message) {
-      add(FocalPlaneReceiveMessageEvent(message));
-    });
+    // Subscribe to selection updates
+    ControlCenter().selectionController.subscribe(state.id, _onSelectionUpdate);
+    developer.log("Focal plane chart bloc created and subscribed", name: "rubintv.focal_plane.chart");
 
-    /// Subscribe to the selection controller to update the chart when points are selected.
-    /// We use a timer so that we don't load data until the selection has stopped
-    ControlCenter().selectionController.subscribe(state.id, (Object? origin, Set<Object> dataPoints) {
-      if (origin == state.id) {
-        return;
-      }
-      _selectionTimer?.cancel();
-      _selectionTimer = Timer(const Duration(milliseconds: 500), () {
-        _updateSeries(dataPoints);
-      });
-    });
-
-    /// Subscribe to the global query stream to update the chart when the query changes.
-    _globalQuerySubscription = ControlCenter().globalQueryStream.listen((GlobalQuery? query) {
-      Set<DataId>? selected =
-          ControlCenter().selectionController.selectedDataPoints.map((e) => e as DataId).toSet();
-      if (selected.isEmpty) {
-        selected = ControlCenter().drillDownController.selectedDataPoints.map((e) => e as DataId).toSet();
-      }
-      if (selected.isEmpty) {
-        selected = null;
-      }
-      _fetchSeriesData(series: state.series, query: query?.query, dayObs: query?.dayObs, selected: selected);
-    });
-
-    /// Initialize the chart.
+    /// Initialize the focal plane chart
     on<InitializeFocalPlaneChartEvent>((event, emit) {
       ColorbarController colorbarController = event.colorbarController;
       emit(FocalPlaneChartState(
@@ -329,7 +304,7 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
       ));
     });
 
-    /// Process data received from the websocket.
+    /// A message has been received from the websocket
     on<FocalPlaneReceiveMessageEvent>((event, emit) {
       List<String>? splitId = event.message["requestId"]?.split(",");
       if (splitId == null || splitId.length != 2) {
@@ -345,7 +320,7 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
       }
     });
 
-    /// Update the Series and fetch the data.
+    /// Update the column being displayed
     on<FocalPlaneUpdateColumnEvent>((event, emit) {
       final String tableName = event.field.schema.name;
       SchemaField detectorField;
@@ -367,7 +342,7 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
         },
       );
 
-      developer.log("Selected data points: ${event.selected}", name: "rubin_chart.focal_plane.chart.dart");
+      developer.log("Selected data points: ${event.selected}", name: "rubintv.focal_plane.chart.dart");
 
       bool isNewPlot = state.data.isEmpty;
 
@@ -380,19 +355,19 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
       emit(state.copyWith(series: newSeries));
     });
 
-    /// Update the data index.
+    /// Update the data index
     on<FocalPlaneUpdateDataIndexEvent>((event, emit) {
       emit(state.copyWith(dataIndex: event.index));
     });
 
-    /// Increase the data index.
+    /// Increase the data index
     on<FocalPlaneIncreaseDataIndexEvent>((event, emit) {
       if (state.dataIndex < state.dataIds.length - 1) {
         emit(state.copyWith(dataIndex: state.dataIndex + 1));
       }
     });
 
-    /// Update the playback speed.
+    /// Update the playback speed
     on<FocalPlaneUpdatePlaybackSpeedEvent>((event, emit) {
       emit(state.copyWith(playbackSpeed: event.speed));
       if (state.isPlaying) {
@@ -400,7 +375,7 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
       }
     });
 
-    /// Start the playback timer, which increases the [dataIndex] periodically.
+    /// Start the timer
     on<FocalPlaneStartTimerEvent>((event, emit) {
       _createTimer();
       int dataIndex = state.dataIndex;
@@ -410,14 +385,14 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
       emit(state.copyWith(isPlaying: true, dataIndex: dataIndex));
     });
 
-    /// Stop the playback timer.
+    /// Stop the timer
     on<FocalPlaneStopTimerEvent>((event, emit) {
       _playTimer?.cancel();
       _playTimer = null;
       emit(state.copyWith(isPlaying: false));
     });
 
-    /// Update the data index when a tick is received.
+    /// A tick has occurred
     on<FocalPlaneTickEvent>((event, emit) {
       if (state.dataIndex < state.dataIds.length - 1) {
         emit(state.copyWith(dataIndex: state.dataIndex + 1));
@@ -429,14 +404,55 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
       }
     });
 
-    /// Toggle the loop playback.
+    /// Toggle loop
     on<FocalPlaneToggleLoopEvent>((event, emit) {
       emit(state.copyWith(loopPlayback: !state.loopPlayback));
     });
 
-    /// Reload all of the data from the server.
+    /// Subscribe to global query updates
+    _globalQuerySubscription = ControlCenter().globalQueryStream.listen((GlobalQuery? query) {
+      Set<DataId>? selected =
+          ControlCenter().selectionController.selectedDataPoints.map((e) => e as DataId).toSet();
+      if (selected.isEmpty) {
+        selected = ControlCenter().drillDownController.selectedDataPoints.map((e) => e as DataId).toSet();
+      }
+      if (selected.isEmpty) {
+        selected = null;
+      }
+      _fetchSeriesData(series: state.series, query: query?.query, dayObs: query?.dayObs, selected: selected);
+    });
+
+    /// Subscribe to websocket messages
+    _websocketSubscription = WebSocketManager().messages.listen((message) {
+      add(FocalPlaneReceiveMessageEvent(message));
+    });
+
+    /// Handle synchronization events (used when loading workspaces)
     on<SynchDataEvent>((event, emit) {
-      _updateSeries();
+      // Fetch data for the current series with the provided dayObs
+      Set<DataId>? selected =
+          ControlCenter().selectionController.selectedDataPoints.map((e) => e as DataId).toSet();
+      if (selected.isEmpty) {
+        selected = ControlCenter().drillDownController.selectedDataPoints.map((e) => e as DataId).toSet();
+      }
+      if (selected.isEmpty) {
+        selected = null;
+      }
+
+      _fetchSeriesData(
+        series: state.series,
+        query: event.globalQuery,
+        dayObs: event.dayObs,
+        selected: selected,
+      );
+    });
+  }
+
+  /// Callback when selection is updated
+  void _onSelectionUpdate(Object? origin, Set<Object> dataPoints) {
+    _selectionTimer?.cancel();
+    _selectionTimer = Timer(const Duration(milliseconds: 500), () {
+      _updateSeries(dataPoints);
     });
   }
 
@@ -455,8 +471,7 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
     int rows = event.message["content"]["data"].values.first.length;
     int columns = event.message["content"]["data"].length;
     developer.log("received $columns columns and $rows rows for ${event.message["requestId"]}",
-        name: "rubin_chart.workspace");
-
+        name: "rubintv.workspace");
     if (rows > 0) {
       // Extract the data from the message
       Map<String, List<dynamic>> allData = Map<String, List<dynamic>>.from(
@@ -544,9 +559,18 @@ class FocalPlaneChartBloc extends WindowBloc<FocalPlaneChartState> {
 
   /// Close the bloc.
   @override
-  Future<void> close() {
-    _websocketSubscription.cancel();
-    _globalQuerySubscription.cancel();
+  Future<void> close() async {
+    _playTimer?.cancel();
+    _selectionTimer?.cancel();
+
+    await _websocketSubscription.cancel();
+    await _globalQuerySubscription.cancel();
+    developer.log("Subscriptions cancelled", name: "rubintv.focal_plane.chart");
+
+    ControlCenter().selectionController.unsubscribe(state.id);
+    developer.log("Unsubscribed from selection controller", name: "rubintv.focal_plane.chart");
+
+    developer.log("Focal plane chart bloc closed", name: "rubintv.focal_plane.chart");
     return super.close();
   }
 }
@@ -584,7 +608,7 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
   /// We use a special editor for the series in a focal plane chart.
   Future<void> _editSeries(BuildContext context, SeriesInfo series) async {
     WorkspaceViewerState workspace = WorkspaceViewer.of(context);
-    developer.log("New series fields: ${series.fields}", name: "rubin_chart.core.chart.dart");
+    developer.log("New series fields: ${series.fields}", name: "rubintv.core.chart.dart");
     DatabaseSchema schema = DataCenter().databases[workspace.info!.instrument!.schema]!;
     SchemaField field;
     if (series.fields.isNotEmpty) {
@@ -771,13 +795,15 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
                             width: 50,
                             child: IconButton(
                               icon: state.isPlaying ? const Icon(Icons.pause) : const Icon(Icons.play_arrow),
-                              onPressed: () {
-                                if (!state.isPlaying) {
-                                  context.read<FocalPlaneChartBloc>().add(FocalPlaneStartTimerEvent());
-                                } else {
-                                  context.read<FocalPlaneChartBloc>().add(FocalPlaneStopTimerEvent());
-                                }
-                              },
+                              onPressed: state.dataIds.length > 1
+                                  ? () {
+                                      if (!state.isPlaying) {
+                                        context.read<FocalPlaneChartBloc>().add(FocalPlaneStartTimerEvent());
+                                      } else {
+                                        context.read<FocalPlaneChartBloc>().add(FocalPlaneStopTimerEvent());
+                                      }
+                                    }
+                                  : null,
                             ),
                           )),
                       const SizedBox(width: 10),
@@ -785,46 +811,47 @@ class FocalPlaneChartViewerState extends State<FocalPlaneChartViewer> {
                           message: "Previous data ID",
                           child: Material(
                             color: Colors.grey[300],
-                            shape: const CircleBorder(),
                             child: IconButton(
                               icon: const Icon(Icons.remove),
-                              onPressed: () {
-                                if (state.dataIndex > 0) {
-                                  context
-                                      .read<FocalPlaneChartBloc>()
-                                      .add(FocalPlaneUpdateDataIndexEvent(state.dataIndex - 1));
-                                }
-                              },
+                              onPressed: (state.dataIds.length > 1 && state.dataIndex > 0)
+                                  ? () {
+                                      context
+                                          .read<FocalPlaneChartBloc>()
+                                          .add(FocalPlaneUpdateDataIndexEvent(state.dataIndex - 1));
+                                    }
+                                  : null,
                             ),
                           )),
                       Expanded(
                         child: Slider(
                           value: state.dataIndex.toDouble(),
                           min: 0,
-                          max: state.dataIds.isNotEmpty ? state.dataIds.length.toDouble() - 1 : 2,
-                          divisions: state.dataIds.isNotEmpty ? state.dataIds.length - 1 : 2,
+                          max: state.dataIds.isNotEmpty ? state.dataIds.length.toDouble() - 1 : 1,
+                          divisions: state.dataIds.length > 1 ? state.dataIds.length - 1 : null,
                           label: state.dataIndex.round().toString(),
-                          onChanged: (value) {
-                            context
-                                .read<FocalPlaneChartBloc>()
-                                .add(FocalPlaneUpdateDataIndexEvent(value.round().toInt()));
-                          },
+                          onChanged: state.dataIds.length > 1
+                              ? (value) {
+                                  context
+                                      .read<FocalPlaneChartBloc>()
+                                      .add(FocalPlaneUpdateDataIndexEvent(value.round().toInt()));
+                                }
+                              : null,
                         ),
                       ),
                       Tooltip(
                           message: "Next data ID",
                           child: Material(
                             color: Colors.grey[300],
-                            shape: const CircleBorder(),
                             child: IconButton(
                               icon: const Icon(Icons.add),
-                              onPressed: () {
-                                if (state.dataIndex < state.dataIds.length - 1) {
-                                  context
-                                      .read<FocalPlaneChartBloc>()
-                                      .add(FocalPlaneUpdateDataIndexEvent(state.dataIndex + 1));
-                                }
-                              },
+                              onPressed:
+                                  (state.dataIds.length > 1 && state.dataIndex < state.dataIds.length - 1)
+                                      ? () {
+                                          context
+                                              .read<FocalPlaneChartBloc>()
+                                              .add(FocalPlaneUpdateDataIndexEvent(state.dataIndex + 1));
+                                        }
+                                      : null,
                             ),
                           )),
                     ]),

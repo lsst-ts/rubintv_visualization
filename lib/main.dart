@@ -31,6 +31,7 @@ import 'package:rubintv_visualization/app.dart';
 import 'package:rubintv_visualization/workspace/data.dart';
 import 'package:rubintv_visualization/error.dart';
 import 'package:rubintv_visualization/utils/browser_logger.dart';
+import 'package:rubintv_visualization/id.dart';
 
 /// A function to get the current version of the application.
 Future<AppVersion> getAppVersion() async {
@@ -49,7 +50,9 @@ Future<AppVersion> getAppVersion() async {
 /// The main function for the application.
 Future main() async {
   // Initialize browser-based logging
+  final firstId = UniqueId.next();
   developer.log('Starting application with browser-based logging', name: 'rubinTV.visualization.main');
+  developer.log('Test value of global _nextId: $firstId', name: 'rubinTV.visualization.main');
 
   FlutterError.onError = (FlutterErrorDetails details) {
     if (details.exception is FlutterError) {

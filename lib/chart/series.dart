@@ -18,6 +18,7 @@
 ///
 /// You should have received a copy of the GNU General Public License
 /// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -161,24 +162,76 @@ class SeriesInfo {
       "marker": marker?.toJson(),
       "errorBars": errorBars?.toJson(),
       "axes": axes.map((e) => e.toJson()).toList(),
-      "fields": fields.entries.map((entry) => [entry.key.toJson(), entry.value.toJson()]).toList(),
+      "fields": Map<String, dynamic>.fromEntries(
+          fields.entries.map((entry) => MapEntry(entry.key.toJson(), entry.value.toJson()))),
       "query": query?.toJson(),
     };
   }
 
   /// Create a [SeriesInfo] from a JSON object.
   static SeriesInfo fromJson(Map<String, dynamic> json) {
-    return SeriesInfo(
-      id: SeriesId.fromString(json["id"]),
-      name: json["name"],
-      marker: json["marker"] == null ? null : Marker.fromJson(json["marker"]),
-      errorBars: json["errorBars"] == null ? null : ErrorBars.fromJson(json["errorBars"]),
-      axes: (json["axes"] as List).map((e) => AxisId.fromJson(e)).toList(),
-      fields: Map.fromEntries((json["fields"] as List).map((e) {
-        List<dynamic> entry = e;
-        return MapEntry(AxisId.fromJson(entry[0]), SchemaField.fromJson(entry[1]));
-      })),
-      query: json["query"] == null ? null : QueryExpression.fromJson(json["query"]),
-    );
+    try {
+      Map<AxisId, SchemaField> fields = {};
+
+      if (json["fields"] is List) {
+        // Handle old format: list of pairs
+        developer.log("Processing fields as list format", name: "rubintv.chart.series");
+        for (dynamic fieldItem in json["fields"]) {
+          if (fieldItem is List && fieldItem.length == 2) {
+            var axisData = fieldItem[0];
+            var fieldData = fieldItem[1];
+
+            developer.log("Processing field pair: $axisData -> $fieldData", name: "rubintv.chart.series");
+
+            if (axisData != null && fieldData != null) {
+              AxisId axisId = AxisId.fromJson(axisData);
+              SchemaField field = SchemaField.fromJson(fieldData as Map<String, dynamic>);
+              fields[axisId] = field;
+              developer.log("Field processed from list: $axisId -> ${field.name}",
+                  name: "rubintv.chart.series");
+            } else {
+              developer.log("Skipping null field pair: $axisData -> $fieldData",
+                  name: "rubintv.chart.series");
+            }
+          } else {
+            developer.log("Invalid field item format: $fieldItem", name: "rubintv.chart.series");
+          }
+        }
+      } else if (json["fields"] is Map) {
+        // Handle new format: map
+        developer.log("Processing fields as map format", name: "rubintv.chart.series");
+        Map<String, dynamic> fieldsMap = json["fields"] as Map<String, dynamic>;
+        for (MapEntry<String, dynamic> entry in fieldsMap.entries) {
+          developer.log("Processing field: ${entry.key} -> ${entry.value}", name: "rubintv.chart.series");
+          if (entry.value != null) {
+            AxisId axisId = AxisId.fromJson(entry.key);
+            SchemaField field = SchemaField.fromJson(entry.value as Map<String, dynamic>);
+            fields[axisId] = field;
+            developer.log("Field processed from map: ${axisId} -> ${field.name}",
+                name: "rubintv.chart.series");
+          } else {
+            developer.log("Skipping null field value for key: ${entry.key}", name: "rubintv.chart.series");
+          }
+        }
+      } else {
+        developer.log("Unknown fields format: ${json["fields"].runtimeType}", name: "rubintv.chart.series");
+        throw ArgumentError("Unknown fields format in JSON");
+      }
+
+      return SeriesInfo(
+        id: SeriesId.fromString(json["id"]),
+        name: json["name"],
+        axes: List<AxisId>.from(json["axes"].map((e) => AxisId.fromJson(e))),
+        fields: fields,
+        query: json.containsKey("query") && json["query"] != null
+            ? QueryExpression.fromJson(json["query"])
+            : null,
+      );
+    } catch (e, stackTrace) {
+      developer.log("Error in SeriesInfo.fromJson: $e",
+          name: "rubintv.chart.series", error: e, stackTrace: stackTrace);
+      developer.log("Full JSON: $json", name: "rubintv.chart.series");
+      rethrow;
+    }
   }
 }

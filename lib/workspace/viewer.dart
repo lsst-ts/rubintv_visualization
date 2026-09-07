@@ -33,6 +33,7 @@ import 'package:rubintv_visualization/workspace/controller.dart';
 import 'package:rubintv_visualization/workspace/state.dart';
 import 'package:rubintv_visualization/workspace/toolbar.dart';
 import 'package:rubintv_visualization/workspace/window.dart';
+import 'package:rubintv_visualization/id.dart';
 
 /// A [Widget] used to display a set of re-sizable and translatable [WindowMetaData] widgets in a container.
 class WorkspaceViewer extends StatefulWidget {
@@ -85,21 +86,29 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   /// The current state of the workspace.
   WorkspaceState? info;
-  UniqueKey get id => UniqueKey();
+
+  /// Use a stable ID for the workspace viewer's subscription
+  final Object _viewerId = Object();
 
   @override
   void initState() {
-    developer.log("Initializing WorkspaceViewerState", name: "rubin_chart.workspace");
     super.initState();
+    ControlCenter().selectionController.subscribe(_viewerId, _onSelectionUpdate);
+  }
 
-    ControlCenter().selectionController.subscribe(id, _onSelectionUpdate);
+  @override
+  void dispose() {
+    ControlCenter().selectionController.unsubscribe(_viewerId);
+    super.dispose();
   }
 
   /// Update the selection data points.
   /// This isn't used now, but can be used in the future if any plots cannot be
   /// matched to obs_date,seq_num data IDs.
   void _onSelectionUpdate(Object? origin, Set<Object> dataPoints) {
-    developer.log("Selection updated: ${dataPoints.length}", name: "rubin_chart.workspace");
+    developer.log("=== WORKSPACE VIEWER SELECTION UPDATE ===", name: "rubintv.workspace.viewer");
+    developer.log("Workspace viewer received selection update from $origin: ${dataPoints.length} points",
+        name: "rubintv.workspace.viewer");
   }
 
   @override
@@ -107,15 +116,60 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
     return BlocProvider(
       create: (context) => WorkspaceBloc()..add(InitializeWorkspaceEvent(theme, version)),
       child: BlocBuilder<WorkspaceBloc, WorkspaceStateBase>(
+        buildWhen: (previous, current) {
+          // Always rebuild if state types are different
+          if (previous.runtimeType != current.runtimeType) {
+            developer.log("State type changed - rebuilding", name: "rubintv.workspace.viewer");
+            return true;
+          }
+
+          // Always rebuild if we're coming from or going to initial state
+          if (previous is WorkspaceStateInitial || current is WorkspaceStateInitial) {
+            developer.log("Initial state transition - rebuilding", name: "rubintv.workspace.viewer");
+            return true;
+          }
+
+          if (previous is WorkspaceState && current is WorkspaceState) {
+            // Always rebuild if instrument changed - this indicates a new workspace
+            if (previous.instrument != current.instrument) {
+              developer.log("Instrument changed - rebuilding", name: "rubintv.workspace.viewer");
+              return true;
+            }
+
+            // Rebuild if window count changed
+            if (previous.windows.length != current.windows.length) {
+              developer.log("Window count changed - rebuilding", name: "rubintv.workspace.viewer");
+              return true;
+            }
+
+            // If we have the same windows but different references, rebuild
+            // This handles updates to individual windows
+            for (UniqueId id in current.windows.keys) {
+              if (previous.windows.containsKey(id) && previous.windows[id] != current.windows[id]) {
+                return true;
+              }
+            }
+
+            return false;
+          }
+
+          // For any other case, rebuild to be safe
+          developer.log("Unhandled state combination - rebuilding", name: "rubintv.workspace.viewer");
+          return true;
+        },
         builder: (context, state) {
           if (state is WorkspaceStateInitial) {
+            developer.log("Workspace state is initial - showing progress indicator",
+                name: "rubintv.workspace.viewer");
             return const Center(
               child: CircularProgressIndicator(),
             );
           }
-
+          info = state as WorkspaceState?;
           if (state is WorkspaceState) {
-            info = state;
+            developer.log(
+                "Workspace state loaded: ${state.windows.length} windows, instrument=${state.instrument?.name}",
+                name: "rubintv.workspace.viewer");
             return Column(children: [
               Toolbar(workspace: state),
               SizedBox(
@@ -124,13 +178,17 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
                 child: Builder(
                   builder: (BuildContext context) {
                     List<Widget> children = [];
-                    for (WindowMetaData window in info!.windows.values) {
+                    for (WindowMetaData window in state.windows.values) {
+                      developer.log("Building window ${window.id} of type ${window.windowType}",
+                          name: "rubintv.workspace.viewer");
                       children.add(Positioned(
+                        key: ValueKey(window.id), // Add unique key to force recreation
                         left: window.offset.dx,
                         top: window.offset.dy,
                         child: buildWindow(window, state),
                       ));
                     }
+                    developer.log("Built ${children.length} windows", name: "rubintv.workspace.viewer");
 
                     return Stack(
                       children: children,
@@ -149,20 +207,25 @@ class WorkspaceViewerState extends State<WorkspaceViewer> {
 
   /// Build a window widget based on the type of the window.
   Widget buildWindow(WindowMetaData window, WorkspaceState workspace) {
+    developer.log("Building window widget for ${window.id} type ${window.windowType}",
+        name: "rubintv.workspace.viewer");
+
     if (window.windowType == WindowTypes.cartesianScatter || window.windowType == WindowTypes.polarScatter) {
-      return ScatterPlotWidget(window: window, bloc: window.bloc as ChartBloc);
+      return ScatterPlotWidget(key: ValueKey(window.id), window: window, bloc: window.bloc as ChartBloc);
     }
     if (window.windowType == WindowTypes.histogram || window.windowType == WindowTypes.box) {
-      return BinnedChartWidget(window: window, bloc: window.bloc as ChartBloc);
+      return BinnedChartWidget(key: ValueKey(window.id), window: window, bloc: window.bloc as ChartBloc);
     }
     if (window.windowType == WindowTypes.detectorSelector) {
       return DetectorSelector(
+        key: ValueKey(window.id),
         window: window,
         workspace: workspace,
       );
     }
     if (window.windowType == WindowTypes.focalPlane) {
       return FocalPlaneChartViewer(
+        key: ValueKey(window.id),
         window: window,
         workspace: workspace,
         bloc: window.bloc as FocalPlaneChartBloc,

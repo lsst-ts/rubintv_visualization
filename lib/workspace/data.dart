@@ -174,9 +174,43 @@ class SchemaField {
   /// that is already loaded by the [DataCenter].
   static SchemaField fromJson(Map<String, dynamic> json) {
     DataCenter dataCenter = DataCenter();
-    TableSchema schema =
-        dataCenter.databases[json["database"]]!.tables.values.firstWhere((e) => e.name == json["schema"]);
-    return schema.fields[json["name"]]!;
+    developer.log("Available databases: ${dataCenter.databases.keys}", name: "rubintv.workspace.data");
+
+    if (!dataCenter.databases.containsKey(json["database"])) {
+      String errorMsg =
+          "Database '${json["database"]}' not found. Available databases: ${dataCenter.databases.keys.join(', ')}";
+      developer.log(errorMsg, name: "rubintv.workspace.data");
+      reportError("Workspace load error: $errorMsg");
+      throw ArgumentError(errorMsg);
+    }
+
+    DatabaseSchema database = dataCenter.databases[json["database"]]!;
+    developer.log("Available tables in database: ${database.tables.keys}", name: "rubintv.workspace.data");
+
+    TableSchema? schema;
+    try {
+      schema = database.tables.values.firstWhere((e) => e.name == json["schema"]);
+      developer.log("Found schema: ${schema.name}", name: "rubintv.workspace.data");
+    } catch (e) {
+      String errorMsg = "Table '${json["schema"]}' not found in database '${json["database"]}'. "
+          "Available tables: ${database.tables.keys.join(', ')}. "
+          "This workspace may have been saved with a different instrument schema.";
+      developer.log(errorMsg, name: "rubintv.workspace.data");
+      reportError("Workspace load error: $errorMsg");
+      throw ArgumentError(errorMsg);
+    }
+
+    if (!schema.fields.containsKey(json["name"])) {
+      String errorMsg = "Field '${json["name"]}' not found in table '${schema.name}'. "
+          "Available fields: ${schema.fields.keys.join(', ')}";
+      developer.log(errorMsg, name: "rubintv.workspace.data");
+      reportError("Workspace load error: $errorMsg");
+      throw ArgumentError(errorMsg);
+    }
+
+    SchemaField result = schema.fields[json["name"]]!;
+    developer.log("Schema field found successfully: ${result.name}", name: "rubintv.workspace.data");
+    return result;
   }
 }
 
@@ -199,6 +233,15 @@ class TableSchema {
       field.schema = this;
     }
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is TableSchema && other.name == name && other.database.name == database.name;
+  }
+
+  @override
+  int get hashCode => Object.hash(name, database.name);
 }
 
 /// A data source.
@@ -384,18 +427,28 @@ class DataCenter {
   }) {
     // Extensive validation
     if (data.isEmpty) {
+      developer.log("No data found for series ${series.id}", name: "rubintv_visualization.workspace.data");
       reportError("No data found for the selected columns.");
       return;
     }
 
     // Check if any data lists are empty
     if (data.values.any((list) => list.isEmpty)) {
+      developer.log("Empty data lists found for series ${series.id}",
+          name: "rubintv_visualization.workspace.data");
+      developer.log(
+          "Data keys with empty lists: ${data.entries.where((e) => e.value.isEmpty).map((e) => e.key)}",
+          name: "rubintv_visualization.workspace.data");
       reportError("One or more columns contain no data.");
       return;
     }
 
     int rows = data.values.first.length;
+    developer.log("Data has $rows rows", name: "rubintv_visualization.workspace.data");
+
     if (rows == 0) {
+      developer.log("No non-null data found for series ${series.id}",
+          name: "rubintv_visualization.workspace.data");
       reportError("No non-null data found for the selected columns.");
       return;
     }
@@ -455,18 +508,37 @@ class DataCenter {
         }
 
         SchemaField field = dataSource.tables[tableName]!.fields[columnName]!;
-        if (series.fields.containsValue(field)) {
+
+        // Find matching field by name and table instead of object reference
+        SchemaField? matchingSeriesField;
+        AxisId? matchingAxisId;
+
+        for (MapEntry<AxisId, SchemaField> entry in series.fields.entries) {
+          SchemaField seriesField = entry.value;
+          if (seriesField.name == field.name &&
+              seriesField.schema.name == field.schema.name &&
+              seriesField.database.name == field.database.name) {
+            matchingSeriesField = field;
+            matchingAxisId = entry.key;
+            break;
+          }
+        }
+
+        if (matchingSeriesField != null && matchingAxisId != null) {
           if (field.isString) {
-            columns[field] = List<String>.from(data[plotColumn]!.map((e) => e));
+            columns[matchingSeriesField] = List<String>.from(data[plotColumn]!.map((e) => e));
           } else if (field.isNumerical) {
-            columns[field] = List<double>.from(data[plotColumn]!.map((e) => e.toDouble()));
+            columns[matchingSeriesField] = List<double>.from(data[plotColumn]!.map((e) => e.toDouble()));
           } else if (field.isDateTime) {
-            columns[field] = List<DateTime>.from(data[plotColumn]!.map((e) => convertRubinDate(e)));
+            columns[matchingSeriesField] =
+                List<DateTime>.from(data[plotColumn]!.map((e) => convertRubinDate(e)));
           }
 
           // Add the column to the series columns
-          AxisId axisId = series.axes[series.fields.values.toList().indexOf(field)];
-          seriesColumns[axisId] = field;
+          seriesColumns[matchingAxisId] = matchingSeriesField;
+        } else {
+          reportError("Plot column '$plotColumn' does not match any series fields.");
+          return;
         }
       }
 
@@ -491,22 +563,16 @@ class DataCenter {
         dataIds: dataIds,
       );
 
+      developer.log("Series data updated successfully for ${series.id}",
+          name: "rubintv_visualization.workspace.data");
       _seriesData[series.id] = seriesData;
     } else {
       throw DataAccessException("Unknown data source: $dataSource");
     }
   }
 
-  /// Check if two [SchemaField]s are compatible
-  bool isFieldCompatible(SchemaField field1, SchemaField field2) => {
-        field1.dataType == field2.dataType,
-        field1.unit == field2.unit,
-      }.every((e) => e);
-
-  @override
-  String toString() => "DataCenter:[${databases.keys}]";
-
   void removeSeriesData(SeriesId id) {
+    developer.log("Removing series data for $id", name: "rubintv_visualization.workspace.data");
     _seriesData.remove(id);
   }
 
@@ -517,6 +583,12 @@ class DataCenter {
   void dispose() {
     _subscription.cancel();
   }
+
+  /// Check if two [SchemaField]s are compatible
+  bool isFieldCompatible(SchemaField field1, SchemaField field2) => {
+        field1.dataType == field2.dataType,
+        field1.unit == field2.unit,
+      }.every((e) => e);
 }
 
 /// DataId for an entry in the exposure or visit table
